@@ -29,7 +29,6 @@ describe("RPC Methods", () => {
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
@@ -41,6 +40,8 @@ describe("RPC Methods", () => {
       ...extra,
     }) as Promise<ExecutionRun>;
   }
+
+  // ─── Existing functional tests ─────────────────────────────────────────
 
   describe("run.list / run.create", () => {
     it("should list empty runs initially", async () => {
@@ -128,7 +129,7 @@ describe("RPC Methods", () => {
         content: "",
         type: "user_defined",
         priority: 1,
-      })).rejects.toThrow("content is required");
+      })).rejects.toThrow("non-empty string");
     });
 
     it("should reject invalid runId", async () => {
@@ -161,7 +162,6 @@ describe("RPC Methods", () => {
 
     it("should reject completed run", async () => {
       const run = await createRun();
-      // Mark as completed directly in the store
       const { Store } = await import("../../src-engine/src/db/store.js");
       const store = new Store(testDir);
       run.status = "completed";
@@ -284,7 +284,6 @@ describe("RPC Methods", () => {
     it("should validate a wizard session with fallback params", async () => {
       const session = await methodHandlers["wizard.start"]({ workingDir: "/tmp/test" }) as Record<string, unknown>;
       const result = await methodHandlers["wizard.validate"]({ sessionId: session.sessionId }) as Record<string, unknown>;
-      // Fallback params from empty session are actually valid (non-empty content, goals, conditions)
       expect(result.valid).toBe(true);
       expect(result.params).toBeDefined();
     });
@@ -292,14 +291,290 @@ describe("RPC Methods", () => {
 
   describe("config.get / config.set", () => {
     it("should get and set config values", async () => {
-      await methodHandlers["config.set"]({ key: "testKey", value: "hello" });
-      const result = await methodHandlers["config.get"]({ key: "testKey" }) as Record<string, unknown>;
-      expect(result.value).toBe("hello");
+      await methodHandlers["config.set"]({ key: "defaultModel", value: "claude" });
+      const result = await methodHandlers["config.get"]({ key: "defaultModel" }) as Record<string, unknown>;
+      expect(result.value).toBe("claude");
     });
 
     it("should return undefined for unknown keys", async () => {
       const result = await methodHandlers["config.get"]({ key: "nonexistent" }) as Record<string, unknown>;
       expect(result.value).toBeUndefined();
     });
+  });
+
+  // ─── Input validation tests ────────────────────────────────────────────
+
+  describe("Input validation — runId", () => {
+    const RUN_METHODS_WITH_RUNID = [
+      "run.report", "run.tasks", "run.commits", "run.lessons",
+      "run.stop", "run.delete", "task.start", "task.pause",
+      "task.resume", "queue.list",
+    ];
+
+    for (const method of RUN_METHODS_WITH_RUNID) {
+      describe(`${method}`, () => {
+        it("should reject missing runId", async () => {
+          await expect(methodHandlers[method]({}))
+            .rejects.toThrow("Missing required parameter: runId");
+        });
+
+        it("should reject null runId", async () => {
+          await expect(methodHandlers[method]({ runId: null }))
+            .rejects.toThrow("Missing required parameter: runId");
+        });
+
+        it("should reject non-string runId", async () => {
+          await expect(methodHandlers[method]({ runId: 123 }))
+            .rejects.toThrow("Parameter 'runId' must be a string");
+        });
+      });
+    }
+
+    it("should reject runId with path traversal (..)", async () => {
+      await expect(methodHandlers["run.report"]({ runId: "../etc/passwd" }))
+        .rejects.toThrow("invalid path characters");
+      await expect(methodHandlers["run.tasks"]({ runId: "abc../def" }))
+        .rejects.toThrow("invalid path characters");
+    });
+
+    it("should reject runId containing forward slash", async () => {
+      await expect(methodHandlers["run.commits"]({ runId: "run/secret" }))
+        .rejects.toThrow("invalid path characters");
+    });
+
+    it("should reject runId containing backslash", async () => {
+      await expect(methodHandlers["run.lessons"]({ runId: "run\\secret" }))
+        .rejects.toThrow("invalid path characters");
+    });
+  });
+
+  describe("Input validation — task.cancel", () => {
+    it("should reject missing taskId", async () => {
+      await expect(methodHandlers["task.cancel"]({ runId: "r1" }))
+        .rejects.toThrow("Missing required parameter: taskId");
+    });
+
+    it("should reject non-string taskId", async () => {
+      await expect(methodHandlers["task.cancel"]({ runId: "r1", taskId: 42 }))
+        .rejects.toThrow("Parameter 'taskId' must be a string");
+    });
+
+    it("should reject missing runId", async () => {
+      await expect(methodHandlers["task.cancel"]({ taskId: "t1" }))
+        .rejects.toThrow("Missing required parameter: runId");
+    });
+  });
+
+  describe("Input validation — task.setTimeout", () => {
+    it("should reject missing minutes", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ runId: "r1", taskId: "t1" }))
+        .rejects.toThrow("between 1 and 1440");
+    });
+
+    it("should reject non-number minutes", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ runId: "r1", taskId: "t1", minutes: "abc" }))
+        .rejects.toThrow("between 1 and 1440");
+    });
+
+    it("should reject NaN minutes", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ runId: "r1", taskId: "t1", minutes: NaN }))
+        .rejects.toThrow("between 1 and 1440");
+    });
+
+    it("should reject Infinity minutes", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ runId: "r1", taskId: "t1", minutes: Infinity }))
+        .rejects.toThrow("between 1 and 1440");
+    });
+
+    it("should reject missing runId", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ taskId: "t1", minutes: 10 }))
+        .rejects.toThrow("Missing required parameter: runId");
+    });
+
+    it("should reject missing taskId", async () => {
+      await expect(methodHandlers["task.setTimeout"]({ runId: "r1", minutes: 10 }))
+        .rejects.toThrow("Missing required parameter: taskId");
+    });
+  });
+
+  describe("Input validation — task.create", () => {
+    it("should reject missing runId", async () => {
+      await expect(methodHandlers["task.create"]({ content: "test", type: "user_defined", priority: 1 }))
+        .rejects.toThrow("Missing required parameter: runId");
+    });
+
+    it("should reject missing content", async () => {
+      await expect(methodHandlers["task.create"]({ runId: "r1", type: "user_defined", priority: 1 }))
+        .rejects.toThrow("Missing required parameter: content");
+    });
+
+    it("should reject whitespace-only content", async () => {
+      await expect(methodHandlers["task.create"]({ runId: "r1", content: "   ", type: "user_defined", priority: 1 }))
+        .rejects.toThrow("non-empty string");
+    });
+
+    it("should reject non-string content", async () => {
+      await expect(methodHandlers["task.create"]({ runId: "r1", content: 42, type: "user_defined", priority: 1 }))
+        .rejects.toThrow("Parameter 'content' must be a string");
+    });
+
+    it("should reject runId with path traversal", async () => {
+      await expect(methodHandlers["task.create"]({ runId: "../etc", content: "test" }))
+        .rejects.toThrow("invalid path characters");
+    });
+  });
+
+  describe("Input validation — queue.reorder", () => {
+    it("should reject missing runId", async () => {
+      await expect(methodHandlers["queue.reorder"]({ taskIds: ["a"] }))
+        .rejects.toThrow("Missing required parameter: runId");
+    });
+
+    it("should reject non-string elements in taskIds", async () => {
+      await expect(methodHandlers["queue.reorder"]({ runId: "r1", taskIds: [1, 2] }))
+        .rejects.toThrow("taskIds[0] must be a string");
+    });
+
+    it("should reject runId with path traversal", async () => {
+      await expect(methodHandlers["queue.reorder"]({ runId: "../etc", taskIds: ["a"] }))
+        .rejects.toThrow("invalid path characters");
+    });
+  });
+
+  describe("Input validation — run.create", () => {
+    it("should reject missing workingDir", async () => {
+      await expect(methodHandlers["run.create"]({ goals: ["g1"], terminationConditions: ["c1"] }))
+        .rejects.toThrow("Missing required parameter: workingDir");
+    });
+
+    it("should reject empty workingDir", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "", goals: ["g1"], terminationConditions: ["c1"] }))
+        .rejects.toThrow("non-empty string");
+    });
+
+    it("should reject missing goals", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "/tmp/t", terminationConditions: ["c1"] }))
+        .rejects.toThrow("goals");
+    });
+
+    it("should reject empty goals array", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "/tmp/t", goals: [], terminationConditions: ["c1"] }))
+        .rejects.toThrow("goals");
+    });
+
+    it("should reject missing terminationConditions", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "/tmp/t", goals: ["g1"] }))
+        .rejects.toThrow("terminationConditions");
+    });
+
+    it("should reject empty terminationConditions array", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "/tmp/t", goals: ["g1"], terminationConditions: [] }))
+        .rejects.toThrow("terminationConditions");
+    });
+
+    it("should reject non-array tasks", async () => {
+      await expect(methodHandlers["run.create"]({ workingDir: "/tmp/t", goals: ["g1"], terminationConditions: ["c1"], tasks: "bad" }))
+        .rejects.toThrow("tasks");
+    });
+  });
+
+  describe("Input validation — wizard.start", () => {
+    it("should reject missing workingDir", async () => {
+      await expect(methodHandlers["wizard.start"]({}))
+        .rejects.toThrow("Missing required parameter: workingDir");
+    });
+
+    it("should reject empty workingDir", async () => {
+      await expect(methodHandlers["wizard.start"]({ workingDir: "" }))
+        .rejects.toThrow("non-empty string");
+    });
+  });
+
+  describe("Input validation — wizard.chat", () => {
+    it("should reject missing sessionId", async () => {
+      await expect(methodHandlers["wizard.chat"]({ message: "hi" }))
+        .rejects.toThrow("Missing required parameter: sessionId");
+    });
+
+    it("should reject missing message", async () => {
+      await expect(methodHandlers["wizard.chat"]({ sessionId: "s1" }))
+        .rejects.toThrow("Missing required parameter: message");
+    });
+
+    it("should reject empty message", async () => {
+      await expect(methodHandlers["wizard.chat"]({ sessionId: "s1", message: "" }))
+        .rejects.toThrow("non-empty string");
+    });
+  });
+
+  describe("Input validation — wizard.validate", () => {
+    it("should reject missing sessionId", async () => {
+      await expect(methodHandlers["wizard.validate"]({}))
+        .rejects.toThrow("Missing required parameter: sessionId");
+    });
+
+    it("should reject non-string sessionId", async () => {
+      await expect(methodHandlers["wizard.validate"]({ sessionId: 123 }))
+        .rejects.toThrow("Parameter 'sessionId' must be a string");
+    });
+  });
+
+  describe("Input validation — config.get", () => {
+    it("should reject missing key", async () => {
+      await expect(methodHandlers["config.get"]({}))
+        .rejects.toThrow("Missing required parameter: key");
+    });
+
+    it("should reject non-string key", async () => {
+      await expect(methodHandlers["config.get"]({ key: 42 }))
+        .rejects.toThrow("Parameter 'key' must be a string");
+    });
+  });
+
+  describe("Input validation — config.set", () => {
+    it("should reject missing key", async () => {
+      await expect(methodHandlers["config.set"]({ value: "v" }))
+        .rejects.toThrow("Missing required parameter: key");
+    });
+
+    it("should reject disallowed key", async () => {
+      await expect(methodHandlers["config.set"]({ key: "evilKey", value: "v" }))
+        .rejects.toThrow("not allowed");
+    });
+
+    it("should allow known config keys", async () => {
+      // defaultModel is in the allow list, no numeric constraints
+      const result = await methodHandlers["config.set"]({ key: "defaultModel", value: "claude" }) as Record<string, unknown>;
+      expect(result.saved).toBe(true);
+    });
+
+    it("should enforce numeric constraints on maxBudgetUsd", async () => {
+      await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: -1 }))
+        .rejects.toThrow("between 0 and 1000");
+      await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: 2000 }))
+        .rejects.toThrow("between 0 and 1000");
+      await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: "abc" }))
+        .rejects.toThrow("finite number");
+    });
+
+    it("should accept valid numeric config", async () => {
+      const result = await methodHandlers["config.set"]({ key: "maxBudgetUsd", value: 50 }) as Record<string, unknown>;
+      expect(result.saved).toBe(true);
+    });
+  });
+
+  describe("Path traversal protection across methods", () => {
+    const METHODS_WITH_RUNID = [
+      "run.report", "run.tasks", "run.commits", "run.lessons",
+      "run.stop", "run.delete", "task.start", "task.pause",
+      "task.resume", "queue.list",
+    ];
+
+    for (const method of METHODS_WITH_RUNID) {
+      it(`${method} should reject runId with ".."`, async () => {
+        await expect(methodHandlers[method]({ runId: "../etc/passwd" }))
+          .rejects.toThrow("invalid path characters");
+      });
+    }
   });
 });

@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket, type Data } from "ws";
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
 import { RPC_ERRORS } from "@ai-workbench/shared";
-import { methodHandlers } from "./json-rpc/methods.js";
+import { methodHandlers, RpcValidationError } from "./json-rpc/methods.js";
 
 const PORT = 9731;
 const HEARTBEAT_INTERVAL_MS = 30000;
@@ -129,15 +129,23 @@ export class WsServer {
       this.send(ws, { jsonrpc: "2.0", id: req.id, result });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[rpc] ${req.method} failed: ${errMsg}`);
-      this.send(ws, {
-        jsonrpc: "2.0",
-        id: req.id,
-        error: {
-          code: RPC_ERRORS.INTERNAL_ERROR.code,
-          message: err instanceof Error ? err.message : String(err),
-        },
-      });
+      if (err instanceof RpcValidationError) {
+        this.send(ws, {
+          jsonrpc: "2.0",
+          id: req.id,
+          error: { code: RPC_ERRORS.INVALID_PARAMS.code, message: errMsg },
+        });
+      } else {
+        console.error(`[rpc] ${req.method} failed: ${errMsg}`);
+        this.send(ws, {
+          jsonrpc: "2.0",
+          id: req.id,
+          error: {
+            code: RPC_ERRORS.INTERNAL_ERROR.code,
+            message: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     }
   }
 

@@ -10,6 +10,42 @@ const store = new Store();
 const queueManager = new QueueManager();
 const activeExecutors = new Map<string, Executor>();
 
+// ─── Validation helpers ────────────────────────────────────────────────
+
+export class RpcValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RpcValidationError";
+  }
+}
+
+function requireString(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  if (value === undefined || value === null) {
+    throw new RpcValidationError(`Missing required parameter: ${key}`);
+  }
+  if (typeof value !== "string") {
+    throw new RpcValidationError(`Parameter '${key}' must be a string, got ${typeof value}`);
+  }
+  return value;
+}
+
+function requireNonEmptyString(params: Record<string, unknown>, key: string): string {
+  const value = requireString(params, key);
+  if (value.trim().length === 0) {
+    throw new RpcValidationError(`Parameter '${key}' must be a non-empty string`);
+  }
+  return value;
+}
+
+function validateRunId(runId: string): void {
+  if (runId.includes("..") || runId.includes("/") || runId.includes("\\")) {
+    throw new RpcValidationError("runId contains invalid path characters");
+  }
+}
+
+// ─── Working dir validation ────────────────────────────────────────────
+
 const SYSTEM_DIRS = [
   "/etc", "/usr", "/bin", "/sbin", "/var", "/sys", "/proc", "/dev",
   "/boot", "/lib", "/lib64", "/snap", "/nix",
@@ -40,12 +76,25 @@ function validateWorkingDir(dir: string): string {
   return resolved;
 }
 
+// ─── Config constraints ────────────────────────────────────────────────
+
 const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> = {
   maxBudgetUsd: { min: 0, max: 1000 },
   maxEvalLoops: { min: 1, max: 100 },
   stagnationThreshold: { min: 0, max: 1 },
   maxConcurrentTasks: { min: 1, max: 10 },
 };
+
+const ALLOWED_CONFIG_KEYS = new Set([
+  "maxBudgetUsd",
+  "maxEvalLoops",
+  "stagnationThreshold",
+  "maxConcurrentTasks",
+  "defaultModel",
+  "defaultAgentMode",
+]);
+
+// ─── Notify / shutdown ─────────────────────────────────────────────────
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 let notify: NotifyFn = () => {};
@@ -63,6 +112,8 @@ export function shutdown(): void {
 
 type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
 
+// ─── Method handlers ───────────────────────────────────────────────────
+
 export const methodHandlers: Record<string, MethodHandler> = {
   "run.list": async () => {
     return store.listRuns();
@@ -70,7 +121,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "run.create": async (params) => {
     const p = params as unknown as CreateRunParams;
-    const safeWorkingDir = validateWorkingDir(p.workingDir);
+    const safeWorkingDir = validateWorkingDir(
+      requireNonEmptyString(params, "workingDir"),
+    );
+    if (!Array.isArray(p.goals) || p.goals.length === 0) {
+      throw new RpcValidationError("Parameter 'goals' must be a non-empty array");
+    }
+    if (!Array.isArray(p.terminationConditions) || p.terminationConditions.length === 0) {
+      throw new RpcValidationError("Parameter 'terminationConditions' must be a non-empty array");
+    }
     const run: ExecutionRun = {
       id: crypto.randomUUID(),
       workingDir: safeWorkingDir,
@@ -83,6 +142,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
     store.saveRun(run);
 
     if (p.tasks) {
+      if (!Array.isArray(p.tasks)) {
+        throw new RpcValidationError("Parameter 'tasks' must be an array when provided");
+      }
       for (const t of p.tasks) {
         const task = queueManager.enqueue(run.id, t);
         store.saveTask(run.id, task);
@@ -93,29 +155,34 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "run.report": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const run = store.getRun(runId);
     const report = store.getReport(runId);
     return { run, report };
   },
 
   "run.tasks": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     return store.listTasks(runId);
   },
 
   "run.commits": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     return store.getCommits(runId);
   },
 
   "run.lessons": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     return store.getLessons(runId);
   },
 
   "run.stop": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const executor = activeExecutors.get(runId);
     if (executor) {
       executor.stop();
@@ -130,7 +197,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "run.delete": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const executor = activeExecutors.get(runId);
     if (executor) {
       executor.stop();
@@ -142,32 +210,32 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "task.create": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const content = requireNonEmptyString(params, "content");
+    if (!store.getRun(runId)) {
+      throw new RpcValidationError(`Run not found: ${runId}`);
+    }
     const p = params as unknown as CreateTaskParams & { runId: string };
-    if (!p.runId || !store.getRun(p.runId)) {
-      throw new Error(`Run not found: ${p.runId || "missing"}`);
-    }
-    if (!p.content?.trim()) {
-      throw new Error("Task content is required");
-    }
-    const task = queueManager.enqueue(p.runId, p);
-    store.saveTask(p.runId, task);
+    const task = queueManager.enqueue(runId, { ...p, content, runId });
+    store.saveTask(runId, task);
     return task;
   },
 
   "task.start": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const run = store.getRun(runId);
-    if (!run) throw new Error(`Run ${runId} not found`);
+    if (!run) throw new RpcValidationError(`Run ${runId} not found`);
 
     if (run.status === "completed" || run.status === "failed") {
-      throw new Error(`Run ${runId} is already ${run.status} and cannot be restarted`);
+      throw new RpcValidationError(`Run ${runId} is already ${run.status} and cannot be restarted`);
     }
 
     if (activeExecutors.has(runId)) {
-      throw new Error(`Run ${runId} already has an active executor`);
+      throw new RpcValidationError(`Run ${runId} already has an active executor`);
     }
 
-    // Reload pending tasks into queue from store
     const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
     for (const t of pendingTasks) {
       if (!queueManager.list(runId).some((q) => q.id === t.id)) {
@@ -190,7 +258,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "task.pause": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const executor = activeExecutors.get(runId);
     if (executor) {
       executor.stop();
@@ -205,7 +274,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "task.resume": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const run = store.getRun(runId);
     if (run && run.status === "paused") {
       const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
@@ -226,7 +296,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "task.cancel": async (params) => {
-    const { taskId, runId } = params as { taskId: string; runId: string };
+    const runId = requireString(params, "runId");
+    const taskId = requireString(params, "taskId");
+    validateRunId(runId);
     const executor = activeExecutors.get(runId);
     if (executor) {
       executor.cancelTask(taskId, runId);
@@ -235,62 +307,80 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "task.setTimeout": async (params) => {
-    const { taskId, runId, minutes } = params as { taskId: string; runId: string; minutes: number };
-    if (!minutes || minutes < 1 || minutes > 1440) {
-      throw new Error("Timeout must be between 1 and 1440 minutes");
+    const runId = requireString(params, "runId");
+    const taskId = requireString(params, "taskId");
+    validateRunId(runId);
+    const { minutes } = params as { minutes: number };
+    if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      throw new RpcValidationError("Timeout must be a finite number between 1 and 1440 minutes");
     }
     store.updateTask(runId, taskId, { timeoutMinutes: minutes });
     return { taskId, timeoutMinutes: minutes };
   },
 
   "queue.list": async (params) => {
-    const { runId } = params as { runId: string };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     return { runId, queue: queueManager.list(runId) };
   },
 
   "queue.reorder": async (params) => {
-    const { runId, taskIds } = params as { runId: string; taskIds: string[] };
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const { taskIds } = params as { taskIds: unknown[] };
     if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw new Error("taskIds must be a non-empty array");
+      throw new RpcValidationError("Parameter 'taskIds' must be a non-empty array");
     }
-    queueManager.reorder(runId, taskIds);
+    for (let i = 0; i < taskIds.length; i++) {
+      if (typeof taskIds[i] !== "string") {
+        throw new RpcValidationError(`taskIds[${i}] must be a string`);
+      }
+    }
+    queueManager.reorder(runId, taskIds as string[]);
     return { runId, order: taskIds };
   },
 
   "wizard.start": async (params) => {
-    const { workingDir } = params as { workingDir: string };
+    const workingDir = requireNonEmptyString(params, "workingDir");
     const safeWorkingDir = validateWorkingDir(workingDir);
     const session = wizardHandler.startSession(safeWorkingDir);
     return { sessionId: session.sessionId, workingDir: session.workingDir };
   },
 
   "wizard.chat": async (params) => {
-    const { sessionId, message } = params as { sessionId: string; message: string };
+    const sessionId = requireString(params, "sessionId");
+    const message = requireNonEmptyString(params, "message");
     const result = await wizardHandler.chat(sessionId, message);
     return { sessionId, response: result.response, shouldExtractParams: result.shouldExtractParams };
   },
 
   "wizard.validate": async (params) => {
-    const { sessionId } = params as { sessionId: string };
+    const sessionId = requireString(params, "sessionId");
     const extracted = wizardHandler.extractParams(sessionId);
     const validation = wizardHandler.validateParams(extracted);
     return { sessionId, valid: validation.valid, errors: validation.errors, params: extracted };
   },
 
   "config.get": async (params) => {
-    const { key } = params as { key: string };
+    const key = requireString(params, "key");
     return { key, value: store.getConfig(key) };
   },
 
   "config.set": async (params) => {
-    const { key, value } = params as { key: string; value: unknown };
+    const key = requireString(params, "key");
+    if (!ALLOWED_CONFIG_KEYS.has(key)) {
+      throw new RpcValidationError(
+        `Config key '${key}' is not allowed. Allowed keys: ${[...ALLOWED_CONFIG_KEYS].join(", ")}`,
+      );
+    }
+    const { value } = params as { value: unknown };
     const constraints = NUMERIC_CONFIG_CONSTRAINTS[key];
     if (constraints) {
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        throw new Error(`config '${key}' must be a finite number, got: ${value}`);
+        throw new RpcValidationError(`config '${key}' must be a finite number, got: ${value}`);
       }
       if (value < constraints.min || value > constraints.max) {
-        throw new Error(`config '${key}' must be between ${constraints.min} and ${constraints.max}, got: ${value}`);
+        throw new RpcValidationError(`config '${key}' must be between ${constraints.min} and ${constraints.max}, got: ${value}`);
       }
     }
     store.setConfig(key, value);

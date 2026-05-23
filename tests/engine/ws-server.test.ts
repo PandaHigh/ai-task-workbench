@@ -166,7 +166,7 @@ describe("WsServer", () => {
       expect(Array.isArray(response.result)).toBe(true);
     });
 
-    it("should handle handler exceptions as internal error", async () => {
+    it("should handle validation errors as INVALID_PARAMS", async () => {
       const messageHandler = findHandler(ws.on.mock.calls, "message");
 
       await messageHandler!(JSON.stringify({
@@ -174,6 +174,20 @@ describe("WsServer", () => {
         method: "task.create",
         id: 99,
         params: { runId: "nonexistent", content: "test" },
+      }));
+      const response = JSON.parse(ws.send.mock.calls[0][0]);
+      expect(response.error.code).toBe(-32602);
+    });
+
+    it("should handle handler exceptions as internal error", async () => {
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
+
+      // run.create with a system dir triggers a non-validation Error (INTERNAL_ERROR)
+      await messageHandler!(JSON.stringify({
+        jsonrpc: "2.0",
+        method: "run.create",
+        id: 100,
+        params: { workingDir: "/etc", goals: ["g"], terminationConditions: ["c"] },
       }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32603);
