@@ -31,6 +31,8 @@ export function EvolutionDashboard() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQueue, setShowQueue] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -131,6 +133,11 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
+  const closeDrawers = () => {
+    setShowQueue(false);
+    setShowPanel(false);
+  };
+
   const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "—";
   const budgetUsed = run?.totalCostUsd ?? 0;
   const budgetMax = 50;
@@ -141,19 +148,22 @@ export function EvolutionDashboard() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div
-          className="px-6 py-3 border-b flex items-center justify-between"
+          className="px-6 py-3 border-b flex items-center justify-between max-md:px-3"
           style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
         >
-          <div className="flex items-center gap-3">
-            <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
-            <h2 className="text-sm font-bold">自进化看板</h2>
-            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
-            {run && <span className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
-            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80 shrink-0" style={{ color: "var(--text-secondary)" }} aria-label="返回">←</button>
+            <h2 className="text-sm font-bold truncate">自进化看板</h2>
+            <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
+            {run && <span className="text-xs px-2 py-0.5 rounded hidden md:inline" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
+            <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Mobile drawer toggles */}
+            <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 队列</button>
+            <button onClick={() => { setShowPanel(true); setShowQueue(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开控制面板">⚙ 面板</button>
             <RobotMascot mood={isRunning ? "working" : run?.status === "completed" ? "celebrating" : "idle"} size={32} />
-            <span className="status-badge" style={{
+            <span className="status-badge hidden md:inline" style={{
               background: isRunning ? "rgba(88, 166, 255, 0.15)" : run?.status === "completed" ? "rgba(63, 185, 80, 0.15)" : "rgba(125, 133, 144, 0.15)",
               color: isRunning ? "var(--blue)" : run?.status === "completed" ? "var(--green)" : "var(--text-secondary)",
             }}>
@@ -163,9 +173,9 @@ export function EvolutionDashboard() {
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          {/* Task Queue */}
+          {/* Task Queue - desktop: always visible sidebar, mobile: drawer */}
           <div
-            className="w-72 border-r flex flex-col"
+            className={`w-72 border-r flex flex-col max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`}
             style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
           >
             <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
@@ -173,6 +183,7 @@ export function EvolutionDashboard() {
               {queue.length > 0 && (
                 <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>拖拽排序</span>
               )}
+              <button onClick={() => setShowQueue(false)} className="md:hidden text-xs ml-2" style={{ color: "var(--text-secondary)" }} aria-label="关闭队列">✕</button>
             </div>
             <div role="listbox" aria-label="任务队列，可通过拖拽或 Ctrl+上下箭头排序" className="flex-1 overflow-y-auto p-2 space-y-1" onKeyDown={(e) => {
               if (focusIdx === null || queue.length === 0) return;
@@ -245,7 +256,7 @@ export function EvolutionDashboard() {
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
             <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
               {(["logs", "commits", "lessons"] as TabType[]).map((t) => (
@@ -258,7 +269,7 @@ export function EvolutionDashboard() {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "#010409" }}>
+            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs max-md:p-2" style={{ background: "#010409" }}>
               {loading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 8 }, (_, i) => (
@@ -348,13 +359,14 @@ export function EvolutionDashboard() {
         </div>
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar - desktop: always visible, mobile: drawer */}
       <div
-        className="glass-sidebar w-64 border-l flex flex-col"
+        className={`glass-sidebar w-64 border-l flex flex-col max-md:mobile-drawer max-md:mobile-drawer-right ${showPanel ? "" : "max-md:drawer-closed"}`}
         style={{ borderColor: "var(--border)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
       >
-        <div className="px-4 py-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>控制面板</h3>
+          <button onClick={() => setShowPanel(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }} aria-label="关闭面板">✕</button>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {/* Start / Pause */}
@@ -468,6 +480,15 @@ export function EvolutionDashboard() {
           )}
         </div>
       </div>
+
+      {/* Mobile drawer backdrop */}
+      {(showQueue || showPanel) && (
+        <div
+          className="fixed inset-0 md:hidden"
+          style={{ background: "rgba(0,0,0,0.5)", zIndex: 49 }}
+          onClick={closeDrawers}
+        />
+      )}
     </div>
   );
 }

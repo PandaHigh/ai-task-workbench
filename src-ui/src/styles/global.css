@@ -360,6 +360,32 @@ input[type="range"]::-moz-range-thumb {
   border: 2px solid var(--bg-primary);
 }
 
+/* Mobile responsive drawers */
+@media (max-width: 768px) {
+  .mobile-drawer {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+  }
+  .mobile-drawer-left {
+    left: 0;
+    background: var(--bg-primary);
+  }
+  .mobile-drawer-right {
+    right: 0;
+    background: var(--bg-primary);
+  }
+  .mobile-drawer-left.drawer-closed {
+    transform: translateX(-100%);
+  }
+  .mobile-drawer-right.drawer-closed {
+    transform: translateX(100%);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

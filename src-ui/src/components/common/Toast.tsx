@@ -35,7 +35,7 @@ const TOAST_STYLES: Record<ToastType, { bg: string; border: string; icon: string
   info: { bg: "rgba(88, 166, 255, 0.15)", border: "#58a6ff", icon: "ℹ" },
 };
 
-function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) => void }) {
+function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
   const style = TOAST_STYLES[toast.type];
 
   useEffect(() => {
@@ -57,7 +57,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
         border: `1px solid ${style.border}`,
         borderRadius: "8px",
         backdropFilter: "blur(12px)",
-        animation: "slideIn 0.3s ease-out",
+        animation: exiting ? "none" : "slideIn 0.3s ease-out",
+        transition: "opacity 0.3s ease, transform 0.3s ease",
+        opacity: exiting ? 0 : 1,
+        transform: exiting ? "translateX(100%)" : "translateX(0)",
         minWidth: "260px",
         maxWidth: "380px",
       }}
@@ -77,6 +80,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
   const nextIdRef = useRef(0);
 
   const addToast = useCallback((type: ToastType, message: string) => {
@@ -91,7 +95,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const info = useCallback((msg: string) => addToast("info", msg), [addToast]);
 
   const removeToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setExitingIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      setExitingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 300);
   }, []);
 
   return (
@@ -111,7 +127,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       >
         {toasts.map((toast) => (
           <div key={toast.id} style={{ pointerEvents: "auto" }}>
-            <ToastItem toast={toast} onRemove={removeToast} />
+            <ToastItem toast={toast} exiting={exitingIds.has(toast.id)} onRemove={removeToast} />
           </div>
         ))}
       </div>

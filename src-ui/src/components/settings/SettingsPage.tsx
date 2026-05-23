@@ -59,8 +59,8 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6" style={pageEnterStyle()}>
-      <h2 className="text-lg font-bold mb-6" style={{ color: "var(--text-primary)" }}>设置</h2>
+    <div className="flex-1 overflow-y-auto p-6 max-md:p-4" style={pageEnterStyle()}>
+      <h2 className="text-lg font-bold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>设置</h2>
 
       {!loaded ? (
         <div className="max-w-lg space-y-6">

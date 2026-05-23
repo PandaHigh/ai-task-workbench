@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { setModalActive, useRegisterShortcut } from "../../hooks/useKeyboard";
 
 interface ConfirmDialogProps {
@@ -24,6 +24,8 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   const titleId = "dialog-title";
   const descId = "dialog-desc";
@@ -39,21 +41,31 @@ export function ConfirmDialog({
     if (open) {
       previousFocusRef.current = document.activeElement as HTMLElement;
       setModalActive(true);
-
+      setMounted(true);
       requestAnimationFrame(() => {
-        const firstBtn = dialogRef.current?.querySelector<HTMLElement>("button");
-        firstBtn?.focus();
+        requestAnimationFrame(() => {
+          setVisible(true);
+          const firstBtn = dialogRef.current?.querySelector<HTMLElement>("button");
+          firstBtn?.focus();
+        });
       });
-    } else {
+    } else if (mounted) {
+      setVisible(false);
       setModalActive(false);
-      previousFocusRef.current?.focus();
-      previousFocusRef.current = null;
     }
 
     return () => {
       if (open) setModalActive(false);
     };
   }, [open]);
+
+  const handleTransitionEnd = useCallback(() => {
+    if (!visible && mounted) {
+      setMounted(false);
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    }
+  }, [visible, mounted]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -85,7 +97,7 @@ export function ConfirmDialog({
     [onCancel]
   );
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const confirmColor = variant === "danger" ? "var(--red)" : "var(--blue)";
 
@@ -104,10 +116,12 @@ export function ConfirmDialog({
         background: "rgba(0, 0, 0, 0.6)",
         backdropFilter: "blur(4px)",
         zIndex: 10000,
-        animation: "fadeIn 0.15s ease-out",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.15s ease-out",
       }}
       onClick={onCancel}
       onKeyDown={handleKeyDown}
+      onTransitionEnd={handleTransitionEnd}
     >
       <div
         ref={dialogRef}
@@ -118,7 +132,9 @@ export function ConfirmDialog({
           padding: "24px",
           minWidth: "320px",
           maxWidth: "420px",
-          animation: "dropIn 0.2s ease-out",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0) scale(1)" : "translateY(-20px) scale(0.95)",
+          transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
         }}
         onClick={(e) => e.stopPropagation()}
       >

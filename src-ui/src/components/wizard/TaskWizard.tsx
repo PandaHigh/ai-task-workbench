@@ -38,6 +38,8 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
   );
 }
 
+const STEP_LABELS = ["选择目录", "AI 对话", "确认参数"] as const;
+
 export function TaskWizard() {
   const navigate = useNavigate();
   const { call } = useEngine();
@@ -171,52 +173,69 @@ export function TaskWizard() {
     return `${msg.role}-${msg.timestamp}-${idx}`;
   };
 
+  const renderStepIndicator = () => (
+    <>
+      {STEP_LABELS.map((label, i) => (
+        <div key={i} className="flex items-center gap-1" role="tab"
+          aria-selected={step === i}
+          aria-current={step === i ? "step" : undefined}
+          tabIndex={step === i ? 0 : -1}
+          id={`wizard-step-${i}`}
+          aria-controls={`wizard-panel-${i}`}
+        >
+          <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{
+            background: i <= step ? "var(--blue)" : "var(--bg-tertiary)",
+            color: i <= step ? "#0d1117" : "var(--text-secondary)",
+          }}>{i + 1}</div>
+          <span className="text-xs" style={{ color: i <= step ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</span>
+        </div>
+      ))}
+    </>
+  );
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={pageEnterStyle()}>
       <div
-        className="px-6 py-4 border-b"
+        className="px-6 py-4 border-b max-md:px-4 max-md:py-3"
         style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
       >
         <div className="flex items-center gap-3">
           <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">新建 AI 任务</h2>
         </div>
-        <div className="flex gap-2 mt-3" role="tablist" aria-label="任务创建步骤">
-          {["选择目录", "AI 对话", "确认参数"].map((label, i) => (
-            <div key={i} className="flex items-center gap-1" role="tab"
-              aria-selected={step === i}
-              aria-current={step === i ? "step" : undefined}
-              tabIndex={step === i ? 0 : -1}
-              id={`wizard-step-${i}`}
-              aria-controls={`wizard-panel-${i}`}
-            >
-              <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{
-                background: i <= step ? "var(--blue)" : "var(--bg-tertiary)",
-                color: i <= step ? "#0d1117" : "var(--text-secondary)",
-              }}>{i + 1}</div>
-              <span className="text-xs" style={{ color: i <= step ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</span>
-            </div>
-          ))}
+        {/* Desktop step indicators - hidden on mobile (shown in bottom bar) */}
+        <div className="flex gap-2 mt-3 max-md:hidden" role="tablist" aria-label="任务创建步骤">
+          {renderStepIndicator()}
         </div>
       </div>
 
+      {/* Mobile bottom step bar */}
+      <div
+        className="hidden max-md:flex fixed bottom-0 left-0 right-0 z-50 px-4 py-3 justify-around"
+        role="tablist"
+        aria-label="任务创建步骤"
+        style={{ background: "var(--bg-primary)", borderTop: "1px solid var(--border)" }}
+      >
+        {renderStepIndicator()}
+      </div>
+
       {step === 0 && (
-        <div className="flex-1 flex items-center justify-center" role="tabpanel"
+        <div className="flex-1 flex items-center justify-center max-md:pb-16" role="tabpanel"
           id="wizard-panel-0" aria-labelledby="wizard-step-0"
           style={{ animation: "fadeIn 0.4s ease-out" }}>
-          <div className="text-center">
+          <div className="text-center px-4">
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
             {!showDirInput ? (
               <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-center flex-wrap">
                 <input
                   type="text"
                   value={dirInput}
                   onChange={(e) => setDirInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmDir()}
                   placeholder="/path/to/project"
-                  className="px-3 py-2 rounded text-xs outline-none"
+                  className="px-3 py-2 rounded text-xs outline-none max-md:w-full"
                   style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", width: 300 }}
                   autoFocus
                 />
@@ -229,7 +248,7 @@ export function TaskWizard() {
       )}
 
       {step === 1 && (
-        <div className="flex-1 flex flex-col" role="tabpanel"
+        <div className="flex-1 flex flex-col max-md:pb-16" role="tabpanel"
           id="wizard-panel-1" aria-labelledby="wizard-step-1"
           style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -266,7 +285,7 @@ export function TaskWizard() {
               </div>
             )}
           </div>
-          <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
+          <div className="p-4 border-t max-md:p-3" style={{ borderColor: "var(--border)" }}>
             <div className="flex gap-2">
               <textarea
                 value={input}
@@ -290,7 +309,7 @@ export function TaskWizard() {
       )}
 
       {step === 2 && taskParams && (
-        <div className="flex-1 overflow-y-auto p-6" role="tabpanel"
+        <div className="flex-1 overflow-y-auto p-6 max-md:p-4 max-md:pb-20" role="tabpanel"
           id="wizard-panel-2" aria-labelledby="wizard-step-2"
           style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div
