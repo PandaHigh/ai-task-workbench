@@ -71,7 +71,7 @@ export function SettingsPage() {
       ) : (
       <div className="max-w-lg space-y-6">
         {/* Engine status */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+        <div className="glass-card p-4">
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>引擎状态</h3>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full" style={{ background: connected ? "var(--green)" : "var(--red)" }} />
@@ -82,7 +82,7 @@ export function SettingsPage() {
         </div>
 
         {/* Quality threshold */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+        <div className="glass-card p-4">
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量阈值</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
             低于此分数的任务将被回滚。当前: {(qualityThreshold * 100).toFixed(0)}%
@@ -94,7 +94,7 @@ export function SettingsPage() {
         </div>
 
         {/* Default timeout */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+        <div className="glass-card p-4">
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>默认超时时间</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
             每个任务的默认执行超时: {defaultTimeout} 分钟
@@ -106,7 +106,7 @@ export function SettingsPage() {
         </div>
 
         {/* Claude path */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+        <div className="glass-card p-4">
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</h3>
           <input type="text" value={claudePath} onChange={(e) => setClaudePath(e.target.value)}
             className="w-full px-3 py-2 rounded text-xs outline-none" style={{

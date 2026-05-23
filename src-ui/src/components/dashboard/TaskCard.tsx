@@ -53,11 +53,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
   return (
     <>
       <div
-        className="rounded-lg border p-4 cursor-pointer transition-colors group relative card-hover"
-        style={{
-          background: "var(--bg-secondary)",
-          borderColor: "var(--border)",
-        }}
+        className="glass-card glass-card-hover p-4 cursor-pointer group relative"
         onClick={() => navigate(`/evolution/${task.id}`)}
       >
         {/* Delete button */}

@@ -236,8 +236,8 @@ export function TaskWizard() {
                   animation: "slideUp 0.3s ease-out",
                 }}
               >
-                <div className="max-w-[80%] px-3 py-2 rounded-lg text-xs terminal-line whitespace-pre-wrap" style={{
-                  background: msg.role === "user" ? "var(--blue)" : "var(--bg-tertiary)",
+                <div className={`max-w-[80%] px-3 py-2 rounded-lg text-xs terminal-line whitespace-pre-wrap ${msg.role === "assistant" ? "glass-card-sm" : ""}`} style={{
+                  background: msg.role === "user" ? "var(--blue)" : undefined,
                   color: msg.role === "user" ? "#0d1117" : "var(--text-primary)",
                 }}>
                   {msg.role === "assistant" && i === lastAssistantIdx && !isLoading
@@ -249,7 +249,7 @@ export function TaskWizard() {
             ))}
             {isLoading && (
               <div className="flex justify-start" style={{ animation: "slideUp 0.25s ease-out" }}>
-                <div className="px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{ background: "var(--bg-tertiary)" }}>
+                <div className="glass-card-sm px-3 py-2 rounded-lg text-xs flex items-center gap-2">
                   <Spinner size="sm" />
                   <span style={{ color: "var(--text-secondary)" }}>AI 正在思考</span>
                 </div>
@@ -282,8 +282,8 @@ export function TaskWizard() {
       {step === 2 && taskParams && (
         <div className="flex-1 overflow-y-auto p-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div
-            className="rounded-lg border p-4"
-            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", animation: "slideUp 0.35s ease-out" }}
+            className="glass-card p-4"
+            style={{ animation: "slideUp 0.35s ease-out" }}
           >
             <h3 className="text-sm font-bold mb-3">任务参数</h3>
             <div className="space-y-3 text-xs">

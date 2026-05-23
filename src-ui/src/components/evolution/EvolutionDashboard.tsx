@@ -295,7 +295,7 @@ export function EvolutionDashboard() {
                 ) : (
                   <div className="space-y-2">
                     {commits.map((c, i) => (
-                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
+                      <div key={i} className="glass-card-sm px-3 py-2" style={{ ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "—"}</span>
                           {c.isAiCommit && (
@@ -320,7 +320,7 @@ export function EvolutionDashboard() {
                 ) : (
                   <div className="space-y-2">
                     {lessons.map((l, i) => (
-                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
+                      <div key={i} className="glass-card-sm px-3 py-2" style={{ ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="px-1.5 py-0.5 rounded text-[10px]" style={{
                             background: l.category === "failure" ? "rgba(248, 81, 73, 0.15)" :
@@ -350,8 +350,8 @@ export function EvolutionDashboard() {
 
       {/* Right sidebar */}
       <div
-        className="w-64 border-l flex flex-col"
-        style={{ borderColor: "var(--border)", background: "var(--bg-secondary)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
+        className="glass-sidebar w-64 border-l flex flex-col"
+        style={{ borderColor: "var(--border)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
       >
         <div className="px-4 py-2 border-b" style={{ borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>控制面板</h3>
@@ -459,7 +459,7 @@ export function EvolutionDashboard() {
               {run.finalReport && (
                 <div>
                   <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>最终报告</h4>
-                  <div className="text-xs p-2 rounded max-h-32 overflow-y-auto" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
+                  <div className="glass-card-sm text-xs p-2 max-h-32 overflow-y-auto" style={{ color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
                     {run.finalReport}
                   </div>
                 </div>

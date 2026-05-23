@@ -14,11 +14,8 @@ export function Sidebar() {
 
   return (
     <aside
-      className="w-56 flex flex-col border-r max-md:w-14"
-      style={{
-        background: "var(--bg-secondary)",
-        borderColor: "var(--border)",
-      }}
+      className="glass-sidebar w-56 flex flex-col border-r max-md:w-14"
+      style={{ borderColor: "var(--border)" }}
     >
       <div className="p-4 border-b max-md:p-2 max-md:text-center" style={{ borderColor: "var(--border)" }}>
         <h1 className="text-sm font-bold max-md:text-xs" style={{ color: "var(--text-primary)" }}>
