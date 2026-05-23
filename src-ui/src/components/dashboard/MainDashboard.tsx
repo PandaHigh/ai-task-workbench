@@ -5,6 +5,7 @@ import { TaskCard } from "./TaskCard";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import { Skeleton } from "../common/Skeleton";
+import { EmptyState } from "../common/EmptyState";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 
 const REFRESH_INTERVAL = 30_000;
@@ -51,32 +52,11 @@ export function MainDashboard() {
       )}
 
       {!loading && tasks.length === 0 && (
-        <div
-          className="flex flex-col items-center justify-center py-20 rounded-lg border"
-          style={{
-            borderColor: "var(--border)",
-            background: "var(--bg-secondary)",
-            animation: "scaleIn 0.4s ease-out",
-          }}
-        >
-          <div className="text-4xl mb-4 animate-float">🤖</div>
-          <p className="text-sm mb-2" style={{ color: "var(--text-secondary)" }}>
-            还没有任务
-          </p>
-          <p className="text-xs mb-6" style={{ color: "var(--text-secondary)" }}>
-            创建你的第一个 AI 任务开始使用
-          </p>
-          <button
-            onClick={() => navigate("/wizard")}
-            className="px-4 py-2 rounded text-xs font-semibold transition-colors"
-            style={{
-              background: "var(--green)",
-              color: "#0d1117",
-            }}
-          >
-            + 新建任务
-          </button>
-        </div>
+        <EmptyState
+          title="还没有任务"
+          description="创建你的第一个 AI 任务开始使用"
+          action={{ label: "+ 新建任务", onClick: () => navigate("/wizard") }}
+        />
       )}
 
       {!loading && tasks.length > 0 && (

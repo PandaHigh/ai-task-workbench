@@ -5,26 +5,8 @@ import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useToast } from "../common/Toast";
+import { Spinner } from "../common/Spinner";
 import { pageEnterStyle } from "../../hooks/useAnimations";
-
-function ThinkingDots() {
-  return (
-    <span className="inline-flex gap-1 ml-1">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: 4, height: 4, borderRadius: "50%",
-            background: "var(--text-secondary)",
-            display: "inline-block",
-            animation: "pulse 1.2s ease-in-out infinite",
-            animationDelay: `${i * 0.2}s`,
-          }}
-        />
-      ))}
-    </span>
-  );
-}
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
@@ -266,9 +248,9 @@ export function TaskWizard() {
             ))}
             {isLoading && (
               <div className="flex justify-start" style={{ animation: "slideUp 0.25s ease-out" }}>
-                <div className="px-3 py-2 rounded-lg text-xs flex items-center" style={{ background: "var(--bg-tertiary)" }}>
+                <div className="px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{ background: "var(--bg-tertiary)" }}>
+                  <Spinner size="sm" />
                   <span style={{ color: "var(--text-secondary)" }}>AI 正在思考</span>
-                  <ThinkingDots />
                 </div>
               </div>
             )}

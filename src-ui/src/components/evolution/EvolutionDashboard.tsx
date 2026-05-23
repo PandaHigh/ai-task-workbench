@@ -6,6 +6,8 @@ import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { TaskDefinition } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
+import { Skeleton } from "../common/Skeleton";
+import { useToast } from "../common/Toast";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 
@@ -27,28 +29,38 @@ export function EvolutionDashboard() {
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [agentMode, setAgentMode] = useState<"single" | "multi">("single");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   // Load data on mount
   useEffect(() => {
     if (!runId) return;
     reset();
+    setLoading(true);
 
     const load = async () => {
       try {
         const qRes = await call("queue.list", { runId });
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
-      } catch {}
+      } catch (err) {
+        toast.error("加载任务队列失败");
+      }
 
       try {
         const c = await call("run.commits", { runId });
         setCommits((c as any[]) || []);
-      } catch {}
+      } catch {
+        toast.error("加载提交记录失败");
+      }
 
       try {
         const l = await call("run.lessons", { runId });
         setLessons((l as any[]) || []);
-      } catch {}
+      } catch {
+        toast.error("加载经验教训失败");
+      }
+      setLoading(false);
     };
     load();
   }, [runId]);
@@ -77,8 +89,10 @@ export function EvolutionDashboard() {
     try {
       await call("task.start", { runId });
       setRunning(true);
+      toast.success("任务已开始执行");
     } catch (err) {
       addLog({ id: Date.now(), timestamp: Date.now(), level: "error", source: "engine", message: `启动失败: ${err}` });
+      toast.error(`启动失败: ${err instanceof Error ? err.message : err}`);
     }
   };
 
@@ -88,7 +102,10 @@ export function EvolutionDashboard() {
       await call("run.stop", { runId });
       setRunning(false);
       addLog({ id: Date.now(), timestamp: Date.now(), level: "info", source: "engine", message: "执行已暂停" });
-    } catch {}
+      toast.info("执行已暂停");
+    } catch {
+      toast.error("暂停失败");
+    }
   };
 
   const handleReorder = async (taskIds: string[]) => {
@@ -151,7 +168,13 @@ export function EvolutionDashboard() {
               )}
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {queue.length === 0 ? (
+              {loading ? (
+                <div className="space-y-2 p-2">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <Skeleton key={i} variant="card" height={56} />
+                  ))}
+                </div>
+              ) : queue.length === 0 ? (
                 <EmptyState
                   title="队列为空"
                   description={!isRunning && run?.status !== "completed" ? "点击开始执行任务" : undefined}
@@ -211,6 +234,13 @@ export function EvolutionDashboard() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "#010409" }}>
+              {loading ? (
+                <div className="space-y-2 p-2">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <Skeleton key={i} variant="text" height={16} />
+                  ))}
+                </div>
+              ) : <>
               {/* Logs Tab */}
               {tab === "logs" && (
                 logs.length === 0 ? (
@@ -286,6 +316,8 @@ export function EvolutionDashboard() {
                   </div>
                 )
               )}
+              </>}
+
             </div>
           </div>
         </div>

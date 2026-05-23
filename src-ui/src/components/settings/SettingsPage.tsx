@@ -1,8 +1,12 @@
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect } from "react";
+import { Skeleton } from "../common/Skeleton";
+import { useToast } from "../common/Toast";
+import { pageEnterStyle } from "../../hooks/useAnimations";
 
 export function SettingsPage() {
   const { connected, call } = useEngine();
+  const toast = useToast();
   const [qualityThreshold, setQualityThreshold] = useState(0.6);
   const [defaultTimeout, setDefaultTimeout] = useState(60);
   const [claudePath, setClaudePath] = useState("claude");
@@ -15,15 +19,21 @@ export function SettingsPage() {
       try {
         const qt = await call("config.get", { key: "qualityThreshold" });
         if ((qt as any)?.value != null) setQualityThreshold(Number((qt as any).value));
-      } catch {}
+      } catch {
+        toast.error("加载质量阈值失败");
+      }
       try {
         const dt = await call("config.get", { key: "defaultTimeout" });
         if ((dt as any)?.value != null) setDefaultTimeout(Number((dt as any).value));
-      } catch {}
+      } catch {
+        toast.error("加载超时设置失败");
+      }
       try {
         const cp = await call("config.get", { key: "claudePath" });
         if ((cp as any)?.value) setClaudePath(String((cp as any).value));
-      } catch {}
+      } catch {
+        toast.error("加载 Claude 路径失败");
+      }
       setLoaded(true);
     };
     load();
@@ -35,14 +45,24 @@ export function SettingsPage() {
       await call("config.set", { key: "defaultTimeout", value: defaultTimeout });
       await call("config.set", { key: "claudePath", value: claudePath });
       setSaved(true);
+      toast.success("设置已保存");
       setTimeout(() => setSaved(false), 2000);
-    } catch {}
+    } catch (err) {
+      toast.error(`保存失败: ${err instanceof Error ? err.message : err}`);
+    }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-6" style={pageEnterStyle()}>
       <h2 className="text-lg font-bold mb-6" style={{ color: "var(--text-primary)" }}>设置</h2>
 
+      {!loaded ? (
+        <div className="max-w-lg space-y-6">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} variant="card" height={80} />
+          ))}
+        </div>
+      ) : (
       <div className="max-w-lg space-y-6">
         {/* Engine status */}
         <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
@@ -63,7 +83,7 @@ export function SettingsPage() {
           </p>
           <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
-            className="w-full" disabled={!loaded} />
+            className="w-full" />
         </div>
 
         {/* Default timeout */}
@@ -74,25 +94,25 @@ export function SettingsPage() {
           </p>
           <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-            className="w-full" disabled={!loaded} />
+            className="w-full" />
         </div>
 
         {/* Claude path */}
         <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</h3>
           <input type="text" value={claudePath} onChange={(e) => setClaudePath(e.target.value)}
-            disabled={!loaded}
             className="w-full px-3 py-2 rounded text-xs outline-none" style={{
               background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)",
             }} />
         </div>
 
         {/* Save button */}
-        <button onClick={handleSave} disabled={!loaded}
+        <button onClick={handleSave}
           className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--blue)", color: "#0d1117" }}>
           {saved ? "已保存" : "保存设置"}
         </button>
       </div>
+      )}
     </div>
   );
 }
