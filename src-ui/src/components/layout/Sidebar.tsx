@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 const navItems = [
   { path: "/", label: "仪表盘", icon: "◎" },
   { path: "/wizard", label: "新建任务", icon: "+" },
+  { path: "/settings", label: "设置", icon: "⚙" },
 ];
 
 export function Sidebar() {

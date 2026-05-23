@@ -2,6 +2,7 @@ import type { CreateRunParams, CreateTaskParams, ExecutionRun, TaskDefinition } 
 import { Store } from "../db/store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
+import * as wizardHandler from "../wizard/wizard-handler.js";
 
 const store = new Store();
 const queueManager = new QueueManager();
@@ -64,7 +65,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!run) throw new Error(`Run ${runId} not found`);
 
     run.status = "running";
-    run.startedAt = new Date();
+    run.startedAt = Date.now();
     store.saveRun(run);
 
     const executor = new Executor(queueManager, notify);
@@ -122,17 +123,21 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "wizard.start": async (params) => {
     const { workingDir } = params as { workingDir: string };
-    return { sessionId: crypto.randomUUID(), workingDir };
+    const session = wizardHandler.startSession(workingDir);
+    return { sessionId: session.sessionId, workingDir: session.workingDir };
   },
 
   "wizard.chat": async (params) => {
     const { sessionId, message } = params as { sessionId: string; message: string };
-    return { sessionId, response: "Echo: " + message };
+    const result = await wizardHandler.chat(sessionId, message);
+    return { sessionId, response: result.response, shouldExtractParams: result.shouldExtractParams };
   },
 
   "wizard.validate": async (params) => {
     const { sessionId } = params as { sessionId: string };
-    return { sessionId, valid: false, errors: ["Not implemented"] };
+    const extracted = wizardHandler.extractParams(sessionId);
+    const validation = wizardHandler.validateParams(extracted);
+    return { sessionId, valid: validation.valid, errors: validation.errors, params: extracted };
   },
 
   "config.get": async (params) => {

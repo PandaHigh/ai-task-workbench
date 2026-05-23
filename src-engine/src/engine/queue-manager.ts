@@ -21,7 +21,7 @@ export class QueueManager {
       agentMode: params.agentMode ?? "single",
       promptJson: params.promptJson ?? "",
       status: "pending",
-      createdAt: new Date(),
+      createdAt: Date.now(),
     };
 
     const position = queue.length;

@@ -7,6 +7,10 @@ export interface AdaptedMessage {
   metadata?: Record<string, unknown>;
 }
 
+function getProp(msg: CCMessage, key: string): unknown {
+  return (msg as unknown as Record<string, unknown>)[key];
+}
+
 export function adaptCCMessage(msg: CCMessage, taskId: string): AdaptedMessage | null {
   switch (msg.type) {
     case "assistant": {
@@ -25,24 +29,24 @@ export function adaptCCMessage(msg: CCMessage, taskId: string): AdaptedMessage |
           type: "result",
           content: (msg.content as string) || "",
           metadata: {
-            totalCostUsd: (msg as Record<string, unknown>).total_cost_usd,
-            durationMs: (msg as Record<string, unknown>).duration_ms,
-            numTurns: (msg as Record<string, unknown>).num_turns,
+            totalCostUsd: getProp(msg, "total_cost_usd"),
+            durationMs: getProp(msg, "duration_ms"),
+            numTurns: getProp(msg, "num_turns"),
           },
         };
       }
       return {
         taskId,
         type: "error",
-        content: JSON.stringify((msg as Record<string, unknown>).errors || "Unknown error"),
+        content: JSON.stringify(getProp(msg, "errors") || "Unknown error"),
       };
 
     case "tool_progress":
       return {
         taskId,
         type: "tool",
-        content: `Tool: ${(msg as Record<string, unknown>).tool_name}`,
-        metadata: { elapsed: (msg as Record<string, unknown>).elapsed_time_seconds },
+        content: `Tool: ${getProp(msg, "tool_name")}`,
+        metadata: { elapsed: getProp(msg, "elapsed_time_seconds") },
       };
 
     case "system":
