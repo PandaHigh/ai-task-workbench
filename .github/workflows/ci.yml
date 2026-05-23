@@ -8,10 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         node-version: [20, 22]
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +22,14 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install dependencies
         run: npm ci
@@ -34,8 +43,18 @@ jobs:
       - name: Type check - UI
         run: cd src-ui && npx tsc --noEmit
 
-      - name: Run engine tests
-        run: cd src-engine && npx vitest run
+      - name: Check Rust code
+        working-directory: src-tauri
+        run: cargo check
+
+      - name: Run tests
+        run: npm test
 
       - name: Build UI
         run: cd src-ui && npx vite build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist-${{ matrix.node-version }}-${{ matrix.os }}
+          path: src-ui/dist/

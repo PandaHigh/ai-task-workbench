@@ -11,6 +11,19 @@ interface WizardSession {
 const sessions = new Map<string, WizardSession>();
 const ccClient = new CCClient();
 
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_MESSAGES = 100;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of sessions) {
+    const lastActivity = (session as any)._lastActivity || 0;
+    if (lastActivity && now - lastActivity > SESSION_TTL_MS) {
+      sessions.delete(id);
+    }
+  }
+}, 60000).unref();
+
 export function startSession(workingDir: string): WizardSession {
   const session: WizardSession = {
     sessionId: crypto.randomUUID(),
@@ -33,6 +46,11 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
   if (!session) throw new Error(`Session ${sessionId} not found`);
 
   session.messages.push({ role: "user", content: userMessage });
+
+  (session as any)._lastActivity = Date.now();
+  if (session.messages.length > MAX_MESSAGES) {
+    session.messages = session.messages.slice(-MAX_MESSAGES);
+  }
 
   const systemPrompt = `你是一个AI任务规划助手。你的任务是通过与用户对话，帮助他们清晰地定义一个AI编程任务。
 

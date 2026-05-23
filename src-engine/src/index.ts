@@ -1,6 +1,8 @@
 import { WsServer } from "./ws-server.js";
 import { setNotifyFn, shutdown } from "./json-rpc/methods.js";
 
+let isShuttingDown = false;
+
 async function main() {
   const wsServer = new WsServer();
 
@@ -10,15 +12,32 @@ async function main() {
 
   wsServer.start();
 
-  const gracefulShutdown = () => {
+  const gracefulShutdown = async () => {
+    if (isShuttingDown) {
+      console.warn("\nForce exit (second signal)");
+      process.exit(1);
+    }
+    isShuttingDown = true;
     console.log("\nShutting down gracefully...");
-    shutdown();
-    wsServer.close();
+    try {
+      shutdown();
+      await wsServer.close();
+    } catch (err) {
+      console.error("Error during shutdown:", err);
+    }
     process.exit(0);
   };
 
   process.on("SIGINT", gracefulShutdown);
   process.on("SIGTERM", gracefulShutdown);
+
+  process.on("uncaughtException", (err) => {
+    console.error("[engine] Uncaught exception:", err);
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    console.error("[engine] Unhandled rejection:", reason);
+  });
 }
 
 main().catch((err) => {

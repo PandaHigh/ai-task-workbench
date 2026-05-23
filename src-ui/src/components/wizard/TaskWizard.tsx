@@ -1,27 +1,85 @@
 import { useWizardStore } from "../../stores/wizard-store";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import type { ExecutionRun } from "@ai-workbench/shared";
+import { useToast } from "../common/Toast";
+
+function ThinkingDots() {
+  return (
+    <span className="inline-flex gap-1 ml-1">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            width: 4, height: 4, borderRadius: "50%",
+            background: "var(--text-secondary)",
+            display: "inline-block",
+            animation: "pulse 1.2s ease-in-out infinite",
+            animationDelay: `${i * 0.2}s`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
+  const [displayed, setDisplayed] = useState("");
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    indexRef.current = 0;
+    setDisplayed("");
+    const timer = setInterval(() => {
+      indexRef.current += 1;
+      if (indexRef.current >= text.length) {
+        setDisplayed(text);
+        clearInterval(timer);
+      } else {
+        setDisplayed(text.slice(0, indexRef.current));
+      }
+    }, speed);
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return <>{displayed}</>;
+}
 
 export function TaskWizard() {
   const navigate = useNavigate();
   const { call } = useEngine();
+  const toast = useToast();
   const {
-    step, workingDir, messages, taskParams, errors,
+    step, workingDir, messages, taskParams, errors, sessionId,
     setStep, setWorkingDir, setSessionId, addMessage, setTaskParams, setValidation, reset,
   } = useWizardStore();
   const addTask = useTaskStore((s) => s.addTask);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [dirInput, setDirInput] = useState("");
+  const [showDirInput, setShowDirInput] = useState(false);
+  const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
+
+  // Track last assistant message for typewriter effect
+  useEffect(() => {
+    let idx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") { idx = i; break; }
+    }
+    setLastAssistantIdx(idx);
+  }, [messages]);
 
   const handleSelectDir = () => {
-    const dir = prompt("请输入项目目录路径:");
-    if (dir) {
-      setWorkingDir(dir);
-      startWizardSession(dir);
-    }
+    setShowDirInput(true);
+  };
+
+  const confirmDir = () => {
+    if (!dirInput.trim()) return;
+    setWorkingDir(dirInput.trim());
+    startWizardSession(dirInput.trim());
+    setShowDirInput(false);
   };
 
   const startWizardSession = async (dir: string) => {
@@ -30,7 +88,7 @@ export function TaskWizard() {
       setSessionId(res.sessionId);
       setStep(1);
     } catch (err) {
-      alert(`启动向导失败: ${err}`);
+      toast.error(`启动向导失败: ${err}`);
     }
   };
 
@@ -42,7 +100,6 @@ export function TaskWizard() {
 
     setIsLoading(true);
     try {
-      const sessionId = useWizardStore.getState().sessionId;
       const res = (await call("wizard.chat", {
         sessionId,
         message: userMsg,
@@ -63,6 +120,17 @@ export function TaskWizard() {
           setStep(2);
         } else {
           setValidation(valRes.valid, valRes.errors);
+          const errorMsg = `参数校验未通过:\n${valRes.errors.map((e: string) => `- ${e}`).join("\n")}\n请重新引导用户提供完整信息。`;
+          addMessage({ role: "assistant", content: `⚠ 参数校验未通过，正在重新引导...`, timestamp: Date.now() });
+          try {
+            const retryRes = (await call("wizard.chat", {
+              sessionId,
+              message: errorMsg,
+            })) as { response: string; shouldExtractParams: boolean };
+            addMessage({ role: "assistant", content: retryRes.response, timestamp: Date.now() });
+          } catch {
+            addMessage({ role: "assistant", content: "请补充以下信息:\n" + valRes.errors.join("\n"), timestamp: Date.now() });
+          }
         }
       }
     } catch (err) {
@@ -92,18 +160,30 @@ export function TaskWizard() {
       })) as ExecutionRun;
 
       addTask(run);
+      toast.success("任务创建成功，开始执行");
       reset();
       navigate(`/evolution/${run.id}`);
     } catch (err) {
-      alert(`创建失败: ${err instanceof Error ? err.message : err}`);
+      toast.error(`创建失败: ${err instanceof Error ? err.message : err}`);
     }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const getMessageId = (msg: typeof messages[0], idx: number) => {
+    return `${msg.role}-${msg.timestamp}-${idx}`;
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }}>← 返回</button>
+          <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">新建 AI 任务</h2>
         </div>
         <div className="flex gap-2 mt-3">
@@ -123,7 +203,23 @@ export function TaskWizard() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
-            <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
+            {!showDirInput ? (
+              <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={dirInput}
+                  onChange={(e) => setDirInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmDir()}
+                  placeholder="/path/to/project"
+                  className="px-3 py-2 rounded text-xs outline-none"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", width: 300 }}
+                  autoFocus
+                />
+                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
+              </div>
+            )}
             {workingDir && <p className="text-xs mt-2" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
           </div>
         </div>
@@ -138,29 +234,47 @@ export function TaskWizard() {
               </div>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                key={getMessageId(msg, i)}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                style={{
+                  animation: "slideUp 0.25s ease-out",
+                }}
+              >
                 <div className="max-w-[80%] px-3 py-2 rounded-lg text-xs terminal-line whitespace-pre-wrap" style={{
                   background: msg.role === "user" ? "var(--blue)" : "var(--bg-tertiary)",
                   color: msg.role === "user" ? "#0d1117" : "var(--text-primary)",
-                }}>{msg.content}</div>
+                }}>
+                  {msg.role === "assistant" && i === lastAssistantIdx && !isLoading
+                    ? <TypewriterText text={msg.content} />
+                    : msg.content
+                  }
+                </div>
               </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="px-3 py-2 rounded-lg text-xs cursor-blink" style={{ background: "var(--bg-tertiary)" }}>
+              <div className="flex justify-start" style={{ animation: "slideUp 0.25s ease-out" }}>
+                <div className="px-3 py-2 rounded-lg text-xs flex items-center" style={{ background: "var(--bg-tertiary)" }}>
                   <span style={{ color: "var(--text-secondary)" }}>AI 正在思考</span>
+                  <ThinkingDots />
                 </div>
               </div>
             )}
           </div>
           <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
             <div className="flex gap-2">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="描述你的任务..." disabled={isLoading}
-                className="flex-1 px-3 py-2 rounded text-xs outline-none" style={{
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="描述你的任务... (Enter 发送, Shift+Enter 换行)"
+                disabled={isLoading}
+                rows={1}
+                className="flex-1 px-3 py-2 rounded text-xs outline-none resize-none"
+                style={{
                   background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)",
-                }} />
+                }}
+              />
               <button onClick={handleSend} disabled={isLoading}
                 className="px-4 py-2 rounded text-xs font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
                 发送

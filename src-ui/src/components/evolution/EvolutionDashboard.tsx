@@ -5,6 +5,8 @@ import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { TaskDefinition } from "@ai-workbench/shared";
+import { EmptyState } from "../common/EmptyState";
+import { formatDuration, formatTimestamp } from "../../lib/utils";
 
 type TabType = "logs" | "commits" | "lessons";
 
@@ -55,7 +57,6 @@ export function EvolutionDashboard() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Refresh commits/lessons on tab switch
   const refreshTabData = useCallback(async (t: TabType) => {
     if (!runId) return;
     if (t === "commits") {
@@ -106,6 +107,9 @@ export function EvolutionDashboard() {
   };
 
   const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "—";
+  const budgetUsed = run?.totalCostUsd ?? 0;
+  const budgetMax = 50;
+  const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -113,7 +117,7 @@ export function EvolutionDashboard() {
         {/* Header */}
         <div className="px-6 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center gap-3">
-            <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: "var(--text-secondary)" }}>← 返回</button>
+            <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
             <h2 className="text-sm font-bold">自进化看板</h2>
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
             {run && <span className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
@@ -141,12 +145,11 @@ export function EvolutionDashboard() {
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {queue.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>队列为空</p>
-                  {!isRunning && run?.status !== "completed" && (
-                    <button onClick={handleStart} className="mt-3 px-3 py-1.5 rounded text-xs" style={{ background: "var(--green)", color: "#0d1117" }}>开始执行</button>
-                  )}
-                </div>
+                <EmptyState
+                  title="队列为空"
+                  description={!isRunning && run?.status !== "completed" ? "点击开始执行任务" : undefined}
+                  action={!isRunning && run?.status !== "completed" ? { label: "开始执行", onClick: handleStart } : undefined}
+                />
               ) : (
                 queue.map((task, i) => (
                   <div
@@ -161,6 +164,9 @@ export function EvolutionDashboard() {
                       background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",
                       border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
                       opacity: dragIdx !== null && dragIdx !== i ? 0.7 : 1,
+                      transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
+                      boxShadow: dragIdx === i ? "0 4px 16px rgba(0,0,0,0.4)" : undefined,
+                      transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
                     }}
                     onClick={() => setActiveTask(task.id)}
                   >
@@ -184,11 +190,12 @@ export function EvolutionDashboard() {
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col">
-            <div className="px-4 py-2 border-b flex gap-3" style={{ borderColor: "var(--border)" }}>
+            {/* Tab bar with sliding indicator */}
+            <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
               {(["logs", "commits", "lessons"] as TabType[]).map((t) => (
-                <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-2 py-1 rounded" style={{
-                  background: tab === t ? "var(--bg-tertiary)" : "transparent",
+                <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: tab === t ? "var(--bg-tertiary)" : "transparent",
                 }}>
                   {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : `经验教训 (${lessons.length})`}
                 </button>
@@ -199,14 +206,14 @@ export function EvolutionDashboard() {
               {/* Logs Tab */}
               {tab === "logs" && (
                 logs.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p style={{ color: "var(--text-secondary)" }}>等待任务执行...</p>
-                    <span className="cursor-blink" />
-                  </div>
+                  <EmptyState
+                    title="等待任务执行"
+                    description="启动后日志将实时显示在这里"
+                  />
                 ) : (
                   <div className="space-y-0.5">
                     {logs.map((log) => (
-                      <div key={log.id} className="terminal-line">
+                      <div key={log.id} className="terminal-line" style={{ animation: "fadeIn 0.15s ease-out" }}>
                         <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
                         <span style={{ color: levelColor(log.level) }}>[{log.level.toUpperCase()}]</span>{" "}
                         <span style={{ color: "var(--text-secondary)" }}>[{log.source}]</span>{" "}
@@ -221,13 +228,11 @@ export function EvolutionDashboard() {
               {/* Commits Tab */}
               {tab === "commits" && (
                 commits.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p style={{ color: "var(--text-secondary)" }}>暂无 Git 提交记录</p>
-                  </div>
+                  <EmptyState title="暂无 Git 提交记录" description="任务执行后提交会显示在这里" />
                 ) : (
                   <div className="space-y-2">
                     {commits.map((c, i) => (
-                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", animation: "slideUp 0.25s ease-out", animationDelay: `${i * 40}ms`, opacity: 0, animationFillMode: "forwards" }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "—"}</span>
                           {c.isAiCommit && (
@@ -248,9 +253,7 @@ export function EvolutionDashboard() {
               {/* Lessons Tab */}
               {tab === "lessons" && (
                 lessons.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p style={{ color: "var(--text-secondary)" }}>暂无经验教训</p>
-                  </div>
+                  <EmptyState title="暂无经验教训" description="任务失败和教训会记录在这里" />
                 ) : (
                   <div className="space-y-2">
                     {lessons.map((l, i) => (
@@ -286,29 +289,64 @@ export function EvolutionDashboard() {
           <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>控制面板</h3>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          {/* Start / Pause / Stop */}
+          {/* Start / Pause */}
           <div className="flex gap-2">
             {!isRunning ? (
               <button onClick={handleStart} disabled={run?.status === "completed"} className="flex-1 px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#0d1117" }}>▶ 开始</button>
             ) : (
-              <>
-                <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
-              </>
+              <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
             )}
           </div>
 
+          {/* Budget progress */}
+          {run && budgetUsed > 0 && (
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
+                <span style={{ color: budgetPct > 80 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
+              </div>
+              <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                <div className="h-full rounded transition-all" style={{
+                  width: `${budgetPct}%`,
+                  background: budgetPct > 80 ? "var(--red)" : budgetPct > 50 ? "var(--yellow)" : "var(--green)",
+                }} />
+              </div>
+            </div>
+          )}
+
           {/* Timeout */}
           <div>
-            <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>超时: {timeoutMinutes}min</label>
-            <input type="range" min="5" max="180" value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(Number(e.target.value))} className="w-full" />
+            <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+              超时: {timeoutMinutes}min
+              {activeTaskId && <button
+                onClick={async () => {
+                  try {
+                    await call("task.setTimeout", { taskId: activeTaskId, runId: run?.id, minutes: timeoutMinutes });
+                  } catch {}
+                }}
+                className="ml-2 text-[10px] px-1.5 py-0.5 rounded"
+                style={{ background: "var(--blue)", color: "#0d1117" }}
+              >应用</button>}
+            </label>
+            <input type="range" min="1" max="180" value={timeoutMinutes}
+              onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
+              aria-valuemin={1} aria-valuemax={180} aria-valuenow={timeoutMinutes}
+              aria-label="任务超时时间"
+              className="w-full" />
           </div>
 
           {/* Agent Mode */}
           <div>
-            <label className="text-xs block mb-2" style={{ color: "var(--text-secondary)" }}>Agent 模式</label>
+            <label className="text-xs block mb-2" style={{ color: "var(--text-secondary)" }}>Agent 模式{activeTaskId ? " (应用到选中任务)" : ""}</label>
             <div className="flex gap-2">
-              <button onClick={() => setAgentMode("single")} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
-              <button onClick={() => setAgentMode("multi")} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
+              <button onClick={() => {
+                setAgentMode("single");
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch(() => {});
+              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
+              <button onClick={() => {
+                setAgentMode("multi");
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch(() => {});
+              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
             </div>
           </div>
 
@@ -371,18 +409,4 @@ function levelColor(level: string): string {
     case "info": return "var(--blue)";
     default: return "var(--text-secondary)";
   }
-}
-
-function formatTimestamp(ts: number | undefined): string {
-  if (!ts) return "";
-  return new Date(ts).toLocaleString();
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
 }

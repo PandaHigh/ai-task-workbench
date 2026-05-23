@@ -10,7 +10,17 @@ export class QueueManager {
   private queues: Map<string, QueueEntry[]> = new Map();
 
   enqueue(runId: string, params: CreateTaskParams): TaskDefinition {
+    for (const existing of this.queues.get(runId) || []) {
+      if (existing.task.content === params.content && existing.task.type === (params.type || "smart_task")) {
+        return existing.task;
+      }
+    }
+
     const queue = this.getOrCreateQueue(runId);
+    if (queue.length >= 200) {
+      throw new Error("Queue is full (max 200 tasks)");
+    }
+
     const task: TaskDefinition = {
       id: crypto.randomUUID(),
       runId,
@@ -71,8 +81,10 @@ export class QueueManager {
       }
     }
 
+    const taskIdSet = new Set(taskIds);
+
     for (const entry of queue) {
-      if (!taskIds.includes(entry.task.id)) {
+      if (!taskIdSet.has(entry.task.id)) {
         entry.position = reordered.length;
         reordered.push(entry);
       }

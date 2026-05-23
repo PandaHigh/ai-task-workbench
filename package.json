@@ -11,7 +11,11 @@
     "build:tauri": "npm run build && cargo tauri build",
     "test": "npm run test --workspaces --if-present",
     "test:engine": "npm run test --workspace=src-engine",
-    "test:ui": "npm run test --workspace=src-ui"
+    "test:ui": "npm run test --workspace=src-ui",
+    "lint": "npx eslint 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx}'",
+    "format": "npx prettier --write 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx,css}'",
+    "format:check": "npx prettier --check 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx,css}'",
+    "clean": "rm -rf src-engine/dist src-ui/dist shared/dist node_modules/.cache"
   },
   "workspaces": [
     "shared",

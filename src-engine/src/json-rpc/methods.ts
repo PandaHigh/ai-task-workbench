@@ -103,6 +103,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "task.create": async (params) => {
     const p = params as unknown as CreateTaskParams & { runId: string };
+    if (!p.runId || !store.getRun(p.runId)) {
+      throw new Error(`Run not found: ${p.runId || "missing"}`);
+    }
+    if (!p.content?.trim()) {
+      throw new Error("Task content is required");
+    }
     const task = queueManager.enqueue(p.runId, p);
     store.saveTask(p.runId, task);
     return task;
@@ -112,6 +118,10 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const { runId } = params as { runId: string };
     const run = store.getRun(runId);
     if (!run) throw new Error(`Run ${runId} not found`);
+
+    if (run.status === "completed" || run.status === "failed") {
+      throw new Error(`Run ${runId} is already ${run.status} and cannot be restarted`);
+    }
 
     if (activeExecutors.has(runId)) {
       throw new Error(`Run ${runId} already has an active executor`);
@@ -141,6 +151,11 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "task.pause": async (params) => {
     const { runId } = params as { runId: string };
+    const executor = activeExecutors.get(runId);
+    if (executor) {
+      executor.stop();
+      activeExecutors.delete(runId);
+    }
     const run = store.getRun(runId);
     if (run) {
       run.status = "paused";
@@ -152,9 +167,20 @@ export const methodHandlers: Record<string, MethodHandler> = {
   "task.resume": async (params) => {
     const { runId } = params as { runId: string };
     const run = store.getRun(runId);
-    if (run) {
+    if (run && run.status === "paused") {
+      const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
+      for (const t of pendingTasks) {
+        if (!queueManager.list(runId).some((q) => q.id === t.id)) {
+          queueManager.restore(runId, t);
+        }
+      }
       run.status = "running";
       store.saveRun(run);
+      const executor = new Executor(queueManager, notify, runId);
+      activeExecutors.set(runId, executor);
+      executor.start(run).finally(() => {
+        activeExecutors.delete(runId);
+      });
     }
     return { status: "running" };
   },
@@ -163,13 +189,16 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const { taskId, runId } = params as { taskId: string; runId: string };
     const executor = activeExecutors.get(runId);
     if (executor) {
-      executor.cancelTask(taskId);
+      executor.cancelTask(taskId, runId);
     }
     return { status: "cancelled" };
   },
 
   "task.setTimeout": async (params) => {
     const { taskId, runId, minutes } = params as { taskId: string; runId: string; minutes: number };
+    if (!minutes || minutes < 1 || minutes > 1440) {
+      throw new Error("Timeout must be between 1 and 1440 minutes");
+    }
     store.updateTask(runId, taskId, { timeoutMinutes: minutes });
     return { taskId, timeoutMinutes: minutes };
   },
@@ -181,6 +210,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "queue.reorder": async (params) => {
     const { runId, taskIds } = params as { runId: string; taskIds: string[] };
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new Error("taskIds must be a non-empty array");
+    }
     queueManager.reorder(runId, taskIds);
     return { runId, order: taskIds };
   },

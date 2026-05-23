@@ -125,4 +125,56 @@ describe("Store (JSON file)", () => {
       expect(store.getConfig("testKey")).toBe("testValue");
     });
   });
+
+  describe("log trimming", () => {
+    it("should trim logs at 1000 entries", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+
+      for (let i = 0; i < 1100; i++) {
+        store.appendLog("run-1", {
+          taskId: "", runId: "run-1", timestamp: Date.now(),
+          level: "info", source: "engine", message: `log ${i}`,
+        });
+      }
+
+      const logs = store.getLogs("run-1");
+      expect(logs.length).toBe(1000);
+    });
+  });
+
+  describe("corrupted JSON", () => {
+    it("should handle corrupted runs index gracefully", () => {
+      fs.writeFileSync(path.join(testDir, "runs.json"), "NOT VALID JSON{{{");
+      const runs = store.listRuns();
+      expect(runs).toEqual([]);
+    });
+  });
+
+  describe("updateTask undefined filtering", () => {
+    it("should not overwrite fields with undefined", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.saveTask("run-1", {
+        id: "task-1", runId: "run-1", type: "user_defined" as const,
+        priority: 1, content: "Test", timeoutMinutes: 60,
+        agentMode: "single" as const, status: "pending" as const, createdAt: Date.now(),
+      });
+
+      store.updateTask("run-1", "task-1", { status: "running", costUsd: undefined });
+      const task = store.getTask("run-1", "task-1");
+      expect(task!.status).toBe("running");
+      // costUsd should remain the original value, not be overwritten with undefined
+    });
+  });
+
+  describe("deleteRun safety", () => {
+    it("should not throw when deleting nonexistent run", () => {
+      expect(() => store.deleteRun("nonexistent")).not.toThrow();
+    });
+  });
 });

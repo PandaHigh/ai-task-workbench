@@ -30,9 +30,7 @@ function getDataDir(): string {
 }
 
 function ensureDir(dir: string): void {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  fs.mkdirSync(dir, { recursive: true });
 }
 
 function readJsonFile<T>(filePath: string, fallback: T): T {
@@ -51,6 +49,9 @@ function writeJsonFile(filePath: string, data: unknown): void {
   const content = JSON.stringify(data, null, 2);
   const tmpPath = filePath + ".tmp";
   fs.writeFileSync(tmpPath, content, "utf-8");
+  if (process.platform === "win32" && fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
   fs.renameSync(tmpPath, filePath);
 }
 
@@ -90,9 +91,8 @@ export class Store {
     const runs = this.listRuns().filter((r) => r.id !== runId);
     writeJsonFile(path.join(this.runsDir, "index.json"), runs);
     const runDir = path.join(this.runsDir, runId);
-    if (fs.existsSync(runDir)) {
-      fs.rmSync(runDir, { recursive: true });
-    }
+    if (!fs.existsSync(runDir)) return;
+    fs.rmSync(runDir, { recursive: true });
   }
 
   // ---- Tasks ----
@@ -127,7 +127,10 @@ export class Store {
     const tasks = this.listTasks(runId);
     const idx = tasks.findIndex((t) => t.id === taskId);
     if (idx >= 0) {
-      tasks[idx] = { ...tasks[idx], ...updates };
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined)
+      );
+      tasks[idx] = { ...tasks[idx], ...cleanUpdates };
       writeJsonFile(path.join(this.runDir(runId), "tasks.json"), tasks);
     }
   }

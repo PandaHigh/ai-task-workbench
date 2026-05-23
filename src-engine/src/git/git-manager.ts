@@ -12,7 +12,7 @@ export class GitManager {
   }
 
   async autoCommit(taskId: string, taskContent: string): Promise<string> {
-    await this.git.add("-A");
+    await this.git.add("-u");
 
     const shortId = taskId.substring(0, 6);
     const summary = taskContent.length > 50
@@ -25,7 +25,13 @@ export class GitManager {
   }
 
   async revert(commitHash: string): Promise<void> {
-    await this.git.raw(["revert", commitHash, "--no-edit"]);
+    try {
+      await this.git.revert(commitHash);
+    } catch (err) {
+      // If revert has conflicts, abort it
+      try { await this.git.raw(["revert", "--abort"]); } catch {}
+      throw err;
+    }
   }
 
   async checkoutClean(): Promise<void> {

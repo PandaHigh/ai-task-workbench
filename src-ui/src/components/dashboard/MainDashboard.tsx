@@ -1,9 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { RobotMascot } from "./RobotMascot";
 import { TaskCard } from "./TaskCard";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
+import { Skeleton } from "../common/Skeleton";
+
+const REFRESH_INTERVAL = 30_000;
 
 export function MainDashboard() {
   const navigate = useNavigate();
@@ -12,6 +15,13 @@ export function MainDashboard() {
 
   useEffect(() => {
     if (connected) loadTasks();
+  }, [connected, loadTasks]);
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    if (!connected) return;
+    const timer = setInterval(() => loadTasks(), REFRESH_INTERVAL);
+    return () => clearInterval(timer);
   }, [connected, loadTasks]);
 
   return (
@@ -29,8 +39,10 @@ export function MainDashboard() {
       </div>
 
       {loading && (
-        <div className="text-center py-10">
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>加载中...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} variant="card" height={120} />
+          ))}
         </div>
       )}
 
@@ -64,8 +76,17 @@ export function MainDashboard() {
 
       {!loading && tasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+          {tasks.map((task, i) => (
+            <div
+              key={task.id}
+              style={{
+                animation: "fadeIn 0.4s ease-out forwards",
+                animationDelay: `${i * 60}ms`,
+                opacity: 0,
+              }}
+            >
+              <TaskCard task={task} onDelete={() => loadTasks()} />
+            </div>
           ))}
         </div>
       )}

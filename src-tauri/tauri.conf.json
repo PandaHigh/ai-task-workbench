@@ -42,6 +42,7 @@
   "plugins": {
     "shell": {
       "open": true
-    }
+    },
+    "window-state": {}
   }
 }

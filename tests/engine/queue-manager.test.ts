@@ -96,4 +96,34 @@ describe("QueueManager", () => {
     expect(queue.list("run-1")).toHaveLength(1);
     expect(queue.list("run-2")).toHaveLength(1);
   });
+
+  it("should deduplicate identical tasks", () => {
+    const t1 = queue.enqueue("run-1", { content: "Same task", type: "smart_task", priority: 1 });
+    const t2 = queue.enqueue("run-1", { content: "Same task", type: "smart_task", priority: 1 });
+    expect(t1.id).toBe(t2.id);
+    expect(queue.list("run-1")).toHaveLength(1);
+  });
+
+  it("should reject enqueue when queue is full", () => {
+    for (let i = 0; i < 200; i++) {
+      queue.enqueue("run-1", { content: `Task ${i}`, type: "smart_task", priority: 1 });
+    }
+    expect(() => queue.enqueue("run-1", { content: "Overflow", type: "smart_task", priority: 1 }))
+      .toThrow("Queue is full");
+  });
+
+  it("should restore tasks into queue", () => {
+    const task = {
+      id: "restored-1", runId: "run-1", content: "Restored",
+      type: "user_defined" as const, priority: 1, status: "pending" as const,
+      createdAt: Date.now(),
+    };
+    queue.restore("run-1", task);
+    expect(queue.list("run-1")).toHaveLength(1);
+    expect(queue.list("run-1")[0].id).toBe("restored-1");
+  });
+
+  it("should return false when removing nonexistent task", () => {
+    expect(queue.remove("run-1", "nonexistent")).toBe(false);
+  });
 });

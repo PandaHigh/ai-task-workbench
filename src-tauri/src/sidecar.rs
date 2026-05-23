@@ -26,23 +26,52 @@ fn find_engine_dir() -> std::path::PathBuf {
 
 /// Resolve npx binary path from common locations
 fn find_npx() -> String {
-    // Check common macOS locations
-    let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = vec![
-        format!("{home}/.nvm/versions/node/default/bin/npx"),
-        "/opt/homebrew/bin/npx".to_string(),
-        "/usr/local/bin/npx".to_string(),
-        format!("{home}/.local/bin/npx"),
-    ];
+    // Platform-specific npx resolution
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let npx_path = std::path::PathBuf::from(appdata).join("npm").join("npx.cmd");
+            if npx_path.exists() {
+                println!("[sidecar] Found npx at {:?}", npx_path);
+                return npx_path.to_string_lossy().to_string();
+            }
+        }
+    }
 
-    for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            println!("[sidecar] Found npx at {}", path);
-            return path.clone();
+    #[cfg(target_os = "linux")]
+    {
+        let linux_candidates = vec![
+            "/usr/bin/npx",
+            "/usr/local/bin/npx",
+        ];
+        for path in &linux_candidates {
+            if std::path::Path::new(path).exists() {
+                println!("[sidecar] Found npx at {}", path);
+                return path.to_string();
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let candidates = vec![
+            format!("{home}/.nvm/versions/node/default/bin/npx"),
+            "/opt/homebrew/bin/npx".to_string(),
+            "/usr/local/bin/npx".to_string(),
+            format!("{home}/.local/bin/npx"),
+        ];
+
+        for path in &candidates {
+            if std::path::Path::new(path).exists() {
+                println!("[sidecar] Found npx at {}", path);
+                return path.clone();
+            }
         }
     }
 
     // Fallback: try to resolve via which
+    #[cfg(unix)]
     if let Ok(output) = std::process::Command::new("/usr/bin/which")
         .arg("npx")
         .output()
@@ -51,6 +80,20 @@ fn find_npx() -> String {
             let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !path.is_empty() && std::path::Path::new(&path).exists() {
                 println!("[sidecar] Found npx via which: {}", path);
+                return path;
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Ok(output) = std::process::Command::new("where")
+        .arg("npx")
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or("").trim().to_string();
+            if !path.is_empty() && std::path::Path::new(&path).exists() {
+                println!("[sidecar] Found npx via where: {}", path);
                 return path;
             }
         }

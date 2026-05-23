@@ -25,7 +25,7 @@ export function RobotMascot({ mood, size = 48 }: RobotMascotProps) {
         filter: style.glow !== "none" ? `drop-shadow(${style.glow})` : undefined,
       }}
     >
-      <svg viewBox="0 0 48 48" width={size} height={size}>
+      <svg viewBox="0 0 48 48" width={size} height={size} role="img" aria-label={`Robot mascot, ${mood} mood`}>
         {/* Body */}
         <rect
           x="12" y="18" width="24" height="20" rx="4"
