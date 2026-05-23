@@ -26,8 +26,7 @@ export function TaskCard({ task }: TaskCardProps) {
 
   const elapsed = task.startedAt
     ? formatDuration(
-        (task.completedAt ? task.completedAt.getTime() : Date.now()) -
-          task.startedAt.getTime(),
+        (task.completedAt || Date.now()) - task.startedAt,
       )
     : "未开始";
 

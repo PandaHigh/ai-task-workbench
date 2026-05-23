@@ -7,16 +7,14 @@ const store = new Store();
 const queueManager = new QueueManager();
 const activeExecutors = new Map<string, Executor>();
 
-type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
+type NotifyFn = (method: string, params: Record<string, unknown>) => void;
+let notify: NotifyFn = () => {};
 
-function createNotify_fn(): (method: string, params: Record<string, unknown>) => void {
-  // Will be wired up by the server
-  return (_method: string, _params: Record<string, unknown>) => {
-    // TODO: emit notification via server
-  };
+export function setNotifyFn(fn: NotifyFn): void {
+  notify = fn;
 }
 
-const notify = createNotify_fn();
+type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
 
 export const methodHandlers: Record<string, MethodHandler> = {
   "run.list": async () => {

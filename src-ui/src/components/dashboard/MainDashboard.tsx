@@ -1,11 +1,18 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { RobotMascot } from "./RobotMascot";
 import { TaskCard } from "./TaskCard";
 import { useTaskStore } from "../../stores/task-store";
+import { useEngine } from "../../hooks/useEngine";
 
 export function MainDashboard() {
   const navigate = useNavigate();
-  const tasks = useTaskStore((s) => s.tasks);
+  const { connected } = useEngine();
+  const { tasks, loading, loadTasks } = useTaskStore();
+
+  useEffect(() => {
+    if (connected) loadTasks();
+  }, [connected, loadTasks]);
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -15,13 +22,19 @@ export function MainDashboard() {
             任务总览
           </h2>
           <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            管理和监控所有 AI 任务
+            {connected ? `已连接引擎 · ${tasks.length} 个任务` : "引擎未连接"}
           </p>
         </div>
-        <RobotMascot mood="idle" />
+        <RobotMascot mood={connected ? "idle" : "error"} />
       </div>
 
-      {tasks.length === 0 ? (
+      {loading && (
+        <div className="text-center py-10">
+          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>加载中...</p>
+        </div>
+      )}
+
+      {!loading && tasks.length === 0 && (
         <div
           className="flex flex-col items-center justify-center py-20 rounded-lg border"
           style={{
@@ -47,7 +60,9 @@ export function MainDashboard() {
             + 新建任务
           </button>
         </div>
-      ) : (
+      )}
+
+      {!loading && tasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tasks.map((task) => (
             <TaskCard key={task.id} task={task} />

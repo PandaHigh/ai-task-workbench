@@ -1,30 +1,14 @@
-import { createRpcServer } from "./json-rpc/server.js";
+import { WsServer } from "./ws-server.js";
+import { setNotifyFn } from "./json-rpc/methods.js";
 
 async function main() {
-  const server = createRpcServer();
+  const wsServer = new WsServer();
 
-  process.stdin.setEncoding("utf-8");
-
-  let buffer = "";
-
-  process.stdin.on("data", (chunk: string) => {
-    buffer += chunk;
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (line.trim()) {
-        server.handleLine(line);
-      }
-    }
+  setNotifyFn((method: string, params: Record<string, unknown>) => {
+    wsServer.broadcast(method, params);
   });
 
-  process.stdin.on("end", () => {
-    process.exit(0);
-  });
-
-  process.on("SIGTERM", () => process.exit(0));
-  process.on("SIGINT", () => process.exit(0));
+  wsServer.start();
 }
 
 main().catch((err) => {

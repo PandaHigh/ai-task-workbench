@@ -1,9 +1,12 @@
 import { create } from "zustand";
-import type { ExecutionRun, TaskDefinition } from "@ai-workbench/shared";
+import type { ExecutionRun } from "@ai-workbench/shared";
+import { engineClient } from "../lib/engine-client";
 
 interface TaskStore {
   tasks: ExecutionRun[];
   activeRunId: string | null;
+  loading: boolean;
+  loadTasks: () => Promise<void>;
   addTask: (task: ExecutionRun) => void;
   updateTask: (id: string, updates: Partial<ExecutionRun>) => void;
   removeTask: (id: string) => void;
@@ -13,6 +16,17 @@ interface TaskStore {
 export const useTaskStore = create<TaskStore>((set) => ({
   tasks: [],
   activeRunId: null,
+  loading: false,
+
+  loadTasks: async () => {
+    set({ loading: true });
+    try {
+      const runs = (await engineClient.call("run.list")) as ExecutionRun[];
+      set({ tasks: runs, loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
 
   addTask: (task) =>
     set((state) => ({ tasks: [...state.tasks, task] })),
