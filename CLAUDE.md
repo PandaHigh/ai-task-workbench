@@ -1,38 +1,59 @@
 # AI Task Workbench (全自动任务AI工具台)
 
 ## 项目概述
-全自动 AI 任务工具台 - 管理多个独立 AI 任务，支持自进化执行循环、质量评分、自动 git 提交。
+全自动 AI 任务工具台 — 管理多个独立 AI 任务，支持自进化执行循环、质量评分、自动 git 提交。
 
 ## 技术栈
-- **桌面框架**: Tauri 2 (Rust)
-- **前端**: React 18 + TypeScript + Tailwind v4
-- **后端引擎**: Node.js sidecar (TypeScript)
+- **前端**: React 18 + TypeScript + Tailwind v4 (Claude Code 终端风格)
+- **后端引擎**: Node.js (TypeScript) — WebSocket server (ws://localhost:9731)
 - **CC 集成**: `claude -p` CLI 子进程 (stream-json)
 - **数据存储**: JSON 文件（不用数据库）
-- **状态管理**: Zustand
-- **状态机**: XState v5
+- **状态管理**: Zustand + XState v5
+- **Git**: simple-git（跨平台）
 
 ## 目录结构
-- `shared/` - 共享 TypeScript 类型
-- `src-engine/` - Node.js 后端引擎（JSON-RPC server，CC 客户端，执行器）
-- `src-ui/` - React 前端（Tauri webview）
-- `src-tauri/` - Rust 后端（Tauri 桌面应用）
+```
+shared/         共享 TypeScript 类型 (TaskDefinition, ExecutionRun, RPC)
+src-engine/     Node.js 引擎 (WS server, CC client, executor, queue, store)
+src-ui/         React 前端 (dashboard, wizard, evolution, settings)
+src-tauri/      Rust 后端 (Phase 5+ Tauri 桌面应用)
+tests/engine/   Vitest 集成测试
+```
 
-## 关键架构
-- Tauri 通过 stdio JSON-RPC 与 Node.js 引擎通信
-- 引擎通过 `claude -p` 子进程调用 Claude Code
-- 数据保存在 `~/Library/Application Support/ai-task-workbench/runs/` 目录
-- 每个 run 一个目录：tasks.json, logs.json, commits.json, lessons.json, scores.json
+## 启动方式
+```bash
+# 启动引擎
+cd src-engine && npx tsx src/index.ts
 
-## 开发命令
-- `cd src-ui && npx vite` - 启动前端开发服务器
-- `cd src-engine && npx tsx src/index.ts` - 启动引擎（stdin/stdout JSON-RPC）
+# 启动前端（另一个终端）
+cd src-ui && npx vite --host --port 1420
+
+# 运行测试
+cd src-engine && npx vitest run
+```
+
+## 架构
+```
+浏览器 (localhost:1420) ←→ WebSocket (ws://localhost:9731) ←→ Node.js 引擎
+                                                            ←→ claude -p 子进程
+                                                            ←→ JSON 文件存储
+                                                            ←→ git 操作
+```
+
+## JSON-RPC 方法
+`run.create/run.list | task.create/task.start/task.pause | queue.list/queue.reorder | wizard.start/wizard.chat/wizard.validate | config.get/config.set`
+
+## 数据存储路径
+`~/Library/Application Support/ai-task-workbench/runs/{runId}/`
+每个 run: tasks.json, logs.json, commits.json, lessons.json, scores.json, report.json
 
 ## Git 提交规范
-- 每个 CC 智能任务完成后自动提交：`[taskId前6位] 任务摘要 #AI commit#`
-- 低于质量阈值的任务自动 revert
+- 格式: `[taskId前6位] 任务摘要 #AI commit#`
+- 质量评分 < 0.6 自动 revert
 
-## 设计风格
-- 模仿 Claude Code 终端美学
-- 深色主题：背景 #0d1117，主文本 #e6edf3
-- 字体：JetBrains Mono
+## 自进化循环
+1. 从队列取任务（用户定义优先）
+2. 队列空 → CC 评估目标是否达成
+3. 未完成 → CC 生成新智能任务入队
+4. 已完成 → CC 生成总结报告
+5. 每个任务：执行 → 评分 → 通过则 git commit / 不通过则 revert + 记录教训
