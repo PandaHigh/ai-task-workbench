@@ -5,7 +5,6 @@ import { TaskWizard } from "./components/wizard/TaskWizard";
 import { EvolutionDashboard } from "./components/evolution/EvolutionDashboard";
 import { SettingsPage } from "./components/settings/SettingsPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { Toast } from "./components/Toast";
 import { useEngine } from "./hooks/useEngine";
 import { useNotifications } from "./hooks/useNotifications";
 
@@ -23,7 +22,6 @@ export function App() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </ErrorBoundary>
-      <Toast />
     </AppShell>
   );
 }

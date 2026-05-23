@@ -2,14 +2,12 @@ import { useEffect } from "react";
 import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
-import { useToastStore } from "./useToast";
 import type { ExecutionRun } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
   const addLog = useEvolutionStore((s) => s.addLog);
   const setRunning = useEvolutionStore((s) => s.setRunning);
-  const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     return engineClient.onNotification((method, params) => {
@@ -48,18 +46,13 @@ export function useNotifications() {
         }
         case "task.scored": {
           const { taskId, score } = params as { taskId: string; score: { overall: number; passed: boolean; reasoning?: string } };
-          const pct = (score.overall * 100).toFixed(0);
           addLog({
             id: Date.now(),
             timestamp: Date.now(),
             level: score.passed ? "info" : "warn",
             source: "scorer",
-            message: `Task ${taskId.substring(0, 6)} scored: ${pct}% ${score.passed ? "PASS" : "FAIL"}${score.reasoning ? ` — ${score.reasoning}` : ""}`,
+            message: `Task ${taskId.substring(0, 6)} scored: ${(score.overall * 100).toFixed(0)}% ${score.passed ? "PASS" : "FAIL"}${score.reasoning ? ` — ${score.reasoning}` : ""}`,
           });
-          addToast(
-            `Task scored ${pct}% — ${score.passed ? "PASS" : "FAIL"}`,
-            score.passed ? "success" : "error",
-          );
           break;
         }
         case "git.commit": {
@@ -71,7 +64,6 @@ export function useNotifications() {
             source: "git",
             message: `Commit ${hash.substring(0, 7)}: ${message}`,
           });
-          addToast(`Committed: ${hash.substring(0, 7)}`, "success");
           break;
         }
         case "queue.updated": {
@@ -87,5 +79,5 @@ export function useNotifications() {
         }
       }
     });
-  }, [updateTask, addLog, setRunning, addToast]);
+  }, [updateTask, addLog, setRunning]);
 }
