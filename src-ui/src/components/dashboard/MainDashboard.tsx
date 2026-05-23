@@ -5,6 +5,7 @@ import { TaskCard } from "./TaskCard";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import { Skeleton } from "../common/Skeleton";
+import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 
 const REFRESH_INTERVAL = 30_000;
 
@@ -25,8 +26,11 @@ export function MainDashboard() {
   }, [connected, loadTasks]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex-1 overflow-y-auto p-6" style={pageEnterStyle()}>
+      <div
+        className="flex items-center justify-between mb-6"
+        style={{ animation: "slideUp 0.4s ease-out" }}
+      >
         <div>
           <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
             任务总览
@@ -52,6 +56,7 @@ export function MainDashboard() {
           style={{
             borderColor: "var(--border)",
             background: "var(--bg-secondary)",
+            animation: "scaleIn 0.4s ease-out",
           }}
         >
           <div className="text-4xl mb-4 animate-float">🤖</div>
@@ -77,14 +82,7 @@ export function MainDashboard() {
       {!loading && tasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tasks.map((task, i) => (
-            <div
-              key={task.id}
-              style={{
-                animation: "fadeIn 0.4s ease-out forwards",
-                animationDelay: `${i * 60}ms`,
-                opacity: 0,
-              }}
-            >
+            <div key={task.id} style={staggerItemStyle(i, 60)}>
               <TaskCard task={task} onDelete={() => loadTasks()} />
             </div>
           ))}

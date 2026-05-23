@@ -74,7 +74,7 @@ export function TerminalLine({ content, color, prefix }: TerminalLineProps) {
 
   if (!hasAnsi) {
     return (
-      <div className="terminal-line" style={{ animation: "fadeIn 0.15s ease-out" }}>
+      <div className="terminal-line terminal-line-enter">
         {prefix && <span style={{ color: "var(--green)" }}>{prefix}</span>}
         <span style={{ color: color || "var(--text-primary)" }}>{content}</span>
       </div>
@@ -83,7 +83,7 @@ export function TerminalLine({ content, color, prefix }: TerminalLineProps) {
 
   const parts = parseAnsi(content);
   return (
-    <div className="terminal-line" style={{ animation: "fadeIn 0.15s ease-out" }}>
+    <div className="terminal-line terminal-line-enter">
       {prefix && <span style={{ color: "var(--green)" }}>{prefix}</span>}
       {parts.map((part, i) => (
         <span key={i} style={{ color: part.color || color || "var(--text-primary)" }}>

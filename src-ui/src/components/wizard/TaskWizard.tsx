@@ -5,6 +5,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useToast } from "../common/Toast";
+import { pageEnterStyle } from "../../hooks/useAnimations";
 
 function ThinkingDots() {
   return (
@@ -27,15 +28,18 @@ function ThinkingDots() {
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
   const indexRef = useRef(0);
 
   useEffect(() => {
     indexRef.current = 0;
     setDisplayed("");
+    setIsTyping(true);
     const timer = setInterval(() => {
       indexRef.current += 1;
       if (indexRef.current >= text.length) {
         setDisplayed(text);
+        setIsTyping(false);
         clearInterval(timer);
       } else {
         setDisplayed(text.slice(0, indexRef.current));
@@ -44,7 +48,12 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
     return () => clearInterval(timer);
   }, [text, speed]);
 
-  return <>{displayed}</>;
+  return (
+    <span>
+      {displayed}
+      {isTyping && <span className="typewriter-cursor" />}
+    </span>
+  );
 }
 
 export function TaskWizard() {
@@ -180,8 +189,11 @@ export function TaskWizard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+    <div className="flex-1 flex flex-col overflow-hidden" style={pageEnterStyle()}>
+      <div
+        className="px-6 py-4 border-b"
+        style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
+      >
         <div className="flex items-center gap-3">
           <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">新建 AI 任务</h2>
@@ -200,7 +212,7 @@ export function TaskWizard() {
       </div>
 
       {step === 0 && (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center" style={{ animation: "fadeIn 0.4s ease-out" }}>
           <div className="text-center">
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
             {!showDirInput ? (
@@ -226,7 +238,7 @@ export function TaskWizard() {
       )}
 
       {step === 1 && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col" style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
               <div className="text-center py-10">
@@ -238,7 +250,7 @@ export function TaskWizard() {
                 key={getMessageId(msg, i)}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 style={{
-                  animation: "slideUp 0.25s ease-out",
+                  animation: "slideUp 0.3s ease-out",
                 }}
               >
                 <div className="max-w-[80%] px-3 py-2 rounded-lg text-xs terminal-line whitespace-pre-wrap" style={{
@@ -285,8 +297,11 @@ export function TaskWizard() {
       )}
 
       {step === 2 && taskParams && (
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+        <div className="flex-1 overflow-y-auto p-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
+          <div
+            className="rounded-lg border p-4"
+            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", animation: "slideUp 0.35s ease-out" }}
+          >
             <h3 className="text-sm font-bold mb-3">任务参数</h3>
             <div className="space-y-3 text-xs">
               <div>

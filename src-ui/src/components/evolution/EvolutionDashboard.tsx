@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { TaskDefinition } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
+import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 
 type TabType = "logs" | "commits" | "lessons";
 
@@ -112,10 +113,13 @@ export function EvolutionDashboard() {
   const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden" style={pageEnterStyle()}>
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="px-6 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+        <div
+          className="px-6 py-3 border-b flex items-center justify-between"
+          style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
+        >
           <div className="flex items-center gap-3">
             <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
             <h2 className="text-sm font-bold">自进化看板</h2>
@@ -136,7 +140,10 @@ export function EvolutionDashboard() {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Task Queue */}
-          <div className="w-72 border-r flex flex-col" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="w-72 border-r flex flex-col"
+            style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
+          >
             <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
               <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务队列 ({queue.length})</h3>
               {queue.length > 0 && (
@@ -163,10 +170,11 @@ export function EvolutionDashboard() {
                     style={{
                       background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",
                       border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
-                      opacity: dragIdx !== null && dragIdx !== i ? 0.7 : 1,
+                      opacity: dragIdx !== null && dragIdx !== i ? 0.7 : dragIdx === i ? 1 : undefined,
                       transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
                       boxShadow: dragIdx === i ? "0 4px 16px rgba(0,0,0,0.4)" : undefined,
                       transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
+                      ...staggerItemStyle(i, 40, "staggerFadeIn", 0.3),
                     }}
                     onClick={() => setActiveTask(task.id)}
                   >
@@ -213,7 +221,7 @@ export function EvolutionDashboard() {
                 ) : (
                   <div className="space-y-0.5">
                     {logs.map((log) => (
-                      <div key={log.id} className="terminal-line" style={{ animation: "fadeIn 0.15s ease-out" }}>
+                      <div key={log.id} className="terminal-line terminal-line-enter">
                         <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
                         <span style={{ color: levelColor(log.level) }}>[{log.level.toUpperCase()}]</span>{" "}
                         <span style={{ color: "var(--text-secondary)" }}>[{log.source}]</span>{" "}
@@ -232,7 +240,7 @@ export function EvolutionDashboard() {
                 ) : (
                   <div className="space-y-2">
                     {commits.map((c, i) => (
-                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", animation: "slideUp 0.25s ease-out", animationDelay: `${i * 40}ms`, opacity: 0, animationFillMode: "forwards" }}>
+                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "—"}</span>
                           {c.isAiCommit && (
@@ -257,7 +265,7 @@ export function EvolutionDashboard() {
                 ) : (
                   <div className="space-y-2">
                     {lessons.map((l, i) => (
-                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                      <div key={i} className="px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="px-1.5 py-0.5 rounded text-[10px]" style={{
                             background: l.category === "failure" ? "rgba(248, 81, 73, 0.15)" :
@@ -284,7 +292,10 @@ export function EvolutionDashboard() {
       </div>
 
       {/* Right sidebar */}
-      <div className="w-64 border-l flex flex-col" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+      <div
+        className="w-64 border-l flex flex-col"
+        style={{ borderColor: "var(--border)", background: "var(--bg-secondary)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
+      >
         <div className="px-4 py-2 border-b" style={{ borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>控制面板</h3>
         </div>

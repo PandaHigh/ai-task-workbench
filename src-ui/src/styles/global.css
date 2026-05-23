@@ -94,6 +94,33 @@ body {
   animation: spin-slow 8s linear infinite;
 }
 
+.page-enter {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.slide-up-enter {
+  animation: slideUp 0.35s ease-out forwards;
+}
+
+.slide-down-enter {
+  animation: slideDown 0.35s ease-out forwards;
+}
+
+.scale-enter {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.terminal-line-enter {
+  animation: terminalLineIn 0.2s ease-out;
+}
+
+.typewriter-cursor::after {
+  content: "▋";
+  animation: typewriterCursor 0.8s step-end infinite;
+  color: var(--green);
+  margin-left: 1px;
+}
+
 .terminal-line {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -236,6 +263,39 @@ textarea,
 @keyframes fadeOut {
   from { opacity: 1; transform: scale(1); }
   to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes terminalLineIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes typewriterCursor {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Custom range input for dark theme */
