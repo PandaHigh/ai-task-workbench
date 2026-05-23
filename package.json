@@ -8,6 +8,7 @@
     "dev:engine": "npm run dev --workspace=src-engine",
     "dev:tauri": "cargo tauri dev",
     "build": "npm run build --workspace=src-engine && npm run build --workspace=src-ui",
+    "build:tauri": "npm run build && cargo tauri build",
     "test": "npm run test --workspaces --if-present",
     "test:engine": "npm run test --workspace=src-engine",
     "test:ui": "npm run test --workspace=src-ui"
