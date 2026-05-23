@@ -105,6 +105,14 @@ export class WsServer {
     }
   }
 
+  close(): void {
+    for (const client of this.clients) {
+      client.close();
+    }
+    this.clients.clear();
+    this.wss.close();
+  }
+
   private isValidRequest(msg: unknown): msg is RpcRequest {
     return (
       typeof msg === "object" &&

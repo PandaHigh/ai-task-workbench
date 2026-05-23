@@ -55,6 +55,7 @@ export class CCClient {
 
       const timeout = setTimeout(() => {
         proc.kill("SIGTERM");
+        setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
         reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
       }, options.timeoutMinutes * 60 * 1000);
 
@@ -105,6 +106,7 @@ export class CCClient {
       if (options.abortSignal) {
         options.abortSignal.addEventListener("abort", () => {
           proc.kill("SIGTERM");
+          setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
           reject(new Error("Task was aborted"));
         });
       }
@@ -125,6 +127,7 @@ export class CCClient {
 
     const timeout = setTimeout(() => {
       proc.kill("SIGTERM");
+      setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
     }, options.timeoutMinutes * 60 * 1000);
 
     let buffer = "";

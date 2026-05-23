@@ -15,6 +15,13 @@ export function setNotifyFn(fn: NotifyFn): void {
   notify = fn;
 }
 
+export function shutdown(): void {
+  for (const [runId, executor] of activeExecutors) {
+    executor.stop();
+    activeExecutors.delete(runId);
+  }
+}
+
 type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
 
 export const methodHandlers: Record<string, MethodHandler> = {
@@ -64,13 +71,28 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const run = store.getRun(runId);
     if (!run) throw new Error(`Run ${runId} not found`);
 
+    if (activeExecutors.has(runId)) {
+      throw new Error(`Run ${runId} already has an active executor`);
+    }
+
+    // Reload pending tasks into queue from store
+    const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
+    for (const t of pendingTasks) {
+      if (!queueManager.list(runId).some((q) => q.id === t.id)) {
+        queueManager.restore(runId, t);
+      }
+    }
+
     run.status = "running";
     run.startedAt = Date.now();
     store.saveRun(run);
 
-    const executor = new Executor(queueManager, notify);
+    const executor = new Executor(queueManager, notify, runId);
     activeExecutors.set(runId, executor);
-    executor.start(run);
+
+    executor.start(run).finally(() => {
+      activeExecutors.delete(runId);
+    });
 
     return { status: "running" };
   },

@@ -97,6 +97,19 @@ export class QueueManager {
     this.queues.delete(runId);
   }
 
+  /** Restore an existing task into the queue (preserves original id/createdAt) */
+  restore(runId: string, task: TaskDefinition): void {
+    const queue = this.getOrCreateQueue(runId);
+    if (queue.some((e) => e.task.id === task.id)) return;
+    queue.push({ task, position: queue.length });
+    queue.sort((a, b) => {
+      if (a.task.type === "user_defined" && b.task.type !== "user_defined") return -1;
+      if (a.task.type !== "user_defined" && b.task.type === "user_defined") return 1;
+      return a.task.priority - b.task.priority;
+    });
+    queue.forEach((entry, i) => { entry.position = i; });
+  }
+
   private getOrCreateQueue(runId: string): QueueEntry[] {
     let queue = this.queues.get(runId);
     if (!queue) {

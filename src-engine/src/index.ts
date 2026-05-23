@@ -1,5 +1,5 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown } from "./json-rpc/methods.js";
 
 async function main() {
   const wsServer = new WsServer();
@@ -9,6 +9,16 @@ async function main() {
   });
 
   wsServer.start();
+
+  const gracefulShutdown = () => {
+    console.log("\nShutting down gracefully...");
+    shutdown();
+    wsServer.close();
+    process.exit(0);
+  };
+
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
 }
 
 main().catch((err) => {
