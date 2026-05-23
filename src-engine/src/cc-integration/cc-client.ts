@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from "child_process";
-import { platform } from "os";
 
 export interface CCExecutionOptions {
   workingDir: string;
@@ -32,7 +31,7 @@ export class CCClient {
   private claudePath: string;
 
   constructor(claudePath: string = "claude") {
-    this.claudePath = platform() === "win32" && claudePath === "claude" ? "claude.cmd" : claudePath;
+    this.claudePath = claudePath;
   }
 
   async executeTask(
@@ -54,46 +53,36 @@ export class CCClient {
         stdio: ["ignore", "pipe", "pipe"],
       });
 
-      let settled = false;
-      let sigkillTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const cleanup = () => {
-        clearTimeout(timeout);
-        if (sigkillTimer) clearTimeout(sigkillTimer);
-      };
-
       const timeout = setTimeout(() => {
-        settled = true;
         proc.kill("SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
+        setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
         reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
       }, options.timeoutMinutes * 60 * 1000);
 
       let stdoutBuffer = "";
       let stderrBuffer = "";
 
-      const parseAndCollect = (text: string) => {
-        if (!text.trim()) return;
-        try {
-          const msg = JSON.parse(text.trim());
-          messages.push(msg);
-          if (msg.type === "result" && msg.subtype === "success") {
-            result = msg.result || "";
-            sessionId = msg.session_id || "";
-            totalCostUsd = msg.total_cost_usd || 0;
-            durationMs = msg.duration_ms || 0;
-            numTurns = msg.num_turns || 0;
-          }
-        } catch {
-          // non-JSON line, skip
-        }
-      };
-
       proc.stdout.on("data", (chunk: Buffer) => {
         stdoutBuffer += chunk.toString();
         const lines = stdoutBuffer.split("\n");
         stdoutBuffer = lines.pop() || "";
-        for (const line of lines) parseAndCollect(line);
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            messages.push(msg);
+            if (msg.type === "result" && msg.subtype === "success") {
+              result = msg.result || "";
+              sessionId = msg.session_id || "";
+              totalCostUsd = msg.total_cost_usd || 0;
+              durationMs = msg.duration_ms || 0;
+              numTurns = msg.num_turns || 0;
+            }
+          } catch {
+            // non-JSON line, skip
+          }
+        }
       });
 
       proc.stderr.on("data", (chunk: Buffer) => {
@@ -101,39 +90,24 @@ export class CCClient {
       });
 
       proc.on("close", (code) => {
-        // Flush remaining buffer
-        parseAndCollect(stdoutBuffer);
-        stdoutBuffer = "";
-        cleanup();
-        if (!settled) {
-          settled = true;
-          if (code === 0 || result) {
-            resolve({ result, sessionId, totalCostUsd, durationMs, numTurns, messages });
-          } else {
-            reject(new Error(`CC process exited with code ${code}: ${stderrBuffer}`));
-          }
+        clearTimeout(timeout);
+        if (code === 0 || result) {
+          resolve({ result, sessionId, totalCostUsd, durationMs, numTurns, messages });
+        } else {
+          reject(new Error(`CC process exited with code ${code}: ${stderrBuffer}`));
         }
       });
 
       proc.on("error", (err) => {
-        cleanup();
-        if (!settled) {
-          settled = true;
-          reject(err);
-        }
+        clearTimeout(timeout);
+        reject(err);
       });
 
       if (options.abortSignal) {
-        const onAbort = () => {
-          if (settled) return;
-          settled = true;
+        options.abortSignal.addEventListener("abort", () => {
           proc.kill("SIGTERM");
-          sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
+          setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
           reject(new Error("Task was aborted"));
-        };
-        options.abortSignal.addEventListener("abort", onAbort);
-        proc.on("close", () => {
-          options.abortSignal!.removeEventListener("abort", onAbort);
         });
       }
     });
@@ -151,16 +125,14 @@ export class CCClient {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    let sigkillTimer: ReturnType<typeof setTimeout> | null = null;
     const timeout = setTimeout(() => {
       proc.kill("SIGTERM");
-      sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
+      setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
     }, options.timeoutMinutes * 60 * 1000);
 
     let buffer = "";
     let resolveNext: ((value: IteratorResult<CCMessage>) => void) | null = null;
     let done = false;
-    let streamError: Error | null = null;
 
     proc.stdout.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
@@ -183,19 +155,6 @@ export class CCClient {
 
     proc.on("close", () => {
       clearTimeout(timeout);
-      if (sigkillTimer) clearTimeout(sigkillTimer);
-      // Flush remaining buffer
-      if (buffer.trim()) {
-        try {
-          const msg = JSON.parse(buffer.trim());
-          if (resolveNext) {
-            resolveNext({ value: msg, done: false });
-            resolveNext = null;
-          }
-        } catch {
-          // incomplete JSON
-        }
-      }
       done = true;
       if (resolveNext) {
         resolveNext({ value: undefined, done: true } as IteratorResult<CCMessage>);
@@ -205,8 +164,6 @@ export class CCClient {
 
     proc.on("error", (err) => {
       clearTimeout(timeout);
-      if (sigkillTimer) clearTimeout(sigkillTimer);
-      streamError = err;
       done = true;
       if (resolveNext) {
         resolveNext({ value: undefined, done: true } as IteratorResult<CCMessage>);
@@ -216,32 +173,21 @@ export class CCClient {
     });
 
     if (options.abortSignal) {
-      const onAbort = () => {
+      options.abortSignal.addEventListener("abort", () => {
         proc.kill("SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
-      };
-      options.abortSignal.addEventListener("abort", onAbort);
-      proc.on("close", () => {
-        options.abortSignal!.removeEventListener("abort", onAbort);
       });
     }
 
     while (!done) {
-      const value = await new Promise<CCMessage | null>((resolve) => {
+      yield await new Promise<CCMessage>((resolve) => {
         resolveNext = (result) => {
           if (result.done) {
-            resolve(null);
+            resolve(null as unknown as CCMessage);
           } else {
             resolve(result.value);
           }
         };
       });
-      if (value === null) break;
-      yield value;
-    }
-
-    if (streamError) {
-      throw streamError;
     }
   }
 

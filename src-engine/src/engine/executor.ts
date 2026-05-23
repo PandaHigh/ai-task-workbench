@@ -4,11 +4,10 @@ import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
 import type { QueueManager } from "./queue-manager.js";
 
-const DEFAULT_QUALITY_THRESHOLD = 0.6;
-const DEFAULT_MAX_EVALUATION_CYCLES = 20;
-const DEFAULT_MAX_BUDGET_USD = 50;
-const DEFAULT_STAGNATION_WINDOW = 5;
-const DEFAULT_MAX_TURNS = 50;
+const QUALITY_THRESHOLD = 0.6;
+const MAX_EVALUATION_CYCLES = 20;
+const MAX_BUDGET_USD = 50;
+const STAGNATION_WINDOW = 5;
 const CYCLE_COOLDOWN_MS = 10000;
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
@@ -20,14 +19,6 @@ export class Executor {
   private running = false;
   private evaluationCycles = 0;
   private progressHistory: number[] = [];
-  private stopController: AbortController | null = null;
-  private config: {
-    qualityThreshold: number;
-    maxEvaluationCycles: number;
-    maxBudgetUsd: number;
-    stagnationWindow: number;
-    maxTurns: number;
-  };
 
   constructor(
     private queueManager: QueueManager,
@@ -36,20 +27,6 @@ export class Executor {
   ) {
     this.ccClient = new CCClient();
     this.store = new Store();
-    this.config = {
-      qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
-      maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,
-      maxBudgetUsd: DEFAULT_MAX_BUDGET_USD,
-      stagnationWindow: DEFAULT_STAGNATION_WINDOW,
-      maxTurns: DEFAULT_MAX_TURNS,
-    };
-    // Try to load config overrides
-    try {
-      const saved = this.store.getConfig();
-      if (saved) {
-        this.config = { ...this.config, ...saved };
-      }
-    } catch {}
   }
 
   async start(run: ExecutionRun): Promise<void> {
