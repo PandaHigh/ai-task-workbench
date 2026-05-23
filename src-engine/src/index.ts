@@ -19,20 +19,23 @@ async function main() {
     }
     isShuttingDown = true;
     console.log("\nShutting down gracefully...");
+    let shutdownOk = true;
     try {
       shutdown();
       await wsServer.close();
     } catch (err) {
       console.error("Error during shutdown:", err);
+      shutdownOk = false;
     }
-    process.exit(0);
+    process.exit(shutdownOk ? 0 : 1);
   };
 
   process.on("SIGINT", gracefulShutdown);
   process.on("SIGTERM", gracefulShutdown);
 
   process.on("uncaughtException", (err) => {
-    console.error("[engine] Uncaught exception:", err);
+    console.error("[engine] Uncaught exception — initiating shutdown:", err);
+    gracefulShutdown();
   });
 
   process.on("unhandledRejection", (reason) => {

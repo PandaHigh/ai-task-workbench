@@ -10,6 +10,8 @@ class EngineClient {
   private pending: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }> = new Map();
   private notificationHandlers: Set<NotificationHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectDelay = 30000;
   private connected = false;
 
   connect(): Promise<void> {
@@ -23,6 +25,7 @@ class EngineClient {
 
       this.ws.onopen = () => {
         this.connected = true;
+        this.reconnectAttempts = 0;
         resolve();
       };
 
@@ -111,10 +114,12 @@ class EngineClient {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts) + Math.random() * 1000, this.maxReconnectDelay);
+    this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect().catch(() => {});
-    }, 3000);
+    }, delay);
   }
 }
 

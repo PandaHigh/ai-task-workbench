@@ -4,14 +4,17 @@ import { RPC_ERRORS } from "@ai-workbench/shared";
 import { methodHandlers } from "./json-rpc/methods.js";
 
 const PORT = 9731;
+const HEARTBEAT_INTERVAL_MS = 30000;
 
 export class WsServer {
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatIntervalMs: number;
 
-  constructor() {
+  constructor(options?: { heartbeatIntervalMs?: number }) {
     this.wss = new WebSocketServer({ port: PORT });
+    this.heartbeatIntervalMs = options?.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
   }
 
   start(): void {
@@ -67,7 +70,7 @@ export class WsServer {
         d.terminate();
         this.clients.delete(d);
       }
-    }, 30000);
+    }, this.heartbeatIntervalMs);
 
     console.log(`[engine] WebSocket server listening on ws://localhost:${PORT}`);
   }
@@ -122,6 +125,8 @@ export class WsServer {
       const result = await handler(req.params || {});
       this.send(ws, { jsonrpc: "2.0", id: req.id, result });
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[rpc] ${req.method} failed: ${errMsg}`);
       this.send(ws, {
         jsonrpc: "2.0",
         id: req.id,

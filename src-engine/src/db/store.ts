@@ -38,8 +38,8 @@ function readJsonFile<T>(filePath: string, fallback: T): T {
     if (fs.existsSync(filePath)) {
       return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
     }
-  } catch {
-    // corrupted file, return fallback
+  } catch (err) {
+    console.error(`[store] Failed to read/parse ${filePath}: ${err instanceof Error ? err.message : err}. Using fallback.`);
   }
   return fallback;
 }
@@ -48,11 +48,38 @@ function writeJsonFile(filePath: string, data: unknown): void {
   ensureDir(path.dirname(filePath));
   const content = JSON.stringify(data, null, 2);
   const tmpPath = filePath + ".tmp";
-  fs.writeFileSync(tmpPath, content, "utf-8");
+  const fd = fs.openSync(tmpPath, "w");
+  try {
+    fs.writeFileSync(fd, content, "utf-8");
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
   if (process.platform === "win32" && fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
   }
   fs.renameSync(tmpPath, filePath);
+}
+
+function cleanupTmpFiles(dir: string): void {
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        cleanupTmpFiles(fullPath);
+      } else if (entry.name.endsWith(".tmp")) {
+        try {
+          fs.unlinkSync(fullPath);
+          console.warn(`[store] Cleaned up stale tmp file: ${fullPath}`);
+        } catch {
+          // best effort
+        }
+      }
+    }
+  } catch {
+    // directory may not exist yet
+  }
 }
 
 export class Store {
@@ -63,6 +90,7 @@ export class Store {
     this.dataDir = customDataDir || getDataDir();
     this.runsDir = path.join(this.dataDir, "runs");
     ensureDir(this.runsDir);
+    cleanupTmpFiles(this.runsDir);
   }
 
   // ---- Execution Runs ----

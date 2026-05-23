@@ -127,7 +127,7 @@ describe("Store (JSON file)", () => {
   });
 
   describe("log trimming", () => {
-    it("should trim logs at 1000 entries", () => {
+    it("should trim logs at 1000 entries", { timeout: 30000 }, () => {
       store.saveRun({
         id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
         status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,

@@ -82,7 +82,7 @@ export class Executor {
         this.store.saveRun(run);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = this.errorToMessage(err);
       this.log(run.id, "engine", "error", `Execution failed: ${msg}`);
       run.status = "failed";
       this.store.saveRun(run);
@@ -114,7 +114,7 @@ export class Executor {
     try {
       evaluation = await this.evaluateGoal(run);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = this.errorToMessage(err);
       this.log(run.id, "engine", "warn", `Goal evaluation failed: ${msg}. Cooling down and retrying next cycle.`);
       try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
       return true;
@@ -141,7 +141,7 @@ export class Executor {
     try {
       smartTasks = await this.generateSmartTasks(run, evaluation);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = this.errorToMessage(err);
       this.log(run.id, "engine", "warn", `Smart task generation failed: ${msg}. Retrying next cycle.`);
       try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
       return true;
@@ -221,7 +221,7 @@ export class Executor {
       const context = await this.buildContext(task, run, gitManager);
       const systemPrompt = this.buildSystemPrompt(task, context);
 
-      this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}... (${task.agentMode === "multi" ? "multi-agent" : "single-agent"})`);
+      this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}... (${task.agentMode === "multi" ? "multi-agent" : "single-agent"})`, task.id);
 
       let result;
 
@@ -268,7 +268,7 @@ export class Executor {
         });
       }
 
-      this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`);
+      this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
 
       this.store.updateTask(run.id, task.id, {
@@ -285,8 +285,8 @@ export class Executor {
       try {
         score = await this.scoreTask(task, result.result, run);
       } catch (scoringErr) {
-        const scoringMsg = scoringErr instanceof Error ? scoringErr.message : String(scoringErr);
-        this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`);
+        const scoringMsg = this.errorToMessage(scoringErr);
+        this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`, task.id);
         score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
       }
 
@@ -295,11 +295,11 @@ export class Executor {
       this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
 
       this.log(run.id, "scorer", score.passed ? "info" : "warn",
-        `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`);
+        `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`, task.id);
 
       if (score.passed) {
         const commitHash = await gitManager.autoCommit(task.id, task.content);
-        this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`);
+        this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
         this.store.appendCommit(run.id, {
           taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
           isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
@@ -308,25 +308,27 @@ export class Executor {
         this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
       } else {
+        let revertSucceeded = true;
         try {
-          // Reset working tree changes first, then revert
           await gitManager.checkoutClean();
           await gitManager.revert("HEAD");
-          this.log(run.id, "git", "warn", "Reverted last commit (quality below threshold)");
+          this.log(run.id, "git", "warn", "Reverted last commit (quality below threshold)", task.id);
         } catch (revertErr) {
-          this.log(run.id, "git", "error", `Revert failed: ${revertErr}`);
+          revertSucceeded = false;
+          this.log(run.id, "git", "error", `Revert failed: ${this.errorToMessage(revertErr)}`, task.id);
         }
         this.store.appendLesson(run.id, {
           runId: run.id, taskId: task.id, category: "failure",
           lesson: `Task "${task.content.substring(0, 50)}" scored ${(score.overall * 100).toFixed(0)}%. Reason: ${score.reasoning}`,
           score: score.overall, createdAt: Date.now(),
         });
-        this.store.updateTask(run.id, task.id, { status: "reverted", completedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "reverted" });
+        const finalStatus = revertSucceeded ? "reverted" : "revert_failed";
+        this.store.updateTask(run.id, task.id, { status: finalStatus, completedAt: Date.now() });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.log(run.id, "engine", "error", `Task failed: ${msg}`);
+      const msg = this.errorToMessage(err);
+      this.log(run.id, "engine", "error", `Task failed: ${msg}`, task.id);
       this.store.updateTask(run.id, task.id, { status: "failed" });
       this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", error: msg });
     } finally {
@@ -465,10 +467,17 @@ export class Executor {
     return findBalanced("{", "}") || findBalanced("[", "]") || cleaned;
   }
 
-  private log(runId: string, source: string, level: string, message: string): void {
-    const entry = { timestamp: Date.now(), level, source, message, taskId: "", runId };
+  private log(runId: string, source: string, level: string, message: string, taskId?: string): void {
+    const entry = { timestamp: Date.now(), level, source, message, taskId: taskId || "", runId };
     this.store.appendLog(runId, entry);
     this.broadcast("log.entry", entry);
+  }
+
+  private errorToMessage(err: unknown): string {
+    if (err instanceof Error) {
+      return err.stack || err.message;
+    }
+    return String(err);
   }
 
   private broadcast(method: string, params: Record<string, unknown>): void {

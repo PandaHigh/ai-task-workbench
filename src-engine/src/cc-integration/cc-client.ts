@@ -132,9 +132,11 @@ export class CCClient {
           reject(new Error("Task was aborted"));
         };
         options.abortSignal.addEventListener("abort", onAbort);
-        proc.on("close", () => {
+        const removeAbortListener = () => {
           options.abortSignal!.removeEventListener("abort", onAbort);
-        });
+        };
+        proc.on("close", removeAbortListener);
+        proc.on("error", removeAbortListener);
       }
     });
   }
@@ -151,8 +153,17 @@ export class CCClient {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    let settled = false;
     let sigkillTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      if (sigkillTimer) clearTimeout(sigkillTimer);
+    };
+
     const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       proc.kill("SIGTERM");
       sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
     }, options.timeoutMinutes * 60 * 1000);
@@ -182,8 +193,7 @@ export class CCClient {
     });
 
     proc.on("close", () => {
-      clearTimeout(timeout);
-      if (sigkillTimer) clearTimeout(sigkillTimer);
+      cleanup();
       // Flush remaining buffer
       if (buffer.trim()) {
         try {
@@ -204,8 +214,7 @@ export class CCClient {
     });
 
     proc.on("error", (err) => {
-      clearTimeout(timeout);
-      if (sigkillTimer) clearTimeout(sigkillTimer);
+      cleanup();
       streamError = err;
       done = true;
       if (resolveNext) {
@@ -217,13 +226,17 @@ export class CCClient {
 
     if (options.abortSignal) {
       const onAbort = () => {
+        if (settled) return;
+        settled = true;
         proc.kill("SIGTERM");
         sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 5000);
       };
       options.abortSignal.addEventListener("abort", onAbort);
-      proc.on("close", () => {
+      const removeAbortListener = () => {
         options.abortSignal!.removeEventListener("abort", onAbort);
-      });
+      };
+      proc.on("close", removeAbortListener);
+      proc.on("error", removeAbortListener);
     }
 
     while (!done) {
