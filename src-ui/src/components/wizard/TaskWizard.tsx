@@ -50,8 +50,10 @@ export function TaskWizard() {
   } = useWizardStore();
   const addTask = useTaskStore((s) => s.addTask);
   const [input, setInput] = useState("");
+  const [inputError, setInputError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [dirInput, setDirInput] = useState("");
+  const [dirError, setDirError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
 
@@ -68,8 +70,25 @@ export function TaskWizard() {
     setShowDirInput(true);
   };
 
+  const validateDir = (value: string) => {
+    if (!value.trim()) {
+      setDirError("目录路径不能为空");
+      return false;
+    }
+    if (value.trim().length < 2) {
+      setDirError("目录路径至少 2 个字符");
+      return false;
+    }
+    if (!/^\/[\w\-./ ]+$/.test(value.trim()) && !/^[A-Za-z]:[\\/\w\-./ ]+$/.test(value.trim())) {
+      setDirError("请输入有效的目录路径（如 /home/user/project 或 C:\\Users\\project）");
+      return false;
+    }
+    setDirError("");
+    return true;
+  };
+
   const confirmDir = () => {
-    if (!dirInput.trim()) return;
+    if (!validateDir(dirInput)) return;
     setWorkingDir(dirInput.trim());
     startWizardSession(dirInput.trim());
     setShowDirInput(false);
@@ -86,7 +105,16 @@ export function TaskWizard() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) {
+      setInputError("消息不能为空");
+      return;
+    }
+    if (input.trim().length < 2) {
+      setInputError("消息至少 2 个字符");
+      return;
+    }
+    if (isLoading) return;
+    setInputError("");
     const userMsg = input;
     setInput("");
     addMessage({ role: "user", content: userMsg, timestamp: Date.now() });
@@ -229,16 +257,30 @@ export function TaskWizard() {
               <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
             ) : (
               <div className="flex gap-2 justify-center flex-wrap">
-                <input
-                  type="text"
-                  value={dirInput}
-                  onChange={(e) => setDirInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && confirmDir()}
-                  placeholder="/path/to/project"
-                  className="px-3 py-2 rounded text-xs outline-none max-md:w-full"
-                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", width: 300 }}
-                  autoFocus
-                />
+                <div className="flex flex-col max-md:w-full">
+                  <input
+                    type="text"
+                    value={dirInput}
+                    onChange={(e) => { setDirInput(e.target.value); validateDir(e.target.value); }}
+                    onKeyDown={(e) => e.key === "Enter" && confirmDir()}
+                    placeholder="/path/to/project"
+                    required
+                    minLength={2}
+                    pattern="\/[\w\-./ ]+|[A-Za-z]:[\\\/\w\-./ ]+"
+                    className="px-3 py-2 rounded text-xs outline-none max-md:w-full"
+                    style={{
+                      background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                      border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
+                      width: 300,
+                    }}
+                    autoFocus
+                    aria-invalid={!!dirError}
+                    aria-describedby={dirError ? "dir-error" : undefined}
+                  />
+                  {dirError && (
+                    <p id="dir-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{dirError}</p>
+                  )}
+                </div>
                 <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
               </div>
             )}
@@ -287,18 +329,34 @@ export function TaskWizard() {
           </div>
           <div className="p-4 border-t max-md:p-3" style={{ borderColor: "var(--border)" }}>
             <div className="flex gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="描述你的任务... (Enter 发送, Shift+Enter 换行)"
-                disabled={isLoading}
-                rows={1}
-                className="flex-1 px-3 py-2 rounded text-xs outline-none resize-none"
-                style={{
-                  background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)",
-                }}
-              />
+              <div className="flex-1 flex flex-col">
+                <textarea
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (inputError) {
+                      if (e.target.value.trim().length >= 2) setInputError("");
+                      else if (!e.target.value.trim()) setInputError("消息不能为空");
+                    }
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="描述你的任务... (Enter 发送, Shift+Enter 换行)"
+                  disabled={isLoading}
+                  required
+                  minLength={2}
+                  rows={1}
+                  className="w-full px-3 py-2 rounded text-xs outline-none resize-none"
+                  style={{
+                    background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                    border: inputError ? "1px solid var(--red)" : "1px solid var(--border)",
+                  }}
+                  aria-invalid={!!inputError}
+                  aria-describedby={inputError ? "chat-error" : undefined}
+                />
+                {inputError && (
+                  <p id="chat-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{inputError}</p>
+                )}
+              </div>
               <button onClick={handleSend} disabled={isLoading}
                 className="px-4 py-2 rounded text-xs font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
                 发送
