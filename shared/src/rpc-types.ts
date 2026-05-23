@@ -53,6 +53,7 @@ export type EngineMethod =
   | "run.commits"
   | "run.lessons"
   | "run.stop"
+  | "run.delete"
   | "config.get"
   | "config.set";
 

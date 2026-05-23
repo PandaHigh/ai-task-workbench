@@ -89,6 +89,18 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { status: "stopped" };
   },
 
+  "run.delete": async (params) => {
+    const { runId } = params as { runId: string };
+    const executor = activeExecutors.get(runId);
+    if (executor) {
+      executor.stop();
+      activeExecutors.delete(runId);
+    }
+    queueManager.clear(runId);
+    store.deleteRun(runId);
+    return { deleted: true };
+  },
+
   "task.create": async (params) => {
     const p = params as unknown as CreateTaskParams & { runId: string };
     const task = queueManager.enqueue(p.runId, p);

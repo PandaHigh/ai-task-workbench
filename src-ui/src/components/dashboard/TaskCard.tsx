@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { ExecutionRun } from "@ai-workbench/shared";
+import { useTaskStore } from "../../stores/task-store";
 
 interface TaskCardProps {
   task: ExecutionRun;
@@ -7,6 +8,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task }: TaskCardProps) {
   const navigate = useNavigate();
+  const deleteTask = useTaskStore((s) => s.deleteTask);
 
   const statusColor: Record<string, string> = {
     idle: "var(--text-secondary)",
@@ -30,9 +32,16 @@ export function TaskCard({ task }: TaskCardProps) {
       )
     : "未开始";
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("确定删除此任务？所有相关数据将被清除。")) {
+      await deleteTask(task.id);
+    }
+  };
+
   return (
     <div
-      className="rounded-lg border p-4 cursor-pointer transition-colors"
+      className="rounded-lg border p-4 cursor-pointer transition-colors group relative"
       style={{
         background: "var(--bg-secondary)",
         borderColor: "var(--border)",
@@ -45,6 +54,18 @@ export function TaskCard({ task }: TaskCardProps) {
         e.currentTarget.style.borderColor = "var(--border)";
       }}
     >
+      {/* Delete button - visible on hover */}
+      <button
+        onClick={handleDelete}
+        className="absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}
+        title="删除"
+      >
+        &times;
+      </button>
+
       <div className="flex items-center justify-between mb-3">
         <span
           className="status-badge"
