@@ -50,7 +50,7 @@ export class CCClient {
       const proc = spawn(this.claudePath, args, {
         cwd: options.workingDir,
         env: { ...process.env },
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["ignore", "pipe", "pipe"],
       });
 
       const timeout = setTimeout(() => {
@@ -120,7 +120,7 @@ export class CCClient {
     const proc = spawn(this.claudePath, args, {
       cwd: options.workingDir,
       env: { ...process.env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     const timeout = setTimeout(() => {
@@ -179,11 +179,17 @@ export class CCClient {
   }
 
   private buildArgs(prompt: string, options: CCExecutionOptions): string[] {
+    const useStream = !options.jsonSchema;
     const args: string[] = [
       "-p", prompt,
-      "--output-format", "stream-json",
-      "--permission-mode", "acceptEdits",
+      "--output-format", useStream ? "stream-json" : "text",
     ];
+
+    if (useStream) {
+      args.push("--verbose");
+    }
+
+    args.push("--permission-mode", "acceptEdits");
 
     if (options.maxTurns) {
       args.push("--max-turns", String(options.maxTurns));
@@ -202,7 +208,6 @@ export class CCClient {
     }
 
     if (options.jsonSchema) {
-      args.push("--output-format", "json");
       args.push("--json-schema", JSON.stringify(options.jsonSchema));
     }
 

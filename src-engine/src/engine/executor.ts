@@ -104,6 +104,7 @@ export class Executor {
         maxTurns: 50,
         systemPrompt,
         abortSignal: abortController.signal,
+        allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
       });
 
       this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`);
@@ -233,7 +234,8 @@ ${run.terminationConditions.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
 Check the actual files in the directory. Respond ONLY with a JSON object:
 { "isComplete": boolean, "progressReport": string, "completedGoals": string[], "remainingGoals": string[], "overallProgress": 0.0_to_1.0 }`,
-      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10 },
+      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10,
+        allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
 
     try {
@@ -255,7 +257,8 @@ ${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}
 
 Respond ONLY with a JSON object:
 { "goalAlignment": 0_to_0.3, "correctness": 0_to_0.3, "completeness": 0_to_0.2, "quality": 0_to_0.2, "reasoning": "brief explanation" }`,
-      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 5 },
+      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 5,
+        allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
 
     try {
@@ -286,7 +289,8 @@ Progress: ${evaluation.progressReport}${lessonStr}
 
 Generate 1-3 focused tasks. Respond ONLY with a JSON array:
 [{ "content": "specific task description", "priority": 1_to_10, "reasoning": "why this task" }]`,
-      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10 },
+      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10,
+        allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
 
     try {
@@ -313,7 +317,8 @@ Total commits: ${commits.length}
 Total cost: $${run.totalCostUsd.toFixed(4)}
 
 Provide a concise summary of what was accomplished, what worked well, and any recommendations.`,
-      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10 },
+      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10,
+        allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     return result.result;
   }
