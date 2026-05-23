@@ -1,13 +1,18 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
-import { useKeyboard } from "../../hooks/useKeyboard";
+import { useKeyboard, setToggleHelp } from "../../hooks/useKeyboard";
+import { ShortcutHelp } from "../common/ShortcutHelp";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const [showHelp, setShowHelp] = useState(false);
   useKeyboard();
+
+  const toggleHelpPanel = useCallback(() => setShowHelp((v) => !v), []);
+  setToggleHelp(toggleHelpPanel);
 
   return (
     <div className="flex h-screen bg-[var(--bg-primary)]">
@@ -27,6 +32,7 @@ export function AppShell({ children }: AppShellProps) {
       <main id="main-content" className="flex-1 overflow-hidden flex flex-col" aria-live="polite">
         {children}
       </main>
+      <ShortcutHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }

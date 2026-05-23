@@ -45,6 +45,8 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
       className="toast-item"
       style={{
         display: "flex",
@@ -64,6 +66,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
       <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>{toast.message}</span>
       <button
         onClick={() => onRemove(toast.id)}
+        aria-label="关闭通知"
         style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}
       >
         ✕
