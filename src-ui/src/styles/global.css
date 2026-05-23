@@ -103,10 +103,6 @@ body {
   animation: fadeIn 0.5s ease-out;
 }
 
-.page-exit {
-  animation: fadeOut 0.25s ease-in forwards;
-}
-
 .slide-up-enter {
   animation: slideUp 0.35s ease-out forwards;
 }

@@ -2,22 +2,16 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 
 type ToastType = "success" | "error" | "warning" | "info";
 
-interface ToastAction {
-  label: string;
-  onClick: () => void;
-}
-
 interface Toast {
   id: number;
   type: ToastType;
   message: string;
-  action?: ToastAction;
 }
 
 interface ToastContextType {
-  addToast: (type: ToastType, message: string, options?: { action?: ToastAction }) => void;
+  addToast: (type: ToastType, message: string) => void;
   success: (message: string) => void;
-  error: (message: string, options?: { action?: ToastAction }) => void;
+  error: (message: string) => void;
   warning: (message: string) => void;
   info: (message: string) => void;
 }
@@ -43,11 +37,9 @@ const TOAST_STYLES: Record<ToastType, { bg: string; border: string; icon: string
 
 function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
   const style = TOAST_STYLES[toast.type];
-  const actionRef = useRef(toast.action);
-  actionRef.current = toast.action;
 
   useEffect(() => {
-    const timer = setTimeout(() => onRemove(toast.id), 5000);
+    const timer = setTimeout(() => onRemove(toast.id), 3000);
     return () => clearTimeout(timer);
   }, [toast.id, onRemove]);
 
@@ -70,29 +62,11 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
         opacity: exiting ? 0 : 1,
         transform: exiting ? "translateX(100%)" : "translateX(0)",
         minWidth: "260px",
-        maxWidth: "400px",
+        maxWidth: "380px",
       }}
     >
       <span style={{ color: style.border, fontWeight: 700, fontSize: "14px" }}>{style.icon}</span>
       <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>{toast.message}</span>
-      {toast.action && (
-        <button
-          onClick={() => { actionRef.current?.onClick(); onRemove(toast.id); }}
-          style={{
-            background: "none",
-            border: `1px solid ${style.border}`,
-            color: style.border,
-            cursor: "pointer",
-            fontSize: "11px",
-            padding: "2px 8px",
-            borderRadius: "4px",
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {toast.action.label}
-        </button>
-      )}
       <button
         onClick={() => onRemove(toast.id)}
         aria-label="关闭通知"
@@ -109,14 +83,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
   const nextIdRef = useRef(0);
 
-  const addToast = useCallback((type: ToastType, message: string, options?: { action?: ToastAction }) => {
+  const addToast = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.random();
     nextIdRef.current = id;
-    setToasts((prev) => [...prev, { id, type, message, action: options?.action }]);
+    setToasts((prev) => [...prev, { id, type, message }]);
   }, []);
 
   const success = useCallback((msg: string) => addToast("success", msg), [addToast]);
-  const error = useCallback((msg: string, options?: { action?: ToastAction }) => addToast("error", msg, options), [addToast]);
+  const error = useCallback((msg: string) => addToast("error", msg), [addToast]);
   const warning = useCallback((msg: string) => addToast("warning", msg), [addToast]);
   const info = useCallback((msg: string) => addToast("info", msg), [addToast]);
 

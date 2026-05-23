@@ -1,5 +1,4 @@
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { MainDashboard } from "./components/dashboard/MainDashboard";
 import { TaskWizard } from "./components/wizard/TaskWizard";
@@ -26,60 +25,21 @@ function NotFound() {
   );
 }
 
-const EXIT_DURATION = 250;
-
-function RouteTransition({ children, locationKey }: { children: React.ReactNode; locationKey: string }) {
-  const [displayKey, setDisplayKey] = useState(locationKey);
-  const [phase, setPhase] = useState<"enter" | "exit">("enter");
-  const [displayChildren, setDisplayChildren] = useState(children);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    if (locationKey !== displayKey) {
-      setPhase("exit");
-      timerRef.current = setTimeout(() => {
-        setDisplayChildren(children);
-        setDisplayKey(locationKey);
-        setPhase("enter");
-      }, EXIT_DURATION);
-    } else {
-      setDisplayChildren(children);
-      setPhase("enter");
-    }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [locationKey, displayKey, children]);
-
-  return (
-    <div
-      key={displayKey}
-      className={phase === "exit" ? "page-exit" : "page-enter"}
-      style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}
-    >
-      {displayChildren}
-    </div>
-  );
-}
-
 export function App() {
   useEngine();
   useNotifications();
-  const location = useLocation();
 
   return (
     <ToastProvider>
       <AppShell>
         <ErrorBoundary>
-          <RouteTransition locationKey={location.pathname + location.search}>
-            <Routes location={location}>
-              <Route path="/" element={<MainDashboard />} />
-              <Route path="/wizard" element={<TaskWizard />} />
-              <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </RouteTransition>
+          <Routes>
+            <Route path="/" element={<MainDashboard />} />
+            <Route path="/wizard" element={<TaskWizard />} />
+            <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </ErrorBoundary>
       </AppShell>
     </ToastProvider>

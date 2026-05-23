@@ -31,7 +31,6 @@ export function SettingsPage() {
   const [claudePathError, setClaudePathError] = useState("");
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [origValues, setOrigValues] = useState<OrigValues | null>(null);
 
   const isDirty = origValues != null && (
@@ -56,53 +55,49 @@ export function SettingsPage() {
     return true;
   }, []);
 
-  const loadSettings = useCallback(async (signal?: { cancelled: boolean }) => {
+  useEffect(() => {
+    if (!connected) return;
     let qt = 0.6;
     let dt = 60;
     let cp = "claude";
-    let hasError = false;
+    let cancelled = false;
 
-    try {
-      const res = await call("config.get", { key: "qualityThreshold" });
-      const val = (res as Record<string, unknown> | null)?.value;
-      if (val != null) qt = Number(val);
-    } catch (err) {
-      console.warn("Failed to load quality threshold:", err instanceof Error ? err.message : err);
-      hasError = true;
-    }
-    try {
-      const res = await call("config.get", { key: "defaultTimeout" });
-      const val = (res as Record<string, unknown> | null)?.value;
-      if (val != null) dt = Number(val);
-    } catch (err) {
-      console.warn("Failed to load default timeout:", err instanceof Error ? err.message : err);
-      hasError = true;
-    }
-    try {
-      const res = await call("config.get", { key: "claudePath" });
-      const val = (res as Record<string, unknown> | null)?.value;
-      if (val) cp = String(val);
-    } catch (err) {
-      console.warn("Failed to load claude path:", err instanceof Error ? err.message : err);
-      hasError = true;
-    }
+    const load = async () => {
+      try {
+        const res = await call("config.get", { key: "qualityThreshold" });
+        const val = (res as Record<string, unknown> | null)?.value;
+        if (val != null) qt = Number(val);
+      } catch (err) {
+        console.warn("Failed to load quality threshold:", err instanceof Error ? err.message : err);
+        toast.error("加载质量阈值失败");
+      }
+      try {
+        const res = await call("config.get", { key: "defaultTimeout" });
+        const val = (res as Record<string, unknown> | null)?.value;
+        if (val != null) dt = Number(val);
+      } catch (err) {
+        console.warn("Failed to load default timeout:", err instanceof Error ? err.message : err);
+        toast.error("加载超时设置失败");
+      }
+      try {
+        const res = await call("config.get", { key: "claudePath" });
+        const val = (res as Record<string, unknown> | null)?.value;
+        if (val) cp = String(val);
+      } catch (err) {
+        console.warn("Failed to load claude path:", err instanceof Error ? err.message : err);
+        toast.error("加载 Claude 路径失败");
+      }
 
-    if (signal?.cancelled) return;
-    setQualityThreshold(qt);
-    setDefaultTimeout(dt);
-    setClaudePath(cp);
-    setOrigValues({ qualityThreshold: qt, defaultTimeout: dt, claudePath: cp });
-    setLoaded(true);
-    setLoadError(hasError);
-    if (hasError) toast.warning("部分设置加载失败");
-  }, [call, toast]);
-
-  useEffect(() => {
-    if (!connected) return;
-    const signal = { cancelled: false };
-    loadSettings(signal);
-    return () => { signal.cancelled = true; };
-  }, [connected, loadSettings]);
+      if (cancelled) return;
+      setQualityThreshold(qt);
+      setDefaultTimeout(dt);
+      setClaudePath(cp);
+      setOrigValues({ qualityThreshold: qt, defaultTimeout: dt, claudePath: cp });
+      setLoaded(true);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [connected]);
 
   const handleSave = async () => {
     if (qtError || dtError) {
@@ -119,25 +114,13 @@ export function SettingsPage() {
       toast.success("设置已保存");
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      toast.error(`保存失败: ${err instanceof Error ? err.message : err}`, {
-        action: {
-          label: "重试",
-          onClick: () => handleSave(),
-        },
-      });
+      toast.error(`保存失败: ${err instanceof Error ? err.message : err}`);
     }
   };
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-md:p-4" style={pageEnterStyle()}>
       <h2 className="text-lg font-bold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>设置</h2>
-
-      {loadError && loaded && (
-        <div className="glass-card p-4 flex items-center justify-between mb-4 max-w-lg" style={{ animation: "fadeIn 0.3s ease-out" }}>
-          <span className="text-xs" style={{ color: "var(--yellow)" }}>部分设置加载失败，显示为默认值</span>
-          <button onClick={() => loadSettings()} className="px-3 py-1 rounded text-xs font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重新加载</button>
-        </div>
-      )}
 
       {!loaded ? (
         <div className="max-w-lg space-y-6">

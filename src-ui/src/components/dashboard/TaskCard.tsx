@@ -4,7 +4,6 @@ import type { ExecutionRun } from "@ai-workbench/shared";
 import { useTaskStore } from "../../stores/task-store";
 import { formatDuration } from "../../lib/utils";
 import { ConfirmDialog } from "../common/ConfirmDialog";
-import { useToast } from "../common/Toast";
 
 interface TaskCardProps {
   task: ExecutionRun;
@@ -14,7 +13,6 @@ interface TaskCardProps {
 export function TaskCard({ task, onDelete }: TaskCardProps) {
   const navigate = useNavigate();
   const deleteTask = useTaskStore((s) => s.deleteTask);
-  const toast = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [now, setNow] = useState(Date.now());
 
@@ -49,20 +47,9 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
 
   const handleDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
-    try {
-      await deleteTask(task.id);
-      onDelete?.();
-    } catch (err) {
-      toast.error("删除任务失败", {
-        action: {
-          label: "重试",
-          onClick: () => {
-            deleteTask(task.id).then(() => onDelete?.()).catch(() => toast.error("删除再次失败"));
-          },
-        },
-      });
-    }
-  }, [deleteTask, task.id, onDelete, toast]);
+    await deleteTask(task.id);
+    onDelete?.();
+  }, [deleteTask, task.id, onDelete]);
 
   return (
     <>
