@@ -297,4 +297,123 @@ describe("Store (JSON file)", () => {
       expect(tasks).toEqual([]);
     });
   });
+
+  describe("atomic write (tmpfile+rename)", () => {
+    it("should not leave .tmp files after successful write", () => {
+      store.setConfig("key", "value");
+      const configPath = path.join(testDir, "config.json");
+      expect(fs.existsSync(configPath)).toBe(true);
+      expect(fs.existsSync(configPath + ".tmp")).toBe(false);
+    });
+
+    it("should produce valid JSON after write", () => {
+      store.setConfig("k1", "v1");
+      store.setConfig("k2", 42);
+      const configPath = path.join(testDir, "config.json");
+      const parsed = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      expect(parsed.k1).toBe("v1");
+      expect(parsed.k2).toBe(42);
+    });
+
+    it("should preserve original file on write failure via tmpfile", () => {
+      const runsDir = path.join(testDir, "runs");
+      const indexPath = path.join(runsDir, "index.json");
+
+      // Write initial data
+      store.saveRun({
+        id: "run-original", workingDir: "/tmp", goals: ["original"],
+        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      const originalContent = fs.readFileSync(indexPath, "utf-8");
+
+      // Place a stale .tmp file to verify cleanup can handle it
+      fs.writeFileSync(indexPath + ".tmp", "stale data");
+      expect(fs.existsSync(indexPath + ".tmp")).toBe(true);
+
+      // Write again — should succeed and not leave .tmp
+      store.saveRun({
+        id: "run-new", workingDir: "/tmp", goals: ["new"],
+        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+
+      expect(fs.existsSync(indexPath + ".tmp")).toBe(false);
+      const parsed = JSON.parse(fs.readFileSync(indexPath, "utf-8"));
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0].id).toBe("run-original");
+      expect(parsed[1].id).toBe("run-new");
+
+      // Original content was overwritten atomically
+      expect(fs.readFileSync(indexPath, "utf-8")).not.toBe(originalContent);
+    });
+
+    it("should clean up stale .tmp files on Store construction", () => {
+      const runsDir = path.join(testDir, "runs");
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      // Create stale .tmp files
+      fs.writeFileSync(path.join(runsDir, "index.json.tmp"), "stale");
+      const subDir = path.join(runsDir, "run-abc");
+      fs.mkdirSync(subDir, { recursive: true });
+      fs.writeFileSync(path.join(subDir, "tasks.json.tmp"), "stale");
+
+      expect(fs.existsSync(path.join(runsDir, "index.json.tmp"))).toBe(true);
+      expect(fs.existsSync(path.join(subDir, "tasks.json.tmp"))).toBe(true);
+
+      // Reconstruct Store triggers cleanup
+      const store2 = new Store(testDir);
+
+      expect(fs.existsSync(path.join(runsDir, "index.json.tmp"))).toBe(false);
+      expect(fs.existsSync(path.join(subDir, "tasks.json.tmp"))).toBe(false);
+    });
+
+    it("should handle concurrent writes to different files without corruption", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+
+      // Rapid sequential writes to different files in same run
+      for (let i = 0; i < 50; i++) {
+        store.appendLog("run-1", {
+          taskId: `t-${i}`, runId: "run-1", timestamp: Date.now(),
+          level: "info", source: "engine", message: `log ${i}`,
+        });
+        store.appendScore("run-1", `t-${i}`, {
+          overall: 0.5, goalAlignment: 0.1, correctness: 0.1,
+          completeness: 0.1, quality: 0.2, passed: true, reasoning: "ok",
+        });
+      }
+
+      // Verify both files are valid JSON
+      const runDir = path.join(testDir, "runs", "run-1");
+      const logs = JSON.parse(fs.readFileSync(path.join(runDir, "logs.json"), "utf-8"));
+      const scores = JSON.parse(fs.readFileSync(path.join(runDir, "scores.json"), "utf-8"));
+      expect(logs.length).toBe(50);
+      expect(scores.length).toBe(50);
+
+      // No leftover tmp files
+      const files = fs.readdirSync(runDir);
+      expect(files.every(f => !f.endsWith(".tmp"))).toBe(true);
+    });
+
+    it("should not corrupt file if target dir does not exist yet", () => {
+      // New run creates subdirectory automatically
+      store.saveRun({
+        id: "brand-new-run", workingDir: "/tmp", goals: ["g"],
+        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.appendLog("brand-new-run", {
+        taskId: "t1", runId: "brand-new-run", timestamp: Date.now(),
+        level: "info", source: "engine", message: "hello",
+      });
+
+      const runDir = path.join(testDir, "runs", "brand-new-run");
+      expect(fs.existsSync(path.join(runDir, "logs.json"))).toBe(true);
+      expect(fs.existsSync(path.join(runDir, "logs.json.tmp"))).toBe(false);
+
+      const logs = JSON.parse(fs.readFileSync(path.join(runDir, "logs.json"), "utf-8"));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].message).toBe("hello");
+    });
+  });
 });
