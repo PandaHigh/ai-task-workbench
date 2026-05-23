@@ -208,6 +208,7 @@ export function EvolutionDashboard() {
                   title="队列为空"
                   description={!isRunning && run?.status !== "completed" ? "点击开始执行任务" : undefined}
                   action={!isRunning && run?.status !== "completed" ? { label: "开始执行", onClick: handleStart } : undefined}
+                  variant="queue"
                 />
               ) : (
                 queue.map((task, i) => (
@@ -283,6 +284,7 @@ export function EvolutionDashboard() {
                   <EmptyState
                     title="等待任务执行"
                     description="启动后日志将实时显示在这里"
+                    variant="logs"
                   />
                 ) : (
                   <div className="space-y-0.5">
@@ -302,7 +304,7 @@ export function EvolutionDashboard() {
               {/* Commits Tab */}
               {tab === "commits" && (
                 commits.length === 0 ? (
-                  <EmptyState title="暂无 Git 提交记录" description="任务执行后提交会显示在这里" />
+                  <EmptyState title="暂无 Git 提交记录" description="任务执行后提交会显示在这里" variant="commits" />
                 ) : (
                   <div className="space-y-2">
                     {commits.map((c, i) => (
@@ -327,7 +329,7 @@ export function EvolutionDashboard() {
               {/* Lessons Tab */}
               {tab === "lessons" && (
                 lessons.length === 0 ? (
-                  <EmptyState title="暂无经验教训" description="任务失败和教训会记录在这里" />
+                  <EmptyState title="暂无经验教训" description="任务失败和教训会记录在这里" variant="lessons" />
                 ) : (
                   <div className="space-y-2">
                     {lessons.map((l, i) => (

@@ -56,6 +56,7 @@ export function MainDashboard() {
           title="还没有任务"
           description="创建你的第一个 AI 任务开始使用"
           action={{ label: "+ 新建任务", onClick: () => navigate("/wizard") }}
+          variant="default"
         />
       )}
 
