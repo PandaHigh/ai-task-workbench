@@ -177,4 +177,124 @@ describe("Store (JSON file)", () => {
       expect(() => store.deleteRun("nonexistent")).not.toThrow();
     });
   });
+
+  describe("report", () => {
+    it("should save and get report", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.saveReport("run-1", "All goals completed successfully.");
+      const report = store.getReport("run-1");
+      expect(report).toBeDefined();
+      expect(report!.report).toBe("All goals completed successfully.");
+      expect(report!.generatedAt).toBeGreaterThan(0);
+    });
+
+    it("should return null for nonexistent report", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      expect(store.getReport("run-1")).toBeNull();
+    });
+  });
+
+  describe("scores", () => {
+    it("should append and get scores", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.appendScore("run-1", "task-1", {
+        overall: 0.8, goalAlignment: 0.2, correctness: 0.2,
+        completeness: 0.2, quality: 0.2, passed: true, reasoning: "Good",
+      });
+      const scores = store.getScores("run-1");
+      expect(scores).toHaveLength(1);
+      expect(scores[0].taskId).toBe("task-1");
+      expect(scores[0].score.overall).toBe(0.8);
+    });
+  });
+
+  describe("commits", () => {
+    it("should append and get commits with limit", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.appendCommit("run-1", {
+        taskId: "t1", runId: "run-1", hash: "abc", message: "fix", isAiCommit: true, timestamp: Date.now(), additions: 10, deletions: 5,
+      });
+      store.appendCommit("run-1", {
+        taskId: "t2", runId: "run-1", hash: "def", message: "feat", isAiCommit: false, timestamp: Date.now(), additions: 20, deletions: 0,
+      });
+      const all = store.getCommits("run-1");
+      expect(all).toHaveLength(2);
+      const limited = store.getCommits("run-1", 1);
+      expect(limited).toHaveLength(1);
+      expect(limited[0].hash).toBe("def");
+    });
+  });
+
+  describe("lessons", () => {
+    it("should get lessons filtered by category", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.appendLesson("run-1", {
+        runId: "run-1", taskId: "t1", category: "failure", lesson: "bad", score: 0.3, createdAt: Date.now(),
+      });
+      store.appendLesson("run-1", {
+        runId: "run-1", taskId: "t2", category: "success", lesson: "good", score: 0.9, createdAt: Date.now(),
+      });
+      const failures = store.getLessons("run-1", "failure");
+      expect(failures).toHaveLength(1);
+      expect(failures[0].category).toBe("failure");
+      const all = store.getLessons("run-1");
+      expect(all).toHaveLength(2);
+    });
+  });
+
+  describe("logs with filters", () => {
+    it("should filter logs by taskId", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.appendLog("run-1", { taskId: "t1", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: "log 1" });
+      store.appendLog("run-1", { taskId: "t2", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: "log 2" });
+      const filtered = store.getLogs("run-1", "t1");
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].message).toBe("log 1");
+    });
+
+    it("should limit logs", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      for (let i = 0; i < 10; i++) {
+        store.appendLog("run-1", { taskId: "", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: `log ${i}` });
+      }
+      const limited = store.getLogs("run-1", undefined, 3);
+      expect(limited).toHaveLength(3);
+    });
+  });
+
+  describe("corrupted task file", () => {
+    it("should handle corrupted tasks.json gracefully", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      // Ensure run dir exists before writing corrupted file
+      const runDir = path.join(testDir, "runs", "run-1");
+      fs.mkdirSync(runDir, { recursive: true });
+      fs.writeFileSync(path.join(runDir, "tasks.json"), "BROKEN{");
+      const tasks = store.listTasks("run-1");
+      expect(tasks).toEqual([]);
+    });
+  });
 });

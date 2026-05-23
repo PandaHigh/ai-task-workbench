@@ -114,4 +114,27 @@ describe("Wizard Handler", () => {
     expect(params!.goals).toContain("完成功能");
     expect(params!.terminationConditions).toContain("测试通过");
   });
+
+  it("should handle chat with nonexistent session", async () => {
+    const { chat } = await import("../../src-engine/src/wizard/wizard-handler.js");
+    await expect(chat("nonexistent", "hello")).rejects.toThrow("not found");
+  });
+
+  it("should extract fallback params from conversation without summary", async () => {
+    const { startSession, getSession } = await import("../../src-engine/src/wizard/wizard-handler.js");
+    const { extractParams } = await import("../../src-engine/src/wizard/wizard-handler.js");
+    const session = startSession("/tmp/project");
+    // Manually add messages without TASK_SUMMARY
+    session.messages.push({ role: "user", content: "my task content" });
+    session.messages.push({ role: "assistant", content: "what are the goals?" });
+    session.messages.push({ role: "user", content: "my goal description" });
+    session.messages.push({ role: "assistant", content: "what are termination conditions?" });
+    session.messages.push({ role: "user", content: "my termination condition" });
+
+    const params = extractParams(session.sessionId);
+    expect(params).toBeDefined();
+    expect(params!.content).toBe("my task content");
+    expect(params!.goals).toEqual(["my goal description"]);
+    expect(params!.terminationConditions).toEqual(["my termination condition"]);
+  });
 });

@@ -246,3 +246,92 @@ describe("Executor extractJson", () => {
     expect(JSON.parse(extractJson('{"msg": "use {curly} braces", "val": 1}'))).toEqual({ msg: "use {curly} braces", val: 1 });
   });
 });
+
+describe("Executor buildSystemPrompt", () => {
+  it("should build prompt with context", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const notifications: any[] = [];
+    const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
+    const qm = createMockQueueManager();
+
+    const executor = new Executor(qm as any, notify, "run-1");
+    // Access private method via any
+    const prompt = (executor as any).buildSystemPrompt(
+      { content: "Test" } as any,
+      {
+        workingDir: "/tmp",
+        goals: ["g1"],
+        terminationConditions: ["done"],
+        lastTenCommits: [{ hash: "abc1234", message: "init", timestamp: 1000, isAiCommit: true }],
+        nextFiveTasks: [{ type: "user_defined", content: "next task" } as any],
+        lessonsLearned: [{ category: "failure", lesson: "avoid X" } as any],
+      },
+    );
+
+    expect(prompt).toContain("init");
+    expect(prompt).toContain("next task");
+    expect(prompt).toContain("avoid X");
+  });
+
+  it("should build prompt without context data", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const notifications: any[] = [];
+    const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
+    const qm = createMockQueueManager();
+
+    const executor = new Executor(qm as any, notify, "run-1");
+    const prompt = (executor as any).buildSystemPrompt(
+      { content: "Test" } as any,
+      {
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        lastTenCommits: [],
+        nextFiveTasks: [],
+        lessonsLearned: [],
+      },
+    );
+
+    expect(prompt).toBe("");
+  });
+});
+
+describe("Executor recalculateCost", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should sum task costs", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const qm = createMockQueueManager();
+    mockStore.listTasks.mockReturnValue([
+      { costUsd: 0.5 },
+      { costUsd: 0.3 },
+      { costUsd: 0.2 },
+    ]);
+
+    const executor = new Executor(qm as any, () => {}, "run-1");
+    const cost = (executor as any).recalculateCost("run-1");
+    expect(cost).toBeCloseTo(1.0);
+  });
+});
+
+describe("Executor config loading", () => {
+  it("should load config from store on construction", async () => {
+    vi.clearAllMocks();
+    mockStore.getConfig.mockImplementation((key: string) => {
+      if (key === "qualityThreshold") return 0.8;
+      if (key === "maxEvaluationCycles") return 10;
+      return undefined;
+    });
+
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const qm = createMockQueueManager();
+    const executor = new Executor(qm as any, () => {}, "run-1");
+    const config = (executor as any).config;
+    expect(config.qualityThreshold).toBe(0.8);
+    expect(config.maxEvaluationCycles).toBe(10);
+    // Unset values keep defaults
+    expect(config.maxBudgetUsd).toBe(50);
+  });
+});
