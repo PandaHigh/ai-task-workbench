@@ -13,6 +13,13 @@ export default defineConfig(async () => ({
       "@ai-workbench/shared": path.resolve(__dirname, "../shared/src"),
     },
   },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
+    css: true,
+  },
   clearScreen: false,
   server: {
     port: 1420,
