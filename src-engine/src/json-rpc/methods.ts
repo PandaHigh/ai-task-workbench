@@ -216,8 +216,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!store.getRun(runId)) {
       throw new RpcValidationError(`Run not found: ${runId}`);
     }
-    const p = params as unknown as CreateTaskParams & { runId: string };
-    const task = queueManager.enqueue(runId, { ...p, content, runId });
+    const { runId: _runId, ...p } = params as unknown as CreateTaskParams & { runId: string };
+    const task = queueManager.enqueue(runId, { ...p, content });
     store.saveTask(runId, task);
     return task;
   },

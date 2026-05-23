@@ -26,6 +26,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
     } catch (err) {
       console.warn("Failed to load tasks:", err instanceof Error ? err.message : err);
       set({ loading: false });
+      throw err;
     }
   },
 

@@ -123,6 +123,9 @@ export function EvolutionDashboard() {
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
     } catch (err) {
       console.warn("Queue reorder failed:", err instanceof Error ? err.message : err);
+      toast.error(`队列排序失败，点击重试`, {
+        action: { label: "重试", onClick: () => handleReorder(taskIds) },
+      });
     }
   };
 
@@ -404,8 +407,17 @@ export function EvolutionDashboard() {
                 onClick={async () => {
                   try {
                     await call("task.setTimeout", { taskId: activeTaskId, runId: run?.id, minutes: timeoutMinutes });
+                    toast.success("超时设置已应用");
                   } catch (err) {
                     console.warn("Set timeout failed:", err instanceof Error ? err.message : err);
+                    toast.error("设置超时失败", {
+                      action: {
+                        label: "重试",
+                        onClick: () => call("task.setTimeout", { taskId: activeTaskId, runId: run?.id, minutes: timeoutMinutes })
+                          .then(() => toast.success("超时设置已应用"))
+                          .catch(() => toast.error("设置超时再次失败")),
+                      },
+                    });
                   }
                 }}
                 className="ml-2 text-[10px] px-1.5 py-0.5 rounded"
@@ -425,11 +437,31 @@ export function EvolutionDashboard() {
             <div className="flex gap-2">
               <button onClick={() => {
                 setAgentMode("single");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch((err) => {
+                  console.warn("Set agent mode failed:", err instanceof Error ? err.message : err);
+                  toast.error("切换 Agent 模式失败", {
+                    action: {
+                      label: "重试",
+                      onClick: () => call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" })
+                        .then(() => toast.success("已切换为单 Agent"))
+                        .catch(() => toast.error("切换 Agent 模式再次失败")),
+                    },
+                  });
+                });
               }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
               <button onClick={() => {
                 setAgentMode("multi");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch((err) => {
+                  console.warn("Set agent mode failed:", err instanceof Error ? err.message : err);
+                  toast.error("切换 Agent 模式失败", {
+                    action: {
+                      label: "重试",
+                      onClick: () => call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" })
+                        .then(() => toast.success("已切换为多 Agent"))
+                        .catch(() => toast.error("切换 Agent 模式再次失败")),
+                    },
+                  });
+                });
               }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
             </div>
           </div>
