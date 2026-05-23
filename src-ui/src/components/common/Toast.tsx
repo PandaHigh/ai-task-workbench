@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -46,7 +46,6 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
   return (
     <div
       className="toast-item"
-      role="alert"
       style={{
         display: "flex",
         alignItems: "center",
@@ -61,11 +60,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
         maxWidth: "380px",
       }}
     >
-      <span aria-hidden="true" style={{ color: style.border, fontWeight: 700, fontSize: "14px" }}>{style.icon}</span>
+      <span style={{ color: style.border, fontWeight: 700, fontSize: "14px" }}>{style.icon}</span>
       <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>{toast.message}</span>
       <button
         onClick={() => onRemove(toast.id)}
-        aria-label="关闭通知"
         style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}
       >
         ✕
@@ -76,11 +74,11 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextIdRef = useRef(0);
+  let nextId = 0;
 
   const addToast = useCallback((type: ToastType, message: string) => {
-    nextIdRef.current = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id: nextIdRef.current, type, message }]);
+    nextId = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id: nextId, type, message }]);
   }, []);
 
   const success = useCallback((msg: string) => addToast("success", msg), [addToast]);
@@ -96,8 +94,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ addToast, success, error, warning, info }}>
       {children}
       <div
-        aria-live="assertive"
-        aria-label="通知"
         style={{
           position: "fixed",
           bottom: "20px",

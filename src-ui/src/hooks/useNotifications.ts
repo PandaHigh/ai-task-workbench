@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
-import type { ExecutionRun, TaskDefinition } from "@ai-workbench/shared";
+import type { ExecutionRun } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -67,9 +67,9 @@ export function useNotifications() {
           break;
         }
         case "queue.updated": {
-          const { queue } = params as { queue: TaskDefinition[] };
+          const { queue } = params as { queue: unknown[] };
           const { setQueue } = useEvolutionStore.getState();
-          setQueue(queue);
+          setQueue(queue as any[]);
           break;
         }
         case "log.entry": {

@@ -4,8 +4,6 @@ import type {
   TaskType,
   AgentMode,
   LessonCategory,
-  LogLevel,
-  LogSource,
 } from "./enums.js";
 
 export interface TaskDefinition {
@@ -56,8 +54,8 @@ export interface TaskLog {
   taskId: string;
   runId: string;
   timestamp: number;
-  level: LogLevel;
-  source: LogSource;
+  level: string;
+  source: string;
   message: string;
   metadata?: Record<string, unknown>;
 }

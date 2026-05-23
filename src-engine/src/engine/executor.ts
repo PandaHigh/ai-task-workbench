@@ -1,4 +1,4 @@
-import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, LogLevel, LogSource } from "@ai-workbench/shared";
+import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails } from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
@@ -467,7 +467,7 @@ export class Executor {
     return findBalanced("{", "}") || findBalanced("[", "]") || cleaned;
   }
 
-  private log(runId: string, source: LogSource, level: LogLevel, message: string, taskId?: string): void {
+  private log(runId: string, source: string, level: string, message: string, taskId?: string): void {
     const entry = { timestamp: Date.now(), level, source, message, taskId: taskId || "", runId };
     this.store.appendLog(runId, entry);
     this.broadcast("log.entry", entry);

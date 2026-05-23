@@ -12,8 +12,6 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
     return (
       <div
         className="skeleton-shimmer"
-        role="presentation"
-        aria-hidden="true"
         style={{
           width: width || "100%",
           height: height || 120,
@@ -30,8 +28,6 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
     return (
       <div
         className="skeleton-shimmer"
-        role="presentation"
-        aria-hidden="true"
         style={{
           width: width || 40,
           height: height || 40,
@@ -45,12 +41,11 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
   }
 
   return (
-    <div role="status" aria-busy="true" aria-label="加载中">
+    <>
       {items.map((i) => (
         <div
           key={i}
           className="skeleton-shimmer"
-          aria-hidden="true"
           style={{
             width: width || "100%",
             height: height || 14,
@@ -62,6 +57,6 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
           }}
         />
       ))}
-    </div>
+    </>
   );
 }

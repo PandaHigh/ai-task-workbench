@@ -17,20 +17,20 @@ export function SettingsPage() {
     if (!connected) return;
     const load = async () => {
       try {
-        const qt = await call("config.get", { key: "qualityThreshold" }) as { value?: unknown } | null;
-        if (qt?.value != null) setQualityThreshold(Number(qt.value));
+        const qt = await call("config.get", { key: "qualityThreshold" });
+        if ((qt as any)?.value != null) setQualityThreshold(Number((qt as any).value));
       } catch {
         toast.error("加载质量阈值失败");
       }
       try {
-        const dt = await call("config.get", { key: "defaultTimeout" }) as { value?: unknown } | null;
-        if (dt?.value != null) setDefaultTimeout(Number(dt.value));
+        const dt = await call("config.get", { key: "defaultTimeout" });
+        if ((dt as any)?.value != null) setDefaultTimeout(Number((dt as any).value));
       } catch {
         toast.error("加载超时设置失败");
       }
       try {
-        const cp = await call("config.get", { key: "claudePath" }) as { value?: unknown } | null;
-        if (cp?.value) setClaudePath(String(cp.value));
+        const cp = await call("config.get", { key: "claudePath" });
+        if ((cp as any)?.value) setClaudePath(String((cp as any).value));
       } catch {
         toast.error("加载 Claude 路径失败");
       }
@@ -76,48 +76,38 @@ export function SettingsPage() {
         </div>
 
         {/* Quality threshold */}
-        <fieldset className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
-          <legend className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>质量阈值</legend>
+        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量阈值</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            低于此分数的任务将被回滚。当前: <span id="qt-value">{(qualityThreshold * 100).toFixed(0)}%</span>
+            低于此分数的任务将被回滚。当前: {(qualityThreshold * 100).toFixed(0)}%
           </p>
-          <input type="range" id="quality-threshold" min="0" max="100" value={qualityThreshold * 100}
+          <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
-            aria-labelledby="quality-threshold-label"
-            aria-valuenow={Math.round(qualityThreshold * 100)}
-            aria-valuemin={0} aria-valuemax={100}
             className="w-full" />
-          <label id="quality-threshold-label" htmlFor="quality-threshold" className="sr-only">质量阈值百分比</label>
-        </fieldset>
+        </div>
 
         {/* Default timeout */}
-        <fieldset className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
-          <legend className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>默认超时时间</legend>
+        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>默认超时时间</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            每个任务的默认执行超时: <span id="dt-value">{defaultTimeout} 分钟</span>
+            每个任务的默认执行超时: {defaultTimeout} 分钟
           </p>
-          <input type="range" id="default-timeout" min="5" max="180" value={defaultTimeout}
+          <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-            aria-labelledby="default-timeout-label"
-            aria-valuenow={defaultTimeout}
-            aria-valuemin={5} aria-valuemax={180}
             className="w-full" />
-          <label id="default-timeout-label" htmlFor="default-timeout" className="sr-only">默认超时分钟数</label>
-        </fieldset>
+        </div>
 
         {/* Claude path */}
-        <fieldset className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
-          <legend className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</legend>
-          <input type="text" id="claude-path" value={claudePath} onChange={(e) => setClaudePath(e.target.value)}
-            aria-label="Claude Code 可执行文件路径"
+        <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</h3>
+          <input type="text" value={claudePath} onChange={(e) => setClaudePath(e.target.value)}
             className="w-full px-3 py-2 rounded text-xs outline-none" style={{
               background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)",
             }} />
-        </fieldset>
+        </div>
 
         {/* Save button */}
         <button onClick={handleSave}
-          aria-label={saved ? "设置已保存" : "保存设置"}
           className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--blue)", color: "#0d1117" }}>
           {saved ? "已保存" : "保存设置"}
         </button>

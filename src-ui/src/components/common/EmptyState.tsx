@@ -7,7 +7,6 @@ interface EmptyStateProps {
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
     <div
-      role="status"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -18,7 +17,6 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
       }}
     >
       <div
-        aria-hidden="true"
         style={{
           fontSize: "32px",
           marginBottom: "12px",
@@ -39,7 +37,6 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
       {action && (
         <button
           onClick={action.onClick}
-          aria-label={action.label}
           style={{
             marginTop: "16px",
             padding: "6px 16px",

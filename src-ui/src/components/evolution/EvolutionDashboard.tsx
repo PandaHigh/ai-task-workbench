@@ -4,7 +4,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
+import type { TaskDefinition } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
@@ -48,15 +48,15 @@ export function EvolutionDashboard() {
       }
 
       try {
-        const c = await call("run.commits", { runId }) as GitCommit[] | null;
-        setCommits(c || []);
+        const c = await call("run.commits", { runId });
+        setCommits((c as any[]) || []);
       } catch {
         toast.error("加载提交记录失败");
       }
 
       try {
-        const l = await call("run.lessons", { runId }) as LessonLearned[] | null;
-        setLessons(l || []);
+        const l = await call("run.lessons", { runId });
+        setLessons((l as any[]) || []);
       } catch {
         toast.error("加载经验教训失败");
       }
@@ -73,9 +73,9 @@ export function EvolutionDashboard() {
   const refreshTabData = useCallback(async (t: TabType) => {
     if (!runId) return;
     if (t === "commits") {
-      try { setCommits((await call("run.commits", { runId })) as GitCommit[]); } catch {}
+      try { setCommits((await call("run.commits", { runId })) as any[]); } catch {}
     } else if (t === "lessons") {
-      try { setLessons((await call("run.lessons", { runId })) as LessonLearned[]); } catch {}
+      try { setLessons((await call("run.lessons", { runId })) as any[]); } catch {}
     }
   }, [runId, call]);
 
@@ -167,7 +167,7 @@ export function EvolutionDashboard() {
                 <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>拖拽排序</span>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1" role="list" aria-label="任务队列列表">
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {loading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 4 }, (_, i) => (
@@ -189,13 +189,6 @@ export function EvolutionDashboard() {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => { if (dragIdx !== null && dragIdx !== i) moveTask(dragIdx, i); setDragIdx(null); }}
                     onDragEnd={() => setDragIdx(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowUp" && i > 0) { e.preventDefault(); moveTask(i, i - 1); }
-                      if (e.key === "ArrowDown" && i < queue.length - 1) { e.preventDefault(); moveTask(i, i + 1); }
-                    }}
-                    tabIndex={0}
-                    role="listitem"
-                    aria-label={`任务 ${i + 1}: ${task.content}，优先级 ${task.priority}，使用方向键重新排序`}
                     className="px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
                     style={{
                       background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",
@@ -229,24 +222,18 @@ export function EvolutionDashboard() {
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col">
             {/* Tab bar with sliding indicator */}
-            <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }} role="tablist" aria-label="内容标签页">
+            <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
               {(["logs", "commits", "lessons"] as TabType[]).map((t) => (
-                <button key={t} onClick={() => handleTabChange(t)}
-                  role="tab"
-                  aria-selected={tab === t}
-                  aria-controls={`tabpanel-${t}`}
-                  id={`tab-${t}`}
-                  tabIndex={tab === t ? 0 : -1}
-                  className="text-xs px-3 py-1.5 rounded transition-colors" style={{
-                    color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
-                    background: tab === t ? "var(--bg-tertiary)" : "transparent",
-                  }}>
+                <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
+                  color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: tab === t ? "var(--bg-tertiary)" : "transparent",
+                }}>
                   {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : `经验教训 (${lessons.length})`}
                 </button>
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "#010409" }} role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
+            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "#010409" }}>
               {loading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 8 }, (_, i) => (
@@ -348,9 +335,9 @@ export function EvolutionDashboard() {
           {/* Start / Pause */}
           <div className="flex gap-2">
             {!isRunning ? (
-              <button onClick={handleStart} disabled={run?.status === "completed"} aria-label="开始执行任务" className="flex-1 px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#0d1117" }}>▶ 开始</button>
+              <button onClick={handleStart} disabled={run?.status === "completed"} className="flex-1 px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#0d1117" }}>▶ 开始</button>
             ) : (
-              <button onClick={handlePause} aria-label="暂停执行" className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
+              <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
             )}
           </div>
 
@@ -361,7 +348,7 @@ export function EvolutionDashboard() {
                 <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
                 <span style={{ color: budgetPct > 80 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
               </div>
-              <div className="w-full h-1.5 rounded" role="progressbar" aria-valuenow={Math.round(budgetPct)} aria-valuemin={0} aria-valuemax={100} aria-label={`预算消耗 ${budgetUsed.toFixed(2)} 美元，上限 ${budgetMax} 美元`} style={{ background: "var(--bg-tertiary)" }}>
+              <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
                 <div className="h-full rounded transition-all" style={{
                   width: `${budgetPct}%`,
                   background: budgetPct > 80 ? "var(--red)" : budgetPct > 50 ? "var(--yellow)" : "var(--green)",
@@ -381,7 +368,6 @@ export function EvolutionDashboard() {
                   } catch {}
                 }}
                 className="ml-2 text-[10px] px-1.5 py-0.5 rounded"
-                aria-label="应用超时设置到当前任务"
                 style={{ background: "var(--blue)", color: "#0d1117" }}
               >应用</button>}
             </label>
@@ -395,15 +381,15 @@ export function EvolutionDashboard() {
           {/* Agent Mode */}
           <div>
             <label className="text-xs block mb-2" style={{ color: "var(--text-secondary)" }}>Agent 模式{activeTaskId ? " (应用到选中任务)" : ""}</label>
-            <div className="flex gap-2" role="radiogroup" aria-label="Agent 模式选择">
+            <div className="flex gap-2">
               <button onClick={() => {
                 setAgentMode("single");
                 if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch(() => {});
-              }} role="radio" aria-checked={agentMode === "single"} aria-label="单 Agent 模式" className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
+              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
               <button onClick={() => {
                 setAgentMode("multi");
                 if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch(() => {});
-              }} role="radio" aria-checked={agentMode === "multi"} aria-label="多 Agent 模式" className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
+              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
             </div>
           </div>
 

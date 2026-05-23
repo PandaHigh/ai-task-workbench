@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-
 interface ConfirmDialogProps {
   open: boolean;
   title?: string;
@@ -17,66 +15,16 @@ export function ConfirmDialog({
   message,
   confirmLabel = "确认",
   cancelLabel = "取消",
-  variant = "danger",
+  variant = "default",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
+  if (!open) return null;
 
   const confirmColor = variant === "danger" ? "var(--red)" : "var(--blue)";
 
-  // Focus trap & restore
-  useEffect(() => {
-    if (!open) return;
-    previousFocusRef.current = document.activeElement as HTMLElement;
-
-    const dialog = dialogRef.current;
-    if (dialog) {
-      const firstBtn = dialog.querySelector<HTMLElement>("button");
-      firstBtn?.focus();
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onCancel();
-        return;
-      }
-      if (e.key !== "Tab" || !dialog) return;
-
-      const focusable = dialog.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      previousFocusRef.current?.focus();
-    };
-  }, [open, onCancel]);
-
-  if (!open) return null;
-
-  const titleId = "confirm-dialog-title";
-
   return (
     <div
-      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -91,10 +39,6 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
         style={{
           background: "var(--bg-secondary)",
           border: "1px solid var(--border)",
@@ -106,7 +50,7 @@ export function ConfirmDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id={titleId} style={{ margin: "0 0 12px", fontSize: "16px", color: "var(--text-primary)" }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: "16px", color: "var(--text-primary)" }}>
           {title}
         </h3>
         <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -115,7 +59,6 @@ export function ConfirmDialog({
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
           <button
             onClick={onCancel}
-            aria-label={cancelLabel}
             style={{
               padding: "6px 16px",
               background: "transparent",
@@ -130,7 +73,6 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            aria-label={confirmLabel}
             style={{
               padding: "6px 16px",
               background: confirmColor,
