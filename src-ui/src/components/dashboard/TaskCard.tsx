@@ -4,7 +4,6 @@ import type { ExecutionRun } from "@ai-workbench/shared";
 import { useTaskStore } from "../../stores/task-store";
 import { formatDuration } from "../../lib/utils";
 import { ConfirmDialog } from "../common/ConfirmDialog";
-import { fadeOutStyle } from "../../hooks/useAnimations";
 
 interface TaskCardProps {
   task: ExecutionRun;
@@ -15,7 +14,6 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
   const navigate = useNavigate();
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   // Real-time elapsed time for running tasks
@@ -49,8 +47,6 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
 
   const handleDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
-    setDeleting(true);
-    await new Promise((r) => setTimeout(r, 300));
     await deleteTask(task.id);
     onDelete?.();
   }, [deleteTask, task.id, onDelete]);
@@ -59,8 +55,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
     <>
       <div
         className="glass-card glass-card-hover p-4 cursor-pointer group relative"
-        style={deleting ? fadeOutStyle() : undefined}
-        onClick={() => !deleting && navigate(`/evolution/${task.id}`)}
+        onClick={() => navigate(`/evolution/${task.id}`)}
       >
         {/* Delete button */}
         <button

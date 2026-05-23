@@ -271,8 +271,7 @@ export function TaskWizard() {
                     style={{
                       background: "var(--bg-tertiary)", color: "var(--text-primary)",
                       border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
-                      maxWidth: 300,
-                      width: "100%",
+                      width: 300,
                     }}
                     autoFocus
                     aria-invalid={!!dirError}

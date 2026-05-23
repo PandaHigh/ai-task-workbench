@@ -29,7 +29,7 @@ export function AppShell({ children }: AppShellProps) {
         跳到主要内容
       </a>
       <Sidebar />
-      <main id="main-content" className="flex-1 overflow-hidden flex flex-col max-md:pl-10" aria-live="polite">
+      <main id="main-content" className="flex-1 overflow-hidden flex flex-col max-md:pl-12" aria-live="polite">
         {children}
       </main>
       <ShortcutHelp open={showHelp} onClose={() => setShowHelp(false)} />

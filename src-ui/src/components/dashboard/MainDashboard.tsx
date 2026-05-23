@@ -27,7 +27,7 @@ export function MainDashboard() {
   }, [connected, loadTasks]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-md:p-3" style={pageEnterStyle()}>
+    <div className="flex-1 overflow-y-auto p-6" style={pageEnterStyle()}>
       <div
         className="flex items-center justify-between mb-6"
         style={{ animation: "slideUp 0.4s ease-out" }}
