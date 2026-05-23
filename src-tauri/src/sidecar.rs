@@ -24,6 +24,43 @@ fn find_engine_dir() -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("../src-engine"))
 }
 
+/// Resolve npx binary path from common locations
+fn find_npx() -> String {
+    // Check common macOS locations
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = vec![
+        format!("{home}/.nvm/versions/node/default/bin/npx"),
+        "/opt/homebrew/bin/npx".to_string(),
+        "/usr/local/bin/npx".to_string(),
+        format!("{home}/.local/bin/npx"),
+    ];
+
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            println!("[sidecar] Found npx at {}", path);
+            return path.clone();
+        }
+    }
+
+    // Fallback: try to resolve via which
+    if let Ok(output) = std::process::Command::new("/usr/bin/which")
+        .arg("npx")
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() && std::path::Path::new(&path).exists() {
+                println!("[sidecar] Found npx via which: {}", path);
+                return path;
+            }
+        }
+    }
+
+    // Last resort
+    println!("[sidecar] npx not found in common paths, using 'npx' as-is");
+    "npx".to_string()
+}
+
 pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let state = app.state::<Mutex<EngineState>>();
     let mut engine = state.lock().unwrap();
@@ -34,7 +71,13 @@ pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let engine_dir = find_engine_dir();
+    let engine_dir = std::fs::canonicalize(&engine_dir).unwrap_or(engine_dir);
     println!("[sidecar] Engine dir: {:?}", engine_dir);
+
+    if !engine_dir.join("src/index.ts").exists() {
+        eprintln!("[sidecar] Engine dir invalid: {:?} — frontend can use restart_engine RPC", engine_dir);
+        return Ok(());
+    }
 
     // Try sidecar binary first
     let child = match app.shell().sidecar("bin/engine") {
@@ -46,44 +89,40 @@ pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                     Some(child)
                 }
                 Err(e) => {
-                    eprintln!("[sidecar] Sidecar failed: {}", e);
-                    npx_spawn_app(app, &engine_dir)?
+                    eprintln!("[sidecar] Sidecar spawn failed: {}", e);
+                    spawn_npx_app(app, &engine_dir)?
                 }
             }
         }
-        Err(e) => {
-            eprintln!("[sidecar] No sidecar: {}", e);
-            npx_spawn_app(app, &engine_dir)?
-        }
+        Err(_) => spawn_npx_app(app, &engine_dir)?,
     };
 
     engine.child = child;
     Ok(())
 }
 
-fn npx_spawn_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
-    if !engine_dir.join("src/index.ts").exists() {
-        eprintln!("[sidecar] Engine dir not found: {:?} — engine needs manual start", engine_dir);
-        return Ok(None);
-    }
-    println!("[sidecar] Starting via npx tsx...");
+fn spawn_npx_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
+    let npx = find_npx();
+    println!("[sidecar] Starting engine: {} tsx src/index.ts in {:?}", npx, engine_dir);
+
     let (_rx, child) = app.shell()
-        .command("npx")
+        .command(&npx)
         .args(["tsx", "src/index.ts"])
         .current_dir(engine_dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
         .spawn()?;
-    println!("[sidecar] Engine started via npx");
+
+    println!("[sidecar] Engine process spawned");
     Ok(Some(child))
 }
 
-fn npx_spawn_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
-    if !engine_dir.join("src/index.ts").exists() {
-        return Err("Engine directory not found".into());
-    }
+fn spawn_npx_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
+    let npx = find_npx();
     let (_rx, child) = app.shell()
-        .command("npx")
+        .command(&npx)
         .args(["tsx", "src/index.ts"])
         .current_dir(engine_dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
         .spawn()?;
     Ok(Some(child))
 }
@@ -102,9 +141,10 @@ pub fn restart_engine(app: AppHandle) -> Result<String, String> {
     stop_engine(&app);
     std::thread::sleep(std::time::Duration::from_millis(500));
     let engine_dir = find_engine_dir();
+    let engine_dir = std::fs::canonicalize(&engine_dir).unwrap_or(engine_dir);
     let state = app.state::<Mutex<EngineState>>();
     let mut engine = state.lock().unwrap();
-    match npx_spawn_handle(&app, &engine_dir) {
+    match spawn_npx_handle(&app, &engine_dir) {
         Ok(child) => {
             engine.child = child;
             Ok("Engine restarted".to_string())

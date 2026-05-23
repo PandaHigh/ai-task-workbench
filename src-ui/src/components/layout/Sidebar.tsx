@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useEngine } from "../../hooks/useEngine";
 
 const navItems = [
   { path: "/", label: "仪表盘", icon: "◎" },
@@ -9,6 +10,7 @@ const navItems = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { connected } = useEngine();
 
   return (
     <aside
@@ -57,7 +59,13 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-3 border-t" style={{ borderColor: "var(--border)" }}>
+      <div className="p-3 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: connected ? "var(--green)" : "var(--red)" }} />
+          <span className="text-[11px]" style={{ color: connected ? "var(--green)" : "var(--red)" }}>
+            {connected ? "Engine connected" : "Engine offline"}
+          </span>
+        </div>
         <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
           v0.1.0
         </div>

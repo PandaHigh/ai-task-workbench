@@ -14,11 +14,6 @@ export function App() {
 
   return (
     <AppShell>
-      {!connected && (
-        <div className="fixed top-0 left-0 right-0 text-center py-1 text-xs z-50" style={{ background: "var(--red)", color: "#fff" }}>
-          Engine disconnected — waiting for connection...
-        </div>
-      )}
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<MainDashboard />} />
