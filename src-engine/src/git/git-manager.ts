@@ -28,6 +28,11 @@ export class GitManager {
     await this.git.raw(["revert", commitHash, "--no-edit"]);
   }
 
+  async checkoutClean(): Promise<void> {
+    await this.git.raw(["checkout", "--", "."]);
+    await this.git.raw(["clean", "-fd"]);
+  }
+
   async getLastNCommits(n: number): Promise<Array<{
     hash: string;
     message: string;

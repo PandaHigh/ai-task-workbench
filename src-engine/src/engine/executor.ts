@@ -231,6 +231,8 @@ export class Executor {
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
       } else {
         try {
+          // Reset working tree changes first, then revert
+          await gitManager.checkoutClean();
           await gitManager.revert("HEAD");
           this.log(run.id, "git", "warn", "Reverted last commit (quality below threshold)");
         } catch (revertErr) {
@@ -341,8 +343,16 @@ export class Executor {
   }
 
   private extractJson(text: string): string {
-    const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    return match ? match[0] : text;
+    // Strip markdown code blocks first
+    let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "");
+    // Try to find JSON object or array
+    const objMatch = cleaned.match(/\{[\s\S]*\}/);
+    const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+    if (objMatch && arrMatch) {
+      // Return whichever starts first
+      return objMatch.index! <= arrMatch.index! ? objMatch[0] : arrMatch[0];
+    }
+    return objMatch?.[0] || arrMatch?.[0] || text;
   }
 
   private log(runId: string, source: string, level: string, message: string): void {
