@@ -393,4 +393,18 @@ input[type="range"]::-moz-range-thumb {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  svg animate,
+  svg animateTransform,
+  svg animateMotion {
+    dur: 0.01ms !important;
+    repeatCount: 1 !important;
+  }
+}
+
+/* Mobile responsive overrides for small viewports */
+@media (max-width: 375px) {
+  .glass-card,
+  .glass-card-sm {
+    padding: 12px !important;
+  }
 }

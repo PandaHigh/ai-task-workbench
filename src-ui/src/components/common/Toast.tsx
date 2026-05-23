@@ -57,12 +57,12 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
         border: `1px solid ${style.border}`,
         borderRadius: "8px",
         backdropFilter: "blur(12px)",
-        animation: exiting ? "none" : "slideIn 0.3s ease-out",
+        animation: exiting ? "fadeOut 0.3s ease-out forwards" : "slideIn 0.3s ease-out",
         transition: "opacity 0.3s ease, transform 0.3s ease",
         opacity: exiting ? 0 : 1,
         transform: exiting ? "translateX(100%)" : "translateX(0)",
-        minWidth: "260px",
         maxWidth: "380px",
+        width: "100%",
       }}
     >
       <span style={{ color: style.border, fontWeight: 700, fontSize: "14px" }}>{style.icon}</span>

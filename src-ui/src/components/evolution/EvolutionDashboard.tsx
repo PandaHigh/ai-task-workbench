@@ -288,8 +288,8 @@ export function EvolutionDashboard() {
                   />
                 ) : (
                   <div className="space-y-0.5">
-                    {logs.map((log) => (
-                      <div key={log.id} className="terminal-line terminal-line-enter">
+                    {logs.map((log, i) => (
+                      <div key={log.id} className="terminal-line" style={staggerItemStyle(i, 30, "staggerFadeIn", 0.2)}>
                         <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
                         <span style={{ color: levelColor(log.level) }}>[{log.level.toUpperCase()}]</span>{" "}
                         <span style={{ color: "var(--text-secondary)" }}>[{log.source}]</span>{" "}
