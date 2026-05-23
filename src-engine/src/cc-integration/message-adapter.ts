@@ -11,12 +11,20 @@ function getProp(msg: CCMessage, key: string): unknown {
   return (msg as unknown as Record<string, unknown>)[key];
 }
 
+function isContentArray(content: unknown): content is Array<{ type: string; text?: string }> {
+  return Array.isArray(content);
+}
+
 export function adaptCCMessage(msg: CCMessage, taskId: string): AdaptedMessage | null {
   switch (msg.type) {
     case "assistant": {
-      const content = msg.content as Array<{ type: string; text?: string }>;
+      const content = msg.content;
+      if (!isContentArray(content)) {
+        const text = typeof content === "string" ? content : "";
+        return { taskId, type: "progress", content: text };
+      }
       const text = content
-        ?.filter((c) => c.type === "text")
+        .filter((c) => c.type === "text")
         .map((c) => c.text || "")
         .join("\n") || "";
       return { taskId, type: "progress", content: text };
@@ -27,7 +35,7 @@ export function adaptCCMessage(msg: CCMessage, taskId: string): AdaptedMessage |
         return {
           taskId,
           type: "result",
-          content: (msg.content as string) || "",
+          content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? ""),
           metadata: {
             totalCostUsd: getProp(msg, "total_cost_usd"),
             durationMs: getProp(msg, "duration_ms"),

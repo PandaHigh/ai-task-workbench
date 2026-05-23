@@ -20,11 +20,24 @@ export class WsServer {
   }
 
   start(): void {
+    this.wss.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`[engine] Port ${PORT} is already in use. Another engine instance may be running.`);
+        process.exit(1);
+      }
+      console.error(`[engine] WebSocket server error: ${err.message}`);
+    });
+
     this.wss.on("connection", (ws) => {
       this.clients.add(ws);
+      (ws as any)._isAlive = true;
 
       ws.on("message", (data: Data) => {
         this.handleMessage(ws, data.toString());
+      });
+
+      ws.on("pong", () => {
+        (ws as any)._isAlive = true;
       });
 
       ws.on("close", () => {
@@ -45,10 +58,19 @@ export class WsServer {
 
     // Heartbeat: detect half-open connections every 30s
     this.heartbeatTimer = setInterval(() => {
+      const dead: WebSocket[] = [];
       for (const client of this.clients) {
-        if (client.readyState === WebSocket.OPEN) {
+        if (!(client as any)._isAlive) {
+          dead.push(client);
+        } else if (client.readyState === WebSocket.OPEN) {
+          (client as any)._isAlive = false;
           client.ping();
         }
+      }
+      for (const d of dead) {
+        console.warn("[ws] terminating dead connection (no pong received)");
+        d.terminate();
+        this.clients.delete(d);
       }
     }, 30000);
 
@@ -126,7 +148,7 @@ export class WsServer {
     }
   }
 
-  close(): void {
+  async close(): Promise<void> {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -135,7 +157,7 @@ export class WsServer {
       client.close();
     }
     this.clients.clear();
-    this.wss.close();
+    await new Promise<void>((resolve) => this.wss.close(() => resolve()));
   }
 
   private isValidRequest(msg: unknown): msg is RpcRequest {
