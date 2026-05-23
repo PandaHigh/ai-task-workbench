@@ -29,6 +29,7 @@ export function EvolutionDashboard() {
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [agentMode, setAgentMode] = useState<"single" | "multi">("single");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -173,7 +174,18 @@ export function EvolutionDashboard() {
                 <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>拖拽排序</span>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div role="listbox" aria-label="任务队列，可通过拖拽或 Ctrl+上下箭头排序" className="flex-1 overflow-y-auto p-2 space-y-1" onKeyDown={(e) => {
+              if (focusIdx === null || queue.length === 0) return;
+              if (e.key === "ArrowUp" && e.ctrlKey && focusIdx > 0) {
+                e.preventDefault();
+                moveTask(focusIdx, focusIdx - 1);
+                setFocusIdx(focusIdx - 1);
+              } else if (e.key === "ArrowDown" && e.ctrlKey && focusIdx < queue.length - 1) {
+                e.preventDefault();
+                moveTask(focusIdx, focusIdx + 1);
+                setFocusIdx(focusIdx + 1);
+              }
+            }}>
               {loading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 4 }, (_, i) => (
@@ -190,11 +202,18 @@ export function EvolutionDashboard() {
                 queue.map((task, i) => (
                   <div
                     key={task.id}
+                    role="option"
+                    aria-grabbed={dragIdx === i ? "true" : "false"}
+                    aria-selected={focusIdx === i ? "true" : "false"}
+                    aria-roledescription="可拖拽任务项，Ctrl+上下箭头可调整顺序"
+                    aria-label={`任务 ${i + 1}: ${task.content}，优先级 P${task.priority}`}
+                    tabIndex={0}
                     draggable
                     onDragStart={() => setDragIdx(i)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => { if (dragIdx !== null && dragIdx !== i) moveTask(dragIdx, i); setDragIdx(null); }}
                     onDragEnd={() => setDragIdx(null)}
+                    onFocus={() => setFocusIdx(i)}
                     className="px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
                     style={{
                       background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",

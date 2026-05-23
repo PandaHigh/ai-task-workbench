@@ -89,6 +89,7 @@ export function SettingsPage() {
           </p>
           <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
+            aria-label={`质量阈值: 当前 ${(qualityThreshold * 100).toFixed(0)}%，范围 0% 到 100%`}
             className="w-full" />
         </div>
 
@@ -100,6 +101,7 @@ export function SettingsPage() {
           </p>
           <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
+            aria-label={`默认超时时间: 当前 ${defaultTimeout} 分钟，范围 5 到 180 分钟`}
             className="w-full" />
         </div>
 
