@@ -3,10 +3,49 @@ import { Store } from "../db/store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
 import * as wizardHandler from "../wizard/wizard-handler.js";
+import { resolve, normalize } from "path";
+import { homedir, tmpdir } from "os";
 
 const store = new Store();
 const queueManager = new QueueManager();
 const activeExecutors = new Map<string, Executor>();
+
+const SYSTEM_DIRS = [
+  "/etc", "/usr", "/bin", "/sbin", "/var", "/sys", "/proc", "/dev",
+  "/boot", "/lib", "/lib64", "/snap", "/nix",
+  "/System", "/Library", "/Applications",
+  "C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)",
+  "C:\\ProgramData",
+].map((d) => normalize(d.toLowerCase()));
+
+function validateWorkingDir(dir: string): string {
+  if (!dir || typeof dir !== "string") {
+    throw new Error("workingDir is required and must be a string");
+  }
+  const resolved = resolve(dir);
+  const normalizedLower = normalize(resolved.toLowerCase());
+
+  for (const sysDir of SYSTEM_DIRS) {
+    if (normalizedLower === sysDir || normalizedLower.startsWith(sysDir + "/") || normalizedLower.startsWith(sysDir + "\\")) {
+      throw new Error(`workingDir cannot point to a system directory: ${resolved}`);
+    }
+  }
+
+  const home = homedir().toLowerCase();
+  const tmp = tmpdir().toLowerCase();
+  if (normalizedLower === home || normalizedLower === tmp) {
+    throw new Error(`workingDir cannot be the home or temp directory: ${resolved}`);
+  }
+
+  return resolved;
+}
+
+const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> = {
+  maxBudgetUsd: { min: 0, max: 1000 },
+  maxEvalLoops: { min: 1, max: 100 },
+  stagnationThreshold: { min: 0, max: 1 },
+  maxConcurrentTasks: { min: 1, max: 10 },
+};
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 let notify: NotifyFn = () => {};
@@ -31,9 +70,10 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "run.create": async (params) => {
     const p = params as unknown as CreateRunParams;
+    const safeWorkingDir = validateWorkingDir(p.workingDir);
     const run: ExecutionRun = {
       id: crypto.randomUUID(),
-      workingDir: p.workingDir,
+      workingDir: safeWorkingDir,
       goals: p.goals,
       terminationConditions: p.terminationConditions,
       status: "idle",
@@ -219,7 +259,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "wizard.start": async (params) => {
     const { workingDir } = params as { workingDir: string };
-    const session = wizardHandler.startSession(workingDir);
+    const safeWorkingDir = validateWorkingDir(workingDir);
+    const session = wizardHandler.startSession(safeWorkingDir);
     return { sessionId: session.sessionId, workingDir: session.workingDir };
   },
 
@@ -243,6 +284,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "config.set": async (params) => {
     const { key, value } = params as { key: string; value: unknown };
+    const constraints = NUMERIC_CONFIG_CONSTRAINTS[key];
+    if (constraints) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(`config '${key}' must be a finite number, got: ${value}`);
+      }
+      if (value < constraints.min || value > constraints.max) {
+        throw new Error(`config '${key}' must be between ${constraints.min} and ${constraints.max}, got: ${value}`);
+      }
+    }
     store.setConfig(key, value);
     return { key, value, saved: true };
   },

@@ -1,5 +1,19 @@
 import { spawn } from "child_process";
-import { platform } from "os";
+import { platform, homedir } from "os";
+
+const SAFE_ENV_KEYS = ["PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP"] as const;
+
+function buildSafeEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of SAFE_ENV_KEYS) {
+    const val = process.env[key];
+    if (val !== undefined) env[key] = val;
+  }
+  if (!env.HOME) env.HOME = homedir();
+  if (!env.PATH) env.PATH = "/usr/bin:/bin";
+  env.LANG = env.LANG || "en_US.UTF-8";
+  return env;
+}
 
 export interface CCExecutionOptions {
   workingDir: string;
@@ -50,7 +64,7 @@ export class CCClient {
     return new Promise((resolve, reject) => {
       const proc = spawn(this.claudePath, args, {
         cwd: options.workingDir,
-        env: { ...process.env },
+        env: buildSafeEnv(),
         stdio: ["ignore", "pipe", "pipe"],
       });
 
