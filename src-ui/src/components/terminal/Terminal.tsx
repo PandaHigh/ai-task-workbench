@@ -19,6 +19,9 @@ export function Terminal({ children, className = "" }: TerminalProps) {
   return (
     <div
       ref={ref}
+      role="log"
+      aria-live="polite"
+      aria-label="终端输出"
       className={`font-mono text-xs leading-relaxed overflow-y-auto ${className}`}
       style={{ background: "#010409", padding: "16px" }}
     >
@@ -124,6 +127,9 @@ export function VirtualizedTerminal({ lines, className = "" }: VirtualizedTermin
   return (
     <div
       ref={containerRef}
+      role="log"
+      aria-live="polite"
+      aria-label="终端输出"
       className={`font-mono text-xs leading-relaxed overflow-y-auto ${className}`}
       style={{ background: "#010409", padding: "16px" }}
       onScroll={handleScroll}

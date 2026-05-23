@@ -181,9 +181,15 @@ export function TaskWizard() {
           <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">新建 AI 任务</h2>
         </div>
-        <div className="flex gap-2 mt-3">
+        <div className="flex gap-2 mt-3" role="tablist" aria-label="任务创建步骤">
           {["选择目录", "AI 对话", "确认参数"].map((label, i) => (
-            <div key={i} className="flex items-center gap-1">
+            <div key={i} className="flex items-center gap-1" role="tab"
+              aria-selected={step === i}
+              aria-current={step === i ? "step" : undefined}
+              tabIndex={step === i ? 0 : -1}
+              id={`wizard-step-${i}`}
+              aria-controls={`wizard-panel-${i}`}
+            >
               <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{
                 background: i <= step ? "var(--blue)" : "var(--bg-tertiary)",
                 color: i <= step ? "#0d1117" : "var(--text-secondary)",
@@ -195,7 +201,9 @@ export function TaskWizard() {
       </div>
 
       {step === 0 && (
-        <div className="flex-1 flex items-center justify-center" style={{ animation: "fadeIn 0.4s ease-out" }}>
+        <div className="flex-1 flex items-center justify-center" role="tabpanel"
+          id="wizard-panel-0" aria-labelledby="wizard-step-0"
+          style={{ animation: "fadeIn 0.4s ease-out" }}>
           <div className="text-center">
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
             {!showDirInput ? (
@@ -221,7 +229,9 @@ export function TaskWizard() {
       )}
 
       {step === 1 && (
-        <div className="flex-1 flex flex-col" style={{ animation: "fadeIn 0.3s ease-out" }}>
+        <div className="flex-1 flex flex-col" role="tabpanel"
+          id="wizard-panel-1" aria-labelledby="wizard-step-1"
+          style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
               <div className="text-center py-10">
@@ -280,7 +290,9 @@ export function TaskWizard() {
       )}
 
       {step === 2 && taskParams && (
-        <div className="flex-1 overflow-y-auto p-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
+        <div className="flex-1 overflow-y-auto p-6" role="tabpanel"
+          id="wizard-panel-2" aria-labelledby="wizard-step-2"
+          style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div
             className="glass-card p-4"
             style={{ animation: "slideUp 0.35s ease-out" }}
