@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -77,11 +77,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  let nextId = 0;
+  const nextIdRef = useRef(0);
 
   const addToast = useCallback((type: ToastType, message: string) => {
-    nextId = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id: nextId, type, message }]);
+    const id = Date.now() + Math.random();
+    nextIdRef.current = id;
+    setToasts((prev) => [...prev, { id, type, message }]);
   }, []);
 
   const success = useCallback((msg: string) => addToast("success", msg), [addToast]);

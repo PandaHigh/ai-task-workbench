@@ -35,10 +35,6 @@ export function startSession(workingDir: string): WizardSession {
   return session;
 }
 
-export function getSession(sessionId: string): WizardSession | undefined {
-  return sessions.get(sessionId);
-}
-
 export async function chat(sessionId: string, userMessage: string): Promise<{
   response: string;
   shouldExtractParams: boolean;

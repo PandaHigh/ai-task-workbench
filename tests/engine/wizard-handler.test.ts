@@ -26,19 +26,6 @@ describe("Wizard Handler", () => {
     expect(session.messages).toHaveLength(0);
   });
 
-  it("should get an existing session", async () => {
-    const { startSession, getSession } = await import("../../src-engine/src/wizard/wizard-handler.js");
-    const session = startSession("/tmp/project");
-    const retrieved = getSession(session.sessionId);
-    expect(retrieved).toBeDefined();
-    expect(retrieved!.sessionId).toBe(session.sessionId);
-  });
-
-  it("should return undefined for nonexistent session", async () => {
-    const { getSession } = await import("../../src-engine/src/wizard/wizard-handler.js");
-    expect(getSession("nonexistent")).toBeUndefined();
-  });
-
   it("should return fallback defaults when no summary in messages", async () => {
     const { extractParams, startSession } = await import("../../src-engine/src/wizard/wizard-handler.js");
     const session = startSession("/tmp/project");
@@ -121,8 +108,7 @@ describe("Wizard Handler", () => {
   });
 
   it("should extract fallback params from conversation without summary", async () => {
-    const { startSession, getSession } = await import("../../src-engine/src/wizard/wizard-handler.js");
-    const { extractParams } = await import("../../src-engine/src/wizard/wizard-handler.js");
+    const { startSession, extractParams } = await import("../../src-engine/src/wizard/wizard-handler.js");
     const session = startSession("/tmp/project");
     // Manually add messages without TASK_SUMMARY
     session.messages.push({ role: "user", content: "my task content" });

@@ -9,7 +9,6 @@ interface TaskStore {
   loadTasks: () => Promise<void>;
   addTask: (task: ExecutionRun) => void;
   updateTask: (id: string, updates: Partial<ExecutionRun>) => void;
-  removeTask: (id: string) => void;
   deleteTask: (id: string) => Promise<void>;
   setActiveRun: (id: string | null) => void;
 }
@@ -37,9 +36,6 @@ export const useTaskStore = create<TaskStore>((set) => ({
     set((state) => ({
       tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
-
-  removeTask: (id) =>
-    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
 
   deleteTask: async (id) => {
     await engineClient.call("run.delete", { runId: id });
