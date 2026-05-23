@@ -72,13 +72,13 @@ function cleanupTmpFiles(dir: string): void {
         try {
           fs.unlinkSync(fullPath);
           console.warn(`[store] Cleaned up stale tmp file: ${fullPath}`);
-        } catch {
-          // best effort
+        } catch (cleanupErr) {
+          console.warn(`[store] Failed to clean up tmp file ${fullPath}: ${cleanupErr instanceof Error ? cleanupErr.message : cleanupErr}`);
         }
       }
     }
-  } catch {
-    // directory may not exist yet
+  } catch (dirErr) {
+    console.warn(`[store] Data directory not found or unreadable: ${dirErr instanceof Error ? dirErr.message : dirErr}`);
   }
 }
 

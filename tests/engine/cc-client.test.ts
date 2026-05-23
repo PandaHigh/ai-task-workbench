@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 import { CCClient } from "../../src-engine/src/cc-integration/cc-client.js";
+import type { Mock } from "vitest";
 
 // Mock child_process.spawn
 vi.mock("child_process", () => ({
@@ -9,8 +10,15 @@ vi.mock("child_process", () => ({
 
 import { spawn } from "child_process";
 
-function createMockProc() {
-  const proc = new EventEmitter() as any;
+interface MockChildProcess extends EventEmitter {
+  stdout: EventEmitter;
+  stderr: EventEmitter;
+  kill: Mock;
+  pid: number;
+}
+
+function createMockProc(): MockChildProcess {
+  const proc = new EventEmitter() as unknown as MockChildProcess;
   proc.stdout = new EventEmitter();
   proc.stderr = new EventEmitter();
   proc.kill = vi.fn();
@@ -28,7 +36,7 @@ describe("CCClient", () => {
 
   it("should execute a task and return result", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test prompt", {
       workingDir: "/tmp/test",
@@ -52,7 +60,7 @@ describe("CCClient", () => {
 
   it("should reject on non-zero exit code without result", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
       workingDir: "/tmp", timeoutMinutes: 1,
@@ -66,7 +74,7 @@ describe("CCClient", () => {
 
   it("should reject on spawn error", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
       workingDir: "/tmp", timeoutMinutes: 1,
@@ -79,7 +87,7 @@ describe("CCClient", () => {
 
   it("should timeout and kill process", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     // Use a very short timeout
     const promise = client.executeTask("test", {
@@ -92,7 +100,7 @@ describe("CCClient", () => {
 
   it("should support abort signal", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const controller = new AbortController();
     const promise = client.executeTask("test", {
@@ -108,7 +116,7 @@ describe("CCClient", () => {
 
   it("should flush remaining buffer on close", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
       workingDir: "/tmp", timeoutMinutes: 5,
@@ -130,7 +138,7 @@ describe("CCClient", () => {
 
   it("should stream messages via executeTaskStream", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const gen = client.executeTaskStream("test", {
       workingDir: "/tmp", timeoutMinutes: 5,
@@ -152,7 +160,7 @@ describe("CCClient", () => {
 
   it("should throw on stream spawn error", async () => {
     const proc = createMockProc();
-    (spawn as any).mockReturnValue(proc);
+    vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const gen = client.executeTaskStream("test", {
       workingDir: "/tmp", timeoutMinutes: 5,
@@ -162,13 +170,13 @@ describe("CCClient", () => {
     setTimeout(() => proc.emit("close", 1), 20);
 
     // Consume generator — should end cleanly (error is thrown after loop completes)
-    const items: any[] = [];
+    const items: unknown[] = [];
     try {
       for await (const msg of gen) {
         items.push(msg);
       }
-    } catch (err: any) {
-      expect(err.message).toBe("stream spawn fail");
+    } catch (err: unknown) {
+      expect((err as Error).message).toBe("stream spawn fail");
     }
   });
 });

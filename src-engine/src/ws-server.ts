@@ -101,8 +101,8 @@ export class WsServer {
     let message: unknown;
     try {
       message = JSON.parse(raw);
-    } catch {
-      console.warn("[ws] received non-JSON message from client");
+    } catch (parseErr) {
+      console.warn("[ws] received non-JSON message from client:", parseErr instanceof Error ? parseErr.message : String(parseErr));
       this.send(ws, { jsonrpc: "2.0", id: 0, error: RPC_ERRORS.PARSE_ERROR });
       return;
     }

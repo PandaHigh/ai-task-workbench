@@ -84,8 +84,8 @@ export class CCClient {
             durationMs = msg.duration_ms || 0;
             numTurns = msg.num_turns || 0;
           }
-        } catch {
-          // non-JSON line from CC stdout, skip
+        } catch (parseErr) {
+          console.warn(`[cc-client] Non-JSON line from CC stdout, skipping: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
         }
       };
 
@@ -186,8 +186,8 @@ export class CCClient {
             resolveNext({ value: msg, done: false });
             resolveNext = null;
           }
-        } catch {
-          // non-JSON line from CC stream, skip
+        } catch (streamParseErr) {
+          console.warn(`[cc-client] Non-JSON line from CC stream, skipping: ${streamParseErr instanceof Error ? streamParseErr.message : String(streamParseErr)}`);
         }
       }
     });
@@ -202,8 +202,8 @@ export class CCClient {
             resolveNext({ value: msg, done: false });
             resolveNext = null;
           }
-        } catch {
-          // incomplete JSON in stream flush, skip
+        } catch (flushErr) {
+          console.warn(`[cc-client] Incomplete JSON in stream flush, skipping: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`);
         }
       }
       done = true;

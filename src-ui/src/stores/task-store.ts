@@ -24,7 +24,8 @@ export const useTaskStore = create<TaskStore>((set) => ({
     try {
       const runs = (await engineClient.call("run.list")) as ExecutionRun[];
       set({ tasks: runs, loading: false });
-    } catch {
+    } catch (err) {
+      console.warn("Failed to load tasks:", err instanceof Error ? err.message : err);
       set({ loading: false });
     }
   },

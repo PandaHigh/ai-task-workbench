@@ -44,20 +44,23 @@ export function EvolutionDashboard() {
         const qRes = await call("queue.list", { runId });
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       } catch (err) {
+        console.warn("Failed to load queue:", err instanceof Error ? err.message : err);
         toast.error("加载任务队列失败");
       }
 
       try {
         const c = await call("run.commits", { runId });
         setCommits((c as GitCommit[]) || []);
-      } catch {
+      } catch (err) {
+        console.warn("Failed to load commits:", err instanceof Error ? err.message : err);
         toast.error("加载提交记录失败");
       }
 
       try {
         const l = await call("run.lessons", { runId });
         setLessons((l as LessonLearned[]) || []);
-      } catch {
+      } catch (err) {
+        console.warn("Failed to load lessons:", err instanceof Error ? err.message : err);
         toast.error("加载经验教训失败");
       }
       setLoading(false);

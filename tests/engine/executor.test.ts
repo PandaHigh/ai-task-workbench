@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
+import type { TaskDefinition, GitCommitSummary, LessonLearned, TaskContext } from "../../shared/src/task-types";
 
 // Mocks must be at module scope for vi.mock
 const mockStore = {
@@ -27,6 +29,10 @@ vi.mock("../../src-engine/src/db/store.js", () => ({
   Store: vi.fn(() => mockStore),
 }));
 
+interface MockCCInstance {
+  executeTask: Mock;
+}
+
 vi.mock("../../src-engine/src/cc-integration/cc-client.js", () => ({
   CCClient: vi.fn(() => ({
     executeTask: vi.fn(),
@@ -43,12 +49,24 @@ vi.mock("../../src-engine/src/git/git-manager.js", () => ({
   })),
 }));
 
-function createMockQueueManager() {
-  const tasks: any[] = [];
+interface MockQueueManager {
+  _tasks: TaskDefinition[];
+  enqueue: Mock;
+  dequeue: Mock;
+  list: Mock;
+  peekNext: Mock;
+  remove: Mock;
+  restore: Mock;
+  clear: Mock;
+  reorder: Mock;
+}
+
+function createMockQueueManager(): MockQueueManager {
+  const tasks: TaskDefinition[] = [];
   return {
     _tasks: tasks,
-    enqueue: vi.fn((runId: string, t: any) => {
-      const task = { id: `task-${tasks.length}`, runId, ...t, status: "pending", createdAt: Date.now() };
+    enqueue: vi.fn((runId: string, t: Partial<TaskDefinition>) => {
+      const task: TaskDefinition = { id: `task-${tasks.length}`, runId, type: "user_defined", priority: 1, timeoutMinutes: 60, agentMode: "single", promptJson: "", status: "pending", createdAt: Date.now(), ...t };
       tasks.push(task);
       return task;
     }),
@@ -58,7 +76,7 @@ function createMockQueueManager() {
       return tasks.splice(idx, 1)[0];
     }),
     list: vi.fn(() => [...tasks]),
-    peekNext: vi.fn((runId: string, n: number) => tasks.slice(0, n)),
+    peekNext: vi.fn((_runId: string, n: number) => tasks.slice(0, n)),
     remove: vi.fn(),
     restore: vi.fn(),
     clear: vi.fn(),
@@ -67,8 +85,8 @@ function createMockQueueManager() {
 }
 
 describe("Executor", () => {
-  let queueManager: ReturnType<typeof createMockQueueManager>;
-  let notifications: any[];
+  let queueManager: MockQueueManager;
+  let notifications: { method: string; params: Record<string, unknown> }[];
   let notify: (method: string, params: Record<string, unknown>) => void;
 
   beforeEach(() => {
@@ -80,13 +98,13 @@ describe("Executor", () => {
 
   it("should stop and mark active tasks as cancelled", async () => {
     const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as any, notify, "run-1");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     executor.stop();
   });
 
   it("should cancel a specific task and update store", async () => {
     const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as any, notify, "run-1");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     executor.cancelTask("task-1", "run-1");
     expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "task-1", {
       status: "cancelled", completedAt: expect.any(Number),
@@ -109,13 +127,11 @@ describe("Executor", () => {
 });
 
 describe("Executor core loop (mocked)", () => {
-  let queueManager: ReturnType<typeof createMockQueueManager>;
-  let notifications: any[];
+  let queueManager: MockQueueManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     queueManager = createMockQueueManager();
-    notifications = [];
     // Reset store mock return values for loop tests
     mockStore.getLessons.mockReturnValue([]);
     mockStore.listTasks.mockReturnValue([]);
@@ -126,7 +142,6 @@ describe("Executor core loop (mocked)", () => {
     // Setup: one task in queue
     queueManager.enqueue("run-1", { content: "Add health endpoint", type: "user_defined", priority: 1 });
     // After first dequeue, return null to trigger goal evaluation
-    const originalDequeue = queueManager.dequeue;
     let dequeueCount = 0;
     queueManager.dequeue.mockImplementation((runId: string) => {
       dequeueCount++;
@@ -136,8 +151,8 @@ describe("Executor core loop (mocked)", () => {
 
     // Mock CC to return success result
     const { CCClient } = await import("../../src-engine/src/cc-integration/cc-client.js");
-    const ccInstance = new (CCClient as any)();
-    ccInstance.executeTask.mockImplementation(async (prompt: string, opts: any) => {
+    const ccInstance = new (CCClient as unknown as new () => MockCCInstance)();
+    ccInstance.executeTask.mockImplementation(async (prompt: string, _opts: unknown) => {
       if (prompt.includes("Score")) {
         return { result: '{"goalAlignment": 0.2, "correctness": 0.2, "completeness": 0.15, "quality": 0.15, "reasoning": "Good"}', sessionId: "s1", totalCostUsd: 0.01, durationMs: 1000, numTurns: 1, messages: [] };
       }
@@ -152,11 +167,10 @@ describe("Executor core loop (mocked)", () => {
   });
 
   it("should revert on low score and record lesson", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
     const { CCClient } = await import("../../src-engine/src/cc-integration/cc-client.js");
 
     // CC returns low score
-    const ccInstance = new (CCClient as any)();
+    const ccInstance = new (CCClient as unknown as new () => MockCCInstance)();
     let callCount = 0;
     ccInstance.executeTask.mockImplementation(async () => {
       callCount++;
@@ -173,7 +187,7 @@ describe("Executor core loop (mocked)", () => {
   it("should generate smart tasks when goals not met", async () => {
     const { CCClient } = await import("../../src-engine/src/cc-integration/cc-client.js");
 
-    const ccInstance = new (CCClient as any)();
+    const ccInstance = new (CCClient as unknown as new () => MockCCInstance)();
     ccInstance.executeTask.mockImplementation(async (prompt: string) => {
       if (prompt.includes("Generate")) {
         return {
@@ -195,7 +209,7 @@ describe("Executor core loop (mocked)", () => {
 describe("Executor extractJson", () => {
   function extractJson(text: string): string {
     let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
-    try { JSON.parse(cleaned); return cleaned; } catch {}
+    try { JSON.parse(cleaned); return cleaned; } catch { /* expected for non-JSON */ }
     const findBalanced = (open: string, close: string): string | null => {
       const startIdx = cleaned.indexOf(open);
       if (startIdx === -1) return null;
@@ -250,23 +264,21 @@ describe("Executor extractJson", () => {
 describe("Executor buildSystemPrompt", () => {
   it("should build prompt with context", async () => {
     const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const notifications: any[] = [];
+    const notifications: { method: string; params: Record<string, unknown> }[] = [];
     const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
     const qm = createMockQueueManager();
 
-    const executor = new Executor(qm as any, notify, "run-1");
-    // Access private method via any
-    const prompt = (executor as any).buildSystemPrompt(
-      { content: "Test" } as any,
-      {
-        workingDir: "/tmp",
-        goals: ["g1"],
-        terminationConditions: ["done"],
-        lastTenCommits: [{ hash: "abc1234", message: "init", timestamp: 1000, isAiCommit: true }],
-        nextFiveTasks: [{ type: "user_defined", content: "next task" } as any],
-        lessonsLearned: [{ category: "failure", lesson: "avoid X" } as any],
-      },
-    );
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const task: Partial<TaskDefinition> = { content: "Test" };
+    const context: TaskContext = {
+      workingDir: "/tmp",
+      goals: ["g1"],
+      terminationConditions: ["done"],
+      lastTenCommits: [{ hash: "abc1234", message: "init", timestamp: 1000, isAiCommit: true }],
+      nextFiveTasks: [{ type: "user_defined", content: "next task", runId: "run-1", id: "t1", priority: 1, timeoutMinutes: 60, agentMode: "single", promptJson: "", status: "pending", createdAt: Date.now() }],
+      lessonsLearned: [{ id: 1, runId: "run-1", category: "failure", lesson: "avoid X", createdAt: Date.now() }],
+    };
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt(task, context);
 
     expect(prompt).toContain("init");
     expect(prompt).toContain("next task");
@@ -275,22 +287,21 @@ describe("Executor buildSystemPrompt", () => {
 
   it("should build prompt without context data", async () => {
     const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const notifications: any[] = [];
+    const notifications: { method: string; params: Record<string, unknown> }[] = [];
     const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
     const qm = createMockQueueManager();
 
-    const executor = new Executor(qm as any, notify, "run-1");
-    const prompt = (executor as any).buildSystemPrompt(
-      { content: "Test" } as any,
-      {
-        workingDir: "/tmp",
-        goals: [],
-        terminationConditions: [],
-        lastTenCommits: [],
-        nextFiveTasks: [],
-        lessonsLearned: [],
-      },
-    );
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const task: Partial<TaskDefinition> = { content: "Test" };
+    const context: TaskContext = {
+      workingDir: "/tmp",
+      goals: [],
+      terminationConditions: [],
+      lastTenCommits: [],
+      nextFiveTasks: [],
+      lessonsLearned: [],
+    };
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt(task, context);
 
     expect(prompt).toBe("");
   });
@@ -310,8 +321,8 @@ describe("Executor recalculateCost", () => {
       { costUsd: 0.2 },
     ]);
 
-    const executor = new Executor(qm as any, () => {}, "run-1");
-    const cost = (executor as any).recalculateCost("run-1");
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
+    const cost = (executor as unknown as { recalculateCost: (runId: string) => number }).recalculateCost("run-1");
     expect(cost).toBeCloseTo(1.0);
   });
 });
@@ -327,8 +338,8 @@ describe("Executor config loading", () => {
 
     const { Executor } = await import("../../src-engine/src/engine/executor.js");
     const qm = createMockQueueManager();
-    const executor = new Executor(qm as any, () => {}, "run-1");
-    const config = (executor as any).config;
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
+    const config = (executor as unknown as { config: Record<string, unknown> }).config;
     expect(config.qualityThreshold).toBe(0.8);
     expect(config.maxEvaluationCycles).toBe(10);
     // Unset values keep defaults

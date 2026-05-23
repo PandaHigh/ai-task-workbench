@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import type { Data } from "ws";
 
 // We test WsServer internals by mocking the ws module to avoid port conflicts.
-const mockClients = new Set<any>();
+interface MockWs {
+  readyState: number;
+  _isAlive: boolean;
+  on: Mock;
+  send: Mock;
+  ping: Mock;
+  close: Mock;
+  terminate: Mock;
+}
+
+const mockClients = new Set<MockWs>();
 const mockWss = {
   on: vi.fn(),
   close: vi.fn((cb: () => void) => cb()),
@@ -15,8 +26,8 @@ vi.mock("ws", () => ({
 
 import { WsServer } from "../../src-engine/src/ws-server.js";
 
-function createMockWs(): any {
-  const ws = {
+function createMockWs(): MockWs {
+  return {
     readyState: 1,
     _isAlive: true,
     on: vi.fn(),
@@ -25,7 +36,12 @@ function createMockWs(): any {
     close: vi.fn(),
     terminate: vi.fn(),
   };
-  return ws;
+}
+
+function findHandler(calls: unknown[][], event: string): Function | undefined {
+  return calls.find(
+    (c: unknown[]) => c[0] === event,
+  )?.[1] as Function | undefined;
 }
 
 describe("WsServer", () => {
@@ -48,13 +64,11 @@ describe("WsServer", () => {
 
     it("should handle new connections", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
       expect(connectionHandler).toBeDefined();
 
       const ws = createMockWs();
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
       expect(ws.on).toHaveBeenCalledWith("pong", expect.any(Function));
       expect(ws.on).toHaveBeenCalledWith("message", expect.any(Function));
@@ -67,52 +81,44 @@ describe("WsServer", () => {
 
     it("should handle pong to keep connection alive", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
       const ws = createMockWs();
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
-      const pongHandler = ws.on.mock.calls.find((c: any[]) => c[0] === "pong")?.[1];
-      pongHandler();
+      const pongHandler = findHandler(ws.on.mock.calls, "pong");
+      pongHandler!();
       expect(ws._isAlive).toBe(true);
     });
 
     it("should remove client on close", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
       const ws = createMockWs();
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
-      const closeHandler = ws.on.mock.calls.find((c: any[]) => c[0] === "close")?.[1];
-      closeHandler();
+      const closeHandler = findHandler(ws.on.mock.calls, "close");
+      closeHandler!();
       // The client should be removed (we can verify via broadcast)
     });
 
     it("should handle EADDRINUSE error", () => {
       server.start();
-      const errorHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "error",
-      )?.[1];
+      const errorHandler = findHandler(mockWss.on.mock.calls, "error");
 
       const mockExit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
-      errorHandler({ code: "EADDRINUSE", message: "in use" });
+      errorHandler!({ code: "EADDRINUSE", message: "in use" });
       expect(mockExit).toHaveBeenCalledWith(1);
       mockExit.mockRestore();
     });
   });
 
   describe("handleMessage", () => {
-    let ws: any;
+    let ws: MockWs;
     let connectionHandler: Function;
 
     beforeEach(() => {
       server.start();
-      connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      connectionHandler = findHandler(mockWss.on.mock.calls, "connection")!;
       ws = createMockWs();
       connectionHandler(ws);
       // Clear the system.ready send call
@@ -120,62 +126,50 @@ describe("WsServer", () => {
     });
 
     it("should return parse error for invalid JSON", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler("not valid json{{{");
+      await messageHandler!("not valid json{{{");
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32700);
     });
 
     it("should return invalid request for missing jsonrpc", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({ method: "test", id: 1 }));
+      await messageHandler!(JSON.stringify({ method: "test", id: 1 }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32600);
     });
 
     it("should return invalid request for non-string method", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({ jsonrpc: "2.0", method: 123, id: 1 }));
+      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: 123, id: 1 }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32600);
     });
 
     it("should return method not found for unknown method", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({ jsonrpc: "2.0", method: "unknown", id: 1 }));
+      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: "unknown", id: 1 }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32601);
     });
 
     it("should dispatch to method handler and return result", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({ jsonrpc: "2.0", method: "run.list", id: 42 }));
+      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: "run.list", id: 42 }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.id).toBe(42);
       expect(Array.isArray(response.result)).toBe(true);
     });
 
     it("should handle handler exceptions as internal error", async () => {
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({
+      await messageHandler!(JSON.stringify({
         jsonrpc: "2.0",
         method: "task.create",
         id: 99,
@@ -187,11 +181,9 @@ describe("WsServer", () => {
 
     it("should not send on non-OPEN websocket", async () => {
       ws.readyState = 2; // CLOSING
-      const messageHandler = ws.on.mock.calls.find(
-        (c: any[]) => c[0] === "message",
-      )?.[1];
+      const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler(JSON.stringify({ jsonrpc: "2.0", method: "run.list", id: 1 }));
+      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: "run.list", id: 1 }));
       expect(ws.send).not.toHaveBeenCalled();
     });
   });
@@ -199,14 +191,12 @@ describe("WsServer", () => {
   describe("broadcast", () => {
     it("should send notification to all open clients", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws1 = createMockWs();
       const ws2 = createMockWs();
-      connectionHandler(ws1);
-      connectionHandler(ws2);
+      connectionHandler!(ws1);
+      connectionHandler!(ws2);
       ws1.send.mockClear();
       ws2.send.mockClear();
 
@@ -221,15 +211,13 @@ describe("WsServer", () => {
 
     it("should skip non-OPEN clients", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws1 = createMockWs();
       const ws2 = createMockWs();
       ws2.readyState = 2; // CLOSING
-      connectionHandler(ws1);
-      connectionHandler(ws2);
+      connectionHandler!(ws1);
+      connectionHandler!(ws2);
       ws1.send.mockClear();
       ws2.send.mockClear();
 
@@ -240,13 +228,11 @@ describe("WsServer", () => {
 
     it("should remove clients that fail to send", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws = createMockWs();
       ws.send.mockImplementation(() => { throw new Error("send failed"); });
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
       server.broadcast("test.event", {});
       // Client should be removed after send failure
@@ -256,12 +242,10 @@ describe("WsServer", () => {
   describe("close", () => {
     it("should close all clients and the server", async () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws = createMockWs();
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
       await server.close();
       expect(ws.close).toHaveBeenCalled();
@@ -272,13 +256,11 @@ describe("WsServer", () => {
   describe("heartbeat", () => {
     it("should detect dead connections and terminate them", () => {
       server.start();
-      const connectionHandler = mockWss.on.mock.calls.find(
-        (c: any[]) => c[0] === "connection",
-      )?.[1];
+      const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws = createMockWs();
       ws._isAlive = false; // Simulate a dead connection
-      connectionHandler(ws);
+      connectionHandler!(ws);
 
       // Find the heartbeat interval handler
       // The heartbeat is set up in start(), but since we mock setInterval timing,
@@ -313,8 +295,8 @@ describe("WsServer", () => {
       return (
         typeof msg === "object" &&
         msg !== null &&
-        (msg as any).jsonrpc === "2.0" &&
-        typeof (msg as any).method === "string"
+        (msg as Record<string, unknown>).jsonrpc === "2.0" &&
+        typeof (msg as Record<string, unknown>).method === "string"
       );
     }
 

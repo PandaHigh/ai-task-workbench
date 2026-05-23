@@ -449,7 +449,7 @@ export class Executor {
   private extractJson(text: string): string {
     let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
 
-    try { JSON.parse(cleaned); return cleaned; } catch { /* not pure JSON, try extracting below */ }
+    try { JSON.parse(cleaned); return cleaned; } catch (jsonErr) { console.warn(`[executor] Text is not pure JSON, attempting bracket extraction: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`); }
 
     const findBalanced = (open: string, close: string): string | null => {
       const startIdx = cleaned.indexOf(open);
@@ -467,7 +467,7 @@ export class Executor {
         if (ch === close) depth--;
         if (depth === 0) {
           const candidate = cleaned.substring(startIdx, i + 1);
-          try { JSON.parse(candidate); return candidate; } catch { return null; } // balanced bracket extraction failed
+          try { JSON.parse(candidate); return candidate; } catch (bracketErr) { console.warn(`[executor] Balanced bracket extraction produced invalid JSON: ${bracketErr instanceof Error ? bracketErr.message : String(bracketErr)}`); return null; }
         }
       }
       return null;

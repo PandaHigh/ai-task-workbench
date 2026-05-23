@@ -12,7 +12,8 @@ export function useEngine() {
       try {
         await engineClient.connect();
         if (mountedRef.current) setConnected(true);
-      } catch {
+      } catch (err) {
+        console.warn("Engine connection failed:", err instanceof Error ? err.message : err);
         if (mountedRef.current) setConnected(false);
       }
     };

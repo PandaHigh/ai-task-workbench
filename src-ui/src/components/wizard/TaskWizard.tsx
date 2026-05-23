@@ -119,7 +119,8 @@ export function TaskWizard() {
               message: errorMsg,
             })) as { response: string; shouldExtractParams: boolean };
             addMessage({ role: "assistant", content: retryRes.response, timestamp: Date.now() });
-          } catch {
+          } catch (retryErr) {
+            console.warn("Wizard validation retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
             addMessage({ role: "assistant", content: "请补充以下信息:\n" + valRes.errors.join("\n"), timestamp: Date.now() });
           }
         }

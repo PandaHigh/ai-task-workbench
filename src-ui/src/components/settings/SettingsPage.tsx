@@ -20,21 +20,24 @@ export function SettingsPage() {
         const qt = await call("config.get", { key: "qualityThreshold" });
         const val = (qt as Record<string, unknown> | null)?.value;
         if (val != null) setQualityThreshold(Number(val));
-      } catch {
+      } catch (err) {
+        console.warn("Failed to load quality threshold:", err instanceof Error ? err.message : err);
         toast.error("加载质量阈值失败");
       }
       try {
         const dt = await call("config.get", { key: "defaultTimeout" });
         const val = (dt as Record<string, unknown> | null)?.value;
         if (val != null) setDefaultTimeout(Number(val));
-      } catch {
+      } catch (err) {
+        console.warn("Failed to load default timeout:", err instanceof Error ? err.message : err);
         toast.error("加载超时设置失败");
       }
       try {
         const cp = await call("config.get", { key: "claudePath" });
         const val = (cp as Record<string, unknown> | null)?.value;
         if (val) setClaudePath(String(val));
-      } catch {
+      } catch (err) {
+        console.warn("Failed to load claude path:", err instanceof Error ? err.message : err);
         toast.error("加载 Claude 路径失败");
       }
       setLoaded(true);

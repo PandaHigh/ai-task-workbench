@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import type { ExecutionRun } from "../../shared/src/task-types";
 
 describe("RPC Methods", () => {
   let methodHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>>;
@@ -14,7 +15,7 @@ describe("RPC Methods", () => {
     vi.resetModules();
 
     vi.doMock("../../src-engine/src/db/store.js", async (importOriginal) => {
-      const actual = (await importOriginal()) as any;
+      const actual = await importOriginal<typeof import("../../src-engine/src/db/store.js")>();
       return {
         Store: vi.fn(function (this: unknown) {
           return new actual.Store(testDir);
@@ -32,13 +33,13 @@ describe("RPC Methods", () => {
     vi.restoreAllMocks();
   });
 
-  async function createRun(extra: Record<string, unknown> = {}): Promise<any> {
+  async function createRun(extra: Record<string, unknown> = {}): Promise<ExecutionRun> {
     return methodHandlers["run.create"]({
       workingDir: "/tmp/test",
       goals: ["goal 1"],
       terminationConditions: ["done when goal met"],
       ...extra,
-    });
+    }) as Promise<ExecutionRun>;
   }
 
   describe("run.list / run.create", () => {
@@ -68,7 +69,7 @@ describe("RPC Methods", () => {
   describe("run.report", () => {
     it("should return run and report", async () => {
       const run = await createRun();
-      const result = await methodHandlers["run.report"]({ runId: run.id });
+      const result = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.run).toBeDefined();
       expect(result.report).toBeNull();
     });
@@ -79,9 +80,9 @@ describe("RPC Methods", () => {
       const run = await createRun({
         tasks: [{ content: "task 1", type: "user_defined", priority: 1 }],
       });
-      const tasks = await methodHandlers["run.tasks"]({ runId: run.id });
+      const tasks = await methodHandlers["run.tasks"]({ runId: run.id }) as unknown[];
       expect(tasks).toHaveLength(1);
-      expect(tasks[0].content).toBe("task 1");
+      expect((tasks[0] as Record<string, unknown>).content).toBe("task 1");
     });
   });
 
@@ -104,7 +105,7 @@ describe("RPC Methods", () => {
   describe("run.stop", () => {
     it("should stop a run and mark as paused", async () => {
       const run = await createRun();
-      const result = await methodHandlers["run.stop"]({ runId: run.id });
+      const result = await methodHandlers["run.stop"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.status).toBe("stopped");
     });
   });
@@ -112,7 +113,7 @@ describe("RPC Methods", () => {
   describe("run.delete", () => {
     it("should delete a run", async () => {
       const run = await createRun();
-      const result = await methodHandlers["run.delete"]({ runId: run.id });
+      const result = await methodHandlers["run.delete"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.deleted).toBe(true);
       const runs = await methodHandlers["run.list"]({});
       expect(runs).toHaveLength(0);
@@ -146,7 +147,7 @@ describe("RPC Methods", () => {
         content: "Implement feature X",
         type: "user_defined",
         priority: 1,
-      });
+      }) as Record<string, unknown>;
       expect(task.content).toBe("Implement feature X");
       expect(task.runId).toBe(run.id);
     });
@@ -161,7 +162,8 @@ describe("RPC Methods", () => {
     it("should reject completed run", async () => {
       const run = await createRun();
       // Mark as completed directly in the store
-      const store = new (await import("../../src-engine/src/db/store.js")).Store(testDir) as any;
+      const { Store } = await import("../../src-engine/src/db/store.js");
+      const store = new Store(testDir);
       run.status = "completed";
       store.saveRun(run);
 
@@ -171,7 +173,7 @@ describe("RPC Methods", () => {
 
     it("should start a run and set status to running", async () => {
       const run = await createRun();
-      const result = await methodHandlers["task.start"]({ runId: run.id });
+      const result = await methodHandlers["task.start"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.status).toBe("running");
     });
 
@@ -188,7 +190,7 @@ describe("RPC Methods", () => {
     it("should pause a running run", async () => {
       const run = await createRun();
       await methodHandlers["task.start"]({ runId: run.id });
-      const result = await methodHandlers["task.pause"]({ runId: run.id });
+      const result = await methodHandlers["task.pause"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.status).toBe("paused");
     });
   });
@@ -198,7 +200,7 @@ describe("RPC Methods", () => {
       const run = await createRun();
       await methodHandlers["task.start"]({ runId: run.id });
       await methodHandlers["task.pause"]({ runId: run.id });
-      const result = await methodHandlers["task.resume"]({ runId: run.id });
+      const result = await methodHandlers["task.resume"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.status).toBe("running");
       await methodHandlers["run.stop"]({ runId: run.id });
     });
@@ -206,7 +208,7 @@ describe("RPC Methods", () => {
 
   describe("task.cancel", () => {
     it("should cancel a task", async () => {
-      const result = await methodHandlers["task.cancel"]({ taskId: "t1", runId: "r1" });
+      const result = await methodHandlers["task.cancel"]({ taskId: "t1", runId: "r1" }) as Record<string, unknown>;
       expect(result.status).toBe("cancelled");
     });
   });
@@ -229,10 +231,10 @@ describe("RPC Methods", () => {
         content: "Test task",
         type: "user_defined",
         priority: 1,
-      });
+      }) as Record<string, unknown>;
       const result = await methodHandlers["task.setTimeout"]({
         runId: run.id, taskId: task.id, minutes: 30,
-      });
+      }) as Record<string, unknown>;
       expect(result.timeoutMinutes).toBe(30);
     });
   });
@@ -242,7 +244,7 @@ describe("RPC Methods", () => {
       const run = await createRun({
         tasks: [{ content: "task 1", type: "user_defined", priority: 1 }],
       });
-      const result = await methodHandlers["queue.list"]({ runId: run.id });
+      const result = await methodHandlers["queue.list"]({ runId: run.id }) as Record<string, unknown>;
       expect(result.queue).toBeDefined();
       expect(result.runId).toBe(run.id);
     });
@@ -263,16 +265,16 @@ describe("RPC Methods", () => {
           { content: "task 2", type: "user_defined", priority: 2 },
         ],
       });
-      const queue = await methodHandlers["queue.list"]({ runId: run.id });
-      const ids = queue.queue.map((t: any) => t.id).reverse();
-      const result = await methodHandlers["queue.reorder"]({ runId: run.id, taskIds: ids });
+      const queue = await methodHandlers["queue.list"]({ runId: run.id }) as Record<string, unknown[]>;
+      const ids = (queue.queue as Record<string, unknown>[]).map((t) => t.id).reverse();
+      const result = await methodHandlers["queue.reorder"]({ runId: run.id, taskIds: ids }) as Record<string, unknown>;
       expect(result.order).toEqual(ids);
     });
   });
 
   describe("wizard.start", () => {
     it("should start a wizard session", async () => {
-      const result = await methodHandlers["wizard.start"]({ workingDir: "/tmp/test" });
+      const result = await methodHandlers["wizard.start"]({ workingDir: "/tmp/test" }) as Record<string, unknown>;
       expect(result.sessionId).toBeDefined();
       expect(result.workingDir).toBe("/tmp/test");
     });
@@ -280,8 +282,8 @@ describe("RPC Methods", () => {
 
   describe("wizard.validate", () => {
     it("should validate a wizard session with fallback params", async () => {
-      const session = await methodHandlers["wizard.start"]({ workingDir: "/tmp/test" });
-      const result = await methodHandlers["wizard.validate"]({ sessionId: session.sessionId });
+      const session = await methodHandlers["wizard.start"]({ workingDir: "/tmp/test" }) as Record<string, unknown>;
+      const result = await methodHandlers["wizard.validate"]({ sessionId: session.sessionId }) as Record<string, unknown>;
       // Fallback params from empty session are actually valid (non-empty content, goals, conditions)
       expect(result.valid).toBe(true);
       expect(result.params).toBeDefined();
@@ -291,12 +293,12 @@ describe("RPC Methods", () => {
   describe("config.get / config.set", () => {
     it("should get and set config values", async () => {
       await methodHandlers["config.set"]({ key: "testKey", value: "hello" });
-      const result = await methodHandlers["config.get"]({ key: "testKey" });
+      const result = await methodHandlers["config.get"]({ key: "testKey" }) as Record<string, unknown>;
       expect(result.value).toBe("hello");
     });
 
     it("should return undefined for unknown keys", async () => {
-      const result = await methodHandlers["config.get"]({ key: "nonexistent" });
+      const result = await methodHandlers["config.get"]({ key: "nonexistent" }) as Record<string, unknown>;
       expect(result.value).toBeUndefined();
     });
   });
