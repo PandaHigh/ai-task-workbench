@@ -26,7 +26,7 @@ function NotFound() {
 }
 
 export function App() {
-  const { connected } = useEngine();
+  useEngine();
   useNotifications();
 
   return (

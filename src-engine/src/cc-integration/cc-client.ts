@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import { platform } from "os";
 
 export interface CCExecutionOptions {

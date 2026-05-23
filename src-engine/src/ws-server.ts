@@ -5,11 +5,6 @@ import { methodHandlers } from "./json-rpc/methods.js";
 
 const PORT = 9731;
 
-interface PendingCall {
-  resolve: (value: unknown) => void;
-  reject: (reason: Error) => void;
-}
-
 export class WsServer {
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();

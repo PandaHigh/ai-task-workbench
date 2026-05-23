@@ -1,4 +1,4 @@
-import type { CreateRunParams, CreateTaskParams, ExecutionRun, TaskDefinition } from "@ai-workbench/shared";
+import type { CreateRunParams, CreateTaskParams, ExecutionRun } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";

@@ -334,7 +334,7 @@ export class Executor {
     }
   }
 
-  private async buildContext(task: TaskDefinition, run: ExecutionRun, gitManager: GitManager): Promise<TaskContext> {
+  private async buildContext(_task: TaskDefinition, run: ExecutionRun, gitManager: GitManager): Promise<TaskContext> {
     const lastTenCommits = await gitManager.getLastNCommits(10).catch(() => []);
     const nextFiveTasks = this.queueManager.peekNext(run.id, 5);
     const lessons = this.store.getLessons(run.id).slice(-20);
@@ -367,7 +367,7 @@ export class Executor {
     return [task.content];
   }
 
-  private buildSystemPrompt(task: TaskDefinition, context: TaskContext): string {
+  private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
     const parts: string[] = [];
     if (context.lastTenCommits.length > 0) {
       parts.push("Recent git commits:");

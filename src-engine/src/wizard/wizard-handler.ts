@@ -1,5 +1,4 @@
 import { CCClient } from "../cc-integration/cc-client.js";
-import type { TaskDefinition } from "@ai-workbench/shared";
 
 interface WizardSession {
   sessionId: string;

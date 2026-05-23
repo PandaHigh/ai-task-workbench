@@ -7,7 +7,7 @@ export interface GitManagerOptions {
 export class GitManager {
   private git: SimpleGit;
 
-  constructor(private options: GitManagerOptions) {
+  constructor(options: GitManagerOptions) {
     this.git = simpleGit(options.workingDir);
   }
 
