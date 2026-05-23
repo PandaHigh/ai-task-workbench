@@ -1,0 +1,20 @@
+{
+  "name": "ai-task-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "全自动任务AI工具台 - Self-evolving AI task workbench",
+  "scripts": {
+    "dev": "npm run dev --workspace=src-ui",
+    "dev:engine": "npm run dev --workspace=src-engine",
+    "dev:tauri": "cargo tauri dev",
+    "build": "npm run build --workspace=src-engine && npm run build --workspace=src-ui",
+    "test": "npm run test --workspaces --if-present",
+    "test:engine": "npm run test --workspace=src-engine",
+    "test:ui": "npm run test --workspace=src-ui"
+  },
+  "workspaces": [
+    "shared",
+    "src-engine",
+    "src-ui"
+  ]
+}
