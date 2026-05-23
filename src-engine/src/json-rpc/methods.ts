@@ -59,6 +59,36 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { run, report };
   },
 
+  "run.tasks": async (params) => {
+    const { runId } = params as { runId: string };
+    return store.listTasks(runId);
+  },
+
+  "run.commits": async (params) => {
+    const { runId } = params as { runId: string };
+    return store.getCommits(runId);
+  },
+
+  "run.lessons": async (params) => {
+    const { runId } = params as { runId: string };
+    return store.getLessons(runId);
+  },
+
+  "run.stop": async (params) => {
+    const { runId } = params as { runId: string };
+    const executor = activeExecutors.get(runId);
+    if (executor) {
+      executor.stop();
+      activeExecutors.delete(runId);
+    }
+    const run = store.getRun(runId);
+    if (run) {
+      run.status = "paused";
+      store.saveRun(run);
+    }
+    return { status: "stopped" };
+  },
+
   "task.create": async (params) => {
     const p = params as unknown as CreateTaskParams & { runId: string };
     const task = queueManager.enqueue(p.runId, p);

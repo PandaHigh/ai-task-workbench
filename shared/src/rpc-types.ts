@@ -49,6 +49,10 @@ export type EngineMethod =
   | "run.create"
   | "run.report"
   | "run.list"
+  | "run.tasks"
+  | "run.commits"
+  | "run.lessons"
+  | "run.stop"
   | "config.get"
   | "config.set";
 

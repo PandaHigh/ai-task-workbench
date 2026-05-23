@@ -13,8 +13,11 @@ export function useNotifications() {
     return engineClient.onNotification((method, params) => {
       switch (method) {
         case "run.status": {
-          const { runId, status } = params as { runId: string; status: string };
-          updateTask(runId, { status: status as ExecutionRun["status"] });
+          const { runId, status, report } = params as { runId: string; status: string; report?: string };
+          const updates: Partial<ExecutionRun> = { status: status as ExecutionRun["status"] };
+          if (report) updates.finalReport = report;
+          if (status === "completed") updates.completedAt = Date.now();
+          updateTask(runId, updates);
           if (status === "running") setRunning(true);
           if (status === "completed" || status === "failed") setRunning(false);
           break;
@@ -24,7 +27,7 @@ export function useNotifications() {
           addLog({
             id: Date.now(),
             timestamp: Date.now(),
-            level: "info",
+            level: status === "failed" ? "error" : status === "reverted" ? "warn" : "info",
             source: "engine",
             message: `Task ${taskId.substring(0, 6)} → ${status}`,
           });
@@ -42,13 +45,13 @@ export function useNotifications() {
           break;
         }
         case "task.scored": {
-          const { taskId, score } = params as { taskId: string; score: { overall: number; passed: boolean } };
+          const { taskId, score } = params as { taskId: string; score: { overall: number; passed: boolean; reasoning?: string } };
           addLog({
             id: Date.now(),
             timestamp: Date.now(),
             level: score.passed ? "info" : "warn",
             source: "scorer",
-            message: `Task ${taskId.substring(0, 6)} scored: ${(score.overall * 100).toFixed(0)}% ${score.passed ? "PASS" : "FAIL"}`,
+            message: `Task ${taskId.substring(0, 6)} scored: ${(score.overall * 100).toFixed(0)}% ${score.passed ? "PASS" : "FAIL"}${score.reasoning ? ` — ${score.reasoning}` : ""}`,
           });
           break;
         }

@@ -1,5 +1,5 @@
 import { useEngine } from "../../hooks/useEngine";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function SettingsPage() {
   const { connected, call } = useEngine();
@@ -7,6 +7,27 @@ export function SettingsPage() {
   const [defaultTimeout, setDefaultTimeout] = useState(60);
   const [claudePath, setClaudePath] = useState("claude");
   const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!connected) return;
+    const load = async () => {
+      try {
+        const qt = await call("config.get", { key: "qualityThreshold" });
+        if ((qt as any)?.value != null) setQualityThreshold(Number((qt as any).value));
+      } catch {}
+      try {
+        const dt = await call("config.get", { key: "defaultTimeout" });
+        if ((dt as any)?.value != null) setDefaultTimeout(Number((dt as any).value));
+      } catch {}
+      try {
+        const cp = await call("config.get", { key: "claudePath" });
+        if ((cp as any)?.value) setClaudePath(String((cp as any).value));
+      } catch {}
+      setLoaded(true);
+    };
+    load();
+  }, [connected]);
 
   const handleSave = async () => {
     try {
@@ -42,7 +63,7 @@ export function SettingsPage() {
           </p>
           <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
-            className="w-full" />
+            className="w-full" disabled={!loaded} />
         </div>
 
         {/* Default timeout */}
@@ -53,21 +74,23 @@ export function SettingsPage() {
           </p>
           <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-            className="w-full" />
+            className="w-full" disabled={!loaded} />
         </div>
 
         {/* Claude path */}
         <div className="rounded-lg border p-4" style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</h3>
           <input type="text" value={claudePath} onChange={(e) => setClaudePath(e.target.value)}
+            disabled={!loaded}
             className="w-full px-3 py-2 rounded text-xs outline-none" style={{
               background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)",
             }} />
         </div>
 
         {/* Save button */}
-        <button onClick={handleSave} className="px-6 py-2 rounded text-xs font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>
-          {saved ? "已保存 ✓" : "保存设置"}
+        <button onClick={handleSave} disabled={!loaded}
+          className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--blue)", color: "#0d1117" }}>
+          {saved ? "已保存" : "保存设置"}
         </button>
       </div>
     </div>
