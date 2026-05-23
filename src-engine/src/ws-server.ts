@@ -9,6 +9,7 @@ const HEARTBEAT_INTERVAL_MS = 30000;
 export class WsServer {
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
+  private clientAlive: WeakMap<WebSocket, boolean> = new WeakMap();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatIntervalMs: number;
 
@@ -28,10 +29,10 @@ export class WsServer {
 
     this.wss.on("connection", (ws) => {
       this.clients.add(ws);
-      (ws as any)._isAlive = true;
+      this.clientAlive.set(ws, true);
 
       ws.on("pong", () => {
-        (ws as any)._isAlive = true;
+        this.clientAlive.set(ws, true);
       });
 
       ws.on("message", (data: Data) => {
@@ -58,10 +59,10 @@ export class WsServer {
     this.heartbeatTimer = setInterval(() => {
       const dead: WebSocket[] = [];
       for (const client of this.clients) {
-        if (!(client as any)._isAlive) {
+        if (!this.clientAlive.get(client)) {
           dead.push(client);
         } else if (client.readyState === WebSocket.OPEN) {
-          (client as any)._isAlive = false;
+          this.clientAlive.set(client, false);
           client.ping();
         }
       }
@@ -87,7 +88,8 @@ export class WsServer {
       if (client.readyState === WebSocket.OPEN) {
         try {
           client.send(data);
-        } catch {
+        } catch (sendErr) {
+          console.warn("[ws] failed to send to client, removing:", sendErr instanceof Error ? sendErr.message : sendErr);
           stale.push(client);
         }
       }
@@ -100,6 +102,7 @@ export class WsServer {
     try {
       message = JSON.parse(raw);
     } catch {
+      console.warn("[ws] received non-JSON message from client");
       this.send(ws, { jsonrpc: "2.0", id: 0, error: RPC_ERRORS.PARSE_ERROR });
       return;
     }
@@ -142,7 +145,8 @@ export class WsServer {
     if (ws.readyState === WebSocket.OPEN) {
       try {
         ws.send(JSON.stringify(message));
-      } catch {
+      } catch (sendErr) {
+        console.warn("[ws] failed to send response to client, removing:", sendErr instanceof Error ? sendErr.message : sendErr);
         this.clients.delete(ws);
       }
     }

@@ -1,4 +1,4 @@
-import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails } from "@ai-workbench/shared";
+import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus } from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
@@ -51,7 +51,9 @@ export class Executor {
           (this.config as Record<string, unknown>)[key] = val;
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn("[executor] failed to load config from store, using defaults:", err instanceof Error ? err.message : err);
+    }
   }
 
   async start(run: ExecutionRun): Promise<void> {
@@ -116,7 +118,7 @@ export class Executor {
     } catch (err) {
       const msg = this.errorToMessage(err);
       this.log(run.id, "engine", "warn", `Goal evaluation failed: ${msg}. Cooling down and retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
+      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during goal evaluation cooldown"); return false; }
       return true;
     }
 
@@ -143,7 +145,7 @@ export class Executor {
     } catch (err) {
       const msg = this.errorToMessage(err);
       this.log(run.id, "engine", "warn", `Smart task generation failed: ${msg}. Retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
+      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during smart task cooldown"); return false; }
       return true;
     }
 
@@ -164,6 +166,7 @@ export class Executor {
     try {
       await this.sleep(CYCLE_COOLDOWN_MS);
     } catch {
+      console.warn("[executor] sleep interrupted during evaluation cycle cooldown");
       return false;
     }
     return true;
@@ -173,7 +176,8 @@ export class Executor {
     try {
       const report = await this.generateReport(run);
       run.finalReport = report;
-    } catch {
+    } catch (reportErr) {
+      console.warn("[executor] report generation failed:", reportErr instanceof Error ? reportErr.message : reportErr);
       run.finalReport = partialReport || "Run completed (report generation failed)";
     }
     run.status = "completed";
@@ -322,7 +326,7 @@ export class Executor {
           lesson: `Task "${task.content.substring(0, 50)}" scored ${(score.overall * 100).toFixed(0)}%. Reason: ${score.reasoning}`,
           score: score.overall, createdAt: Date.now(),
         });
-        const finalStatus = revertSucceeded ? "reverted" : "revert_failed";
+        const finalStatus: TaskStatus = revertSucceeded ? "reverted" : "failed";
         this.store.updateTask(run.id, task.id, { status: finalStatus, completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus });
       }
@@ -364,7 +368,9 @@ export class Executor {
       if (Array.isArray(parsed) && parsed.length >= 2) {
         return parsed.map((s: unknown) => String(s));
       }
-    } catch {}
+    } catch (splitErr) {
+      console.warn("[executor] multi-agent task splitting failed, using original task:", splitErr instanceof Error ? splitErr.message : splitErr);
+    }
     // Fallback: just use the original task as single subtask
     return [task.content];
   }
@@ -393,7 +399,8 @@ export class Executor {
     );
     try {
       return JSON.parse(this.extractJson(result.result)) as GoalEvaluation;
-    } catch {
+    } catch (parseErr) {
+      console.warn("[executor] failed to parse goal evaluation result:", parseErr instanceof Error ? parseErr.message : parseErr);
       return { isComplete: false, progressReport: "Evaluation parse failed", completedGoals: [], remainingGoals: run.goals, overallProgress: 0 };
     }
   }
@@ -407,7 +414,8 @@ export class Executor {
       const parsed = JSON.parse(this.extractJson(scoreResult.result));
       const overall = (parsed.goalAlignment || 0) + (parsed.correctness || 0) + (parsed.completeness || 0) + (parsed.quality || 0);
       return { ...parsed, overall, passed: overall >= this.config.qualityThreshold } as ScoreDetails;
-    } catch {
+    } catch (scoreErr) {
+      console.warn("[executor] failed to parse score result:", scoreErr instanceof Error ? scoreErr.message : scoreErr);
       return { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: "Failed to parse score" };
     }
   }
@@ -421,7 +429,8 @@ export class Executor {
     );
     try {
       return JSON.parse(this.extractJson(result.result));
-    } catch {
+    } catch (genErr) {
+      console.warn("[executor] failed to parse smart task generation result:", genErr instanceof Error ? genErr.message : genErr);
       return [{ content: `Work on: ${evaluation.remainingGoals[0] || "project goals"}`, priority: 5, reasoning: "Fallback task" }];
     }
   }
@@ -440,7 +449,7 @@ export class Executor {
   private extractJson(text: string): string {
     let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
 
-    try { JSON.parse(cleaned); return cleaned; } catch {}
+    try { JSON.parse(cleaned); return cleaned; } catch { /* not pure JSON, try extracting below */ }
 
     const findBalanced = (open: string, close: string): string | null => {
       const startIdx = cleaned.indexOf(open);
@@ -458,7 +467,7 @@ export class Executor {
         if (ch === close) depth--;
         if (depth === 0) {
           const candidate = cleaned.substring(startIdx, i + 1);
-          try { JSON.parse(candidate); return candidate; } catch { return null; }
+          try { JSON.parse(candidate); return candidate; } catch { return null; } // balanced bracket extraction failed
         }
       }
       return null;

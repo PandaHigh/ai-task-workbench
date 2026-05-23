@@ -5,6 +5,7 @@ interface WizardSession {
   workingDir: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   ccSessionId?: string;
+  _lastActivity: number;
 }
 
 const sessions = new Map<string, WizardSession>();
@@ -16,7 +17,7 @@ const MAX_MESSAGES = 100;
 setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions) {
-    const lastActivity = (session as any)._lastActivity || 0;
+    const lastActivity = session._lastActivity || 0;
     if (lastActivity && now - lastActivity > SESSION_TTL_MS) {
       sessions.delete(id);
     }
@@ -28,6 +29,7 @@ export function startSession(workingDir: string): WizardSession {
     sessionId: crypto.randomUUID(),
     workingDir,
     messages: [],
+    _lastActivity: Date.now(),
   };
   sessions.set(session.sessionId, session);
   return session;
@@ -46,7 +48,7 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
 
   session.messages.push({ role: "user", content: userMessage });
 
-  (session as any)._lastActivity = Date.now();
+  session._lastActivity = Date.now();
   if (session.messages.length > MAX_MESSAGES) {
     session.messages = session.messages.slice(-MAX_MESSAGES);
   }

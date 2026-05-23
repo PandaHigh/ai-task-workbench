@@ -18,19 +18,22 @@ export function SettingsPage() {
     const load = async () => {
       try {
         const qt = await call("config.get", { key: "qualityThreshold" });
-        if ((qt as any)?.value != null) setQualityThreshold(Number((qt as any).value));
+        const val = (qt as Record<string, unknown> | null)?.value;
+        if (val != null) setQualityThreshold(Number(val));
       } catch {
         toast.error("加载质量阈值失败");
       }
       try {
         const dt = await call("config.get", { key: "defaultTimeout" });
-        if ((dt as any)?.value != null) setDefaultTimeout(Number((dt as any).value));
+        const val = (dt as Record<string, unknown> | null)?.value;
+        if (val != null) setDefaultTimeout(Number(val));
       } catch {
         toast.error("加载超时设置失败");
       }
       try {
         const cp = await call("config.get", { key: "claudePath" });
-        if ((cp as any)?.value) setClaudePath(String((cp as any).value));
+        const val = (cp as Record<string, unknown> | null)?.value;
+        if (val) setClaudePath(String(val));
       } catch {
         toast.error("加载 Claude 路径失败");
       }

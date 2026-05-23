@@ -4,7 +4,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { TaskDefinition } from "@ai-workbench/shared";
+import type { TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
@@ -49,14 +49,14 @@ export function EvolutionDashboard() {
 
       try {
         const c = await call("run.commits", { runId });
-        setCommits((c as any[]) || []);
+        setCommits((c as GitCommit[]) || []);
       } catch {
         toast.error("加载提交记录失败");
       }
 
       try {
         const l = await call("run.lessons", { runId });
-        setLessons((l as any[]) || []);
+        setLessons((l as LessonLearned[]) || []);
       } catch {
         toast.error("加载经验教训失败");
       }
@@ -73,9 +73,9 @@ export function EvolutionDashboard() {
   const refreshTabData = useCallback(async (t: TabType) => {
     if (!runId) return;
     if (t === "commits") {
-      try { setCommits((await call("run.commits", { runId })) as any[]); } catch {}
+      try { setCommits((await call("run.commits", { runId })) as GitCommit[]); } catch (err) { console.warn("Failed to refresh commits:", err instanceof Error ? err.message : err); }
     } else if (t === "lessons") {
-      try { setLessons((await call("run.lessons", { runId })) as any[]); } catch {}
+      try { setLessons((await call("run.lessons", { runId })) as LessonLearned[]); } catch (err) { console.warn("Failed to refresh lessons:", err instanceof Error ? err.message : err); }
     }
   }, [runId, call]);
 
@@ -103,7 +103,8 @@ export function EvolutionDashboard() {
       setRunning(false);
       addLog({ id: Date.now(), timestamp: Date.now(), level: "info", source: "engine", message: "执行已暂停" });
       toast.info("执行已暂停");
-    } catch {
+    } catch (err) {
+      console.warn("Pause failed:", err instanceof Error ? err.message : err);
       toast.error("暂停失败");
     }
   };
@@ -114,7 +115,9 @@ export function EvolutionDashboard() {
       await call("queue.reorder", { runId, taskIds });
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
-    } catch {}
+    } catch (err) {
+      console.warn("Queue reorder failed:", err instanceof Error ? err.message : err);
+    }
   };
 
   const moveTask = (fromIdx: number, toIdx: number) => {
@@ -365,7 +368,9 @@ export function EvolutionDashboard() {
                 onClick={async () => {
                   try {
                     await call("task.setTimeout", { taskId: activeTaskId, runId: run?.id, minutes: timeoutMinutes });
-                  } catch {}
+                  } catch (err) {
+                    console.warn("Set timeout failed:", err instanceof Error ? err.message : err);
+                  }
                 }}
                 className="ml-2 text-[10px] px-1.5 py-0.5 rounded"
                 style={{ background: "var(--blue)", color: "#0d1117" }}
@@ -384,11 +389,11 @@ export function EvolutionDashboard() {
             <div className="flex gap-2">
               <button onClick={() => {
                 setAgentMode("single");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch(() => {});
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
               }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
               <button onClick={() => {
                 setAgentMode("multi");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch(() => {});
+                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
               }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
             </div>
           </div>

@@ -30,12 +30,20 @@ class EngineClient {
       };
 
       this.ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data as string);
+        let msg: unknown;
+        try {
+          msg = JSON.parse(event.data as string);
+        } catch (parseErr) {
+          console.warn("[engine-client] received non-JSON message:", parseErr instanceof Error ? parseErr.message : parseErr);
+          return;
+        }
 
-        if ("method" in msg && !("id" in msg)) {
-          this.handleNotification(msg as RpcNotification);
-        } else if ("id" in msg) {
-          this.handleResponse(msg as RpcResponse);
+        if (typeof msg === "object" && msg !== null) {
+          if ("method" in msg && !("id" in msg)) {
+            this.handleNotification(msg as RpcNotification);
+          } else if ("id" in msg) {
+            this.handleResponse(msg as RpcResponse);
+          }
         }
       };
 
@@ -118,7 +126,7 @@ class EngineClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect().catch(() => {});
+      this.connect().catch((err) => { console.warn("[engine-client] reconnect failed:", err instanceof Error ? err.message : err); });
     }, delay);
   }
 }

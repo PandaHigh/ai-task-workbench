@@ -106,7 +106,7 @@ export function TaskWizard() {
         };
 
         if (valRes.valid && valRes.params) {
-          setTaskParams(valRes.params as any);
+          setTaskParams(valRes.params as { content: string; goals: string[]; terminationConditions: string[]; postCompletionAction: string });
           setValidation(true, []);
           setStep(2);
         } else {

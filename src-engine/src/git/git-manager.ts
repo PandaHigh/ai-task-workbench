@@ -29,7 +29,7 @@ export class GitManager {
       await this.git.revert(commitHash);
     } catch (err) {
       // If revert has conflicts, abort it
-      try { await this.git.raw(["revert", "--abort"]); } catch {}
+      try { await this.git.raw(["revert", "--abort"]); } catch (abortErr) { console.warn("[git] revert --abort also failed:", abortErr instanceof Error ? abortErr.message : abortErr); }
       throw err;
     }
   }
