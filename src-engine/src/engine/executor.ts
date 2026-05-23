@@ -82,6 +82,16 @@ export class Executor {
 
         run.totalTasksCompleted++;
         this.store.saveRun(run);
+
+        // Post-task budget guard
+        const taskCost = this.recalculateCost(run.id);
+        if (taskCost > this.config.maxBudgetUsd) {
+          this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
+          this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
+          this.stop();
+          await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
+          break;
+        }
       }
     } catch (err) {
       const msg = this.errorToMessage(err);

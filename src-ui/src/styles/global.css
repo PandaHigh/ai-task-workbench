@@ -61,9 +61,14 @@ body {
   51%, 100% { opacity: 0; }
 }
 
-@keyframes pulse {
+@keyframes pulse-scale {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 @keyframes float {
@@ -87,7 +92,7 @@ body {
 }
 
 .animate-pulse-slow {
-  animation: pulse 2s ease-in-out infinite;
+  animation: pulse-scale 2s ease-in-out infinite;
 }
 
 .animate-spin-slow {
@@ -270,8 +275,8 @@ textarea,
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes dropIn {
@@ -321,6 +326,11 @@ textarea,
 @keyframes staggerFadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
 }
 
 /* Custom range input for dark theme */
