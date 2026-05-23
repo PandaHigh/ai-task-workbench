@@ -13,6 +13,7 @@ interface PendingCall {
 export class WsServer {
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.wss = new WebSocketServer({ port: PORT });
@@ -30,7 +31,8 @@ export class WsServer {
         this.clients.delete(ws);
       });
 
-      ws.on("error", () => {
+      ws.on("error", (err) => {
+        console.error(`[ws] client error: ${err.message}`);
         this.clients.delete(ws);
       });
 
@@ -40,6 +42,15 @@ export class WsServer {
         params: { port: PORT },
       });
     });
+
+    // Heartbeat: detect half-open connections every 30s
+    this.heartbeatTimer = setInterval(() => {
+      for (const client of this.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.ping();
+        }
+      }
+    }, 30000);
 
     console.log(`[engine] WebSocket server listening on ws://localhost:${PORT}`);
   }
@@ -51,11 +62,17 @@ export class WsServer {
       params,
     };
     const data = JSON.stringify(notification);
+    const stale: WebSocket[] = [];
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(data);
+        try {
+          client.send(data);
+        } catch {
+          stale.push(client);
+        }
       }
     }
+    for (const s of stale) this.clients.delete(s);
   }
 
   private async handleMessage(ws: WebSocket, raw: string): Promise<void> {
@@ -101,11 +118,19 @@ export class WsServer {
 
   private send(ws: WebSocket, message: RpcResponse | RpcNotification): void {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
+      try {
+        ws.send(JSON.stringify(message));
+      } catch {
+        this.clients.delete(ws);
+      }
     }
   }
 
   close(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
     for (const client of this.clients) {
       client.close();
     }

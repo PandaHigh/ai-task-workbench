@@ -48,7 +48,10 @@ function readJsonFile<T>(filePath: string, fallback: T): T {
 
 function writeJsonFile(filePath: string, data: unknown): void {
   ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  const content = JSON.stringify(data, null, 2);
+  const tmpPath = filePath + ".tmp";
+  fs.writeFileSync(tmpPath, content, "utf-8");
+  fs.renameSync(tmpPath, filePath);
 }
 
 export class Store {

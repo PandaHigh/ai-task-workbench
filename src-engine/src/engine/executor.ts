@@ -206,9 +206,10 @@ export class Executor {
       let score: ScoreDetails;
       try {
         score = await this.scoreTask(task, result.result, run);
-      } catch {
-        this.log(run.id, "scorer", "warn", "Scoring failed — defaulting to pass");
-        score = { overall: 0.6, goalAlignment: 0.2, correctness: 0.2, completeness: 0.1, quality: 0.1, passed: true, reasoning: "Auto-passed (scoring CC failed)" };
+      } catch (scoringErr) {
+        const scoringMsg = scoringErr instanceof Error ? scoringErr.message : String(scoringErr);
+        this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`);
+        score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
       }
 
       this.store.appendScore(run.id, task.id, score);

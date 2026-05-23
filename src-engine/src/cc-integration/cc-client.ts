@@ -162,6 +162,16 @@ export class CCClient {
       }
     });
 
+    proc.on("error", (err) => {
+      clearTimeout(timeout);
+      done = true;
+      if (resolveNext) {
+        resolveNext({ value: undefined, done: true } as IteratorResult<CCMessage>);
+        resolveNext = null;
+      }
+      console.error(`[cc-client] spawn error: ${err.message}`);
+    });
+
     if (options.abortSignal) {
       options.abortSignal.addEventListener("abort", () => {
         proc.kill("SIGTERM");

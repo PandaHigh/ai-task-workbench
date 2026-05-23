@@ -8,21 +8,37 @@ export function useEngine() {
   useEffect(() => {
     mountedRef.current = true;
 
-    engineClient.connect().then(() => {
-      if (mountedRef.current) setConnected(true);
-    }).catch(() => {
-      if (mountedRef.current) setConnected(false);
-    });
+    const doConnect = async () => {
+      try {
+        await engineClient.connect();
+        if (mountedRef.current) setConnected(true);
+      } catch {
+        if (mountedRef.current) setConnected(false);
+      }
+    };
+    doConnect();
 
     const unsub = engineClient.onNotification((method, _params) => {
-      if (method === "system.ready" && mountedRef.current) {
+      if (!mountedRef.current) return;
+      if (method === "system.ready") {
         setConnected(true);
       }
     });
 
+    // Poll connection state to detect disconnects
+    const interval = setInterval(() => {
+      if (!mountedRef.current) return;
+      const isConnected = engineClient.isConnected();
+      setConnected((prev) => {
+        if (prev !== isConnected) return isConnected;
+        return prev;
+      });
+    }, 2000);
+
     return () => {
       mountedRef.current = false;
       unsub();
+      clearInterval(interval);
     };
   }, []);
 
