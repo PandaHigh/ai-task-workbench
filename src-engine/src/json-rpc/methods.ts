@@ -1,4 +1,4 @@
-import type { CreateRunParams, CreateTaskParams, ExecutionRun } from "@ai-workbench/shared";
+import type { CreateRunParams, ExecutionRun } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
@@ -216,8 +216,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!store.getRun(runId)) {
       throw new RpcValidationError(`Run not found: ${runId}`);
     }
-    const p = params as unknown as CreateTaskParams & { runId: string };
-    const task = queueManager.enqueue(runId, { ...p, content, runId });
+    const { type, priority, timeoutMinutes, agentMode, promptJson } = params as Record<string, unknown>;
+    const task = queueManager.enqueue(runId, {
+      content,
+      type: (type ?? "user_defined") as "user_defined" | "smart_task",
+      ...(priority !== undefined && { priority: Number(priority) }),
+      ...(timeoutMinutes !== undefined && { timeoutMinutes: Number(timeoutMinutes) }),
+      ...(agentMode !== undefined && { agentMode: String(agentMode) as "single" | "multi" }),
+      ...(promptJson !== undefined && { promptJson: String(promptJson) }),
+    });
     store.saveTask(runId, task);
     return task;
   },
