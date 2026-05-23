@@ -6,6 +6,7 @@ export type TaskStatus =
   | "reverting"
   | "completed"
   | "reverted"
+  | "revert_failed"
   | "failed"
   | "cancelled";
 

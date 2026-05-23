@@ -100,7 +100,7 @@ export class CCClient {
         stderrBuffer += chunk.toString();
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", (code: number | null) => {
         // Flush remaining buffer
         parseAndCollect(stdoutBuffer);
         stdoutBuffer = "";
@@ -115,7 +115,7 @@ export class CCClient {
         }
       });
 
-      proc.on("error", (err) => {
+      proc.on("error", (err: Error) => {
         cleanup();
         if (!settled) {
           settled = true;

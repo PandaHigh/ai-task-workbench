@@ -28,9 +28,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex-1 flex items-center justify-center p-8" style={{ animation: "fadeIn 0.3s ease-out" }}>
+        <div
+          role="alert"
+          className="flex-1 flex items-center justify-center p-8"
+          style={{ animation: "fadeIn 0.3s ease-out" }}
+        >
           <div className="max-w-md text-center">
-            <div style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.5 }}>⚠</div>
+            <div aria-hidden="true" style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.5 }}>⚠</div>
             <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: "8px", color: "var(--text-primary)" }}>出错了</h2>
             <p style={{ fontSize: "13px", marginBottom: "16px", color: "var(--text-secondary)" }}>
               {this.state.error?.message || "未知错误"}
@@ -39,6 +43,8 @@ export class ErrorBoundary extends Component<Props, State> {
               <div style={{ marginBottom: "16px" }}>
                 <button
                   onClick={() => this.setState((s) => ({ expanded: !s.expanded }))}
+                  aria-label={this.state.expanded ? "收起错误详情" : "展开错误详情"}
+                  aria-expanded={this.state.expanded}
                   style={{ background: "none", border: "none", color: "var(--blue)", cursor: "pointer", fontSize: "12px" }}
                 >
                   {this.state.expanded ? "收起" : "查看详情"}
@@ -58,6 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
             <button
               onClick={this.handleRetry}
+              aria-label="重试"
               style={{
                 padding: "6px 16px", background: "var(--blue)", color: "#0d1117",
                 border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600,

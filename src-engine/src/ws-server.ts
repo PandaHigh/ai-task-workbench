@@ -11,6 +11,7 @@ export class WsServer {
   private clients: Set<WebSocket> = new Set();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatIntervalMs: number;
+  private aliveMap: WeakMap<WebSocket, boolean> = new WeakMap();
 
   constructor(options?: { heartbeatIntervalMs?: number }) {
     this.wss = new WebSocketServer({ port: PORT });
@@ -26,12 +27,12 @@ export class WsServer {
       console.error(`[engine] WebSocket server error: ${err.message}`);
     });
 
-    this.wss.on("connection", (ws) => {
+    this.wss.on("connection", (ws: WebSocket) => {
       this.clients.add(ws);
-      (ws as any)._isAlive = true;
+      this.aliveMap.set(ws, true);
 
       ws.on("pong", () => {
-        (ws as any)._isAlive = true;
+        this.aliveMap.set(ws, true);
       });
 
       ws.on("message", (data: Data) => {
@@ -42,7 +43,7 @@ export class WsServer {
         this.clients.delete(ws);
       });
 
-      ws.on("error", (err) => {
+      ws.on("error", (err: Error) => {
         console.error(`[ws] client error: ${err.message}`);
         this.clients.delete(ws);
       });
@@ -58,10 +59,10 @@ export class WsServer {
     this.heartbeatTimer = setInterval(() => {
       const dead: WebSocket[] = [];
       for (const client of this.clients) {
-        if (!(client as any)._isAlive) {
+        if (!this.aliveMap.get(client)) {
           dead.push(client);
         } else if (client.readyState === WebSocket.OPEN) {
-          (client as any)._isAlive = false;
+          this.aliveMap.set(client, false);
           client.ping();
         }
       }

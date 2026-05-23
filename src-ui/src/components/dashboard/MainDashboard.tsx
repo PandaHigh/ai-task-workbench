@@ -36,7 +36,7 @@ export function MainDashboard() {
           <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
             任务总览
           </h2>
-          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }} aria-live="polite">
             {connected ? `已连接引擎 · ${tasks.length} 个任务` : "引擎未连接"}
           </p>
         </div>
@@ -60,7 +60,7 @@ export function MainDashboard() {
       )}
 
       {!loading && tasks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="任务列表">
           {tasks.map((task, i) => (
             <div key={task.id} style={staggerItemStyle(i, 60)}>
               <TaskCard task={task} onDelete={() => loadTasks()} />

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useTaskStore } from "../../stores/task-store";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { formatDuration } from "../../lib/utils";
 
 interface TaskCardProps {
   task: ExecutionRun;
@@ -58,7 +59,16 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
           background: "var(--bg-secondary)",
           borderColor: "var(--border)",
         }}
+        role="button"
+        tabIndex={0}
+        aria-label={`${task.goals[0] || "未命名任务"}，状态: ${statusLabel[task.status]}`}
         onClick={() => navigate(`/evolution/${task.id}`)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            navigate(`/evolution/${task.id}`);
+          }
+        }}
       >
         {/* Delete button */}
         <button
@@ -74,6 +84,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
         <div className="flex items-center justify-between mb-3">
           <span
             className="status-badge"
+            aria-label={`状态: ${statusLabel[task.status]}`}
             style={{
               background: `${statusColor[task.status]}20`,
               color: statusColor[task.status],
@@ -125,14 +136,4 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
       />
     </>
   );
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
 }

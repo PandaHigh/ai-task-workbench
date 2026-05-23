@@ -33,12 +33,12 @@ async function main() {
   process.on("SIGINT", gracefulShutdown);
   process.on("SIGTERM", gracefulShutdown);
 
-  process.on("uncaughtException", (err) => {
+  process.on("uncaughtException", (err: Error) => {
     console.error("[engine] Uncaught exception — initiating shutdown:", err);
     gracefulShutdown();
   });
 
-  process.on("unhandledRejection", (reason) => {
+  process.on("unhandledRejection", (reason: unknown) => {
     console.error("[engine] Unhandled rejection:", reason);
   });
 }

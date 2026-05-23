@@ -106,7 +106,7 @@ export function TaskWizard() {
         };
 
         if (valRes.valid && valRes.params) {
-          setTaskParams(valRes.params as any);
+          setTaskParams(valRes.params as { content: string; goals: string[]; terminationConditions: string[]; postCompletionAction: string });
           setValidation(true, []);
           setStep(2);
         } else {
@@ -198,7 +198,7 @@ export function TaskWizard() {
           <div className="text-center">
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
             {!showDirInput ? (
-              <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
+              <button onClick={handleSelectDir} aria-label="输入目录路径" className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
             ) : (
               <div className="flex gap-2">
                 <input
@@ -207,11 +207,12 @@ export function TaskWizard() {
                   onChange={(e) => setDirInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && confirmDir()}
                   placeholder="/path/to/project"
+                  aria-label="工作目录路径"
                   className="px-3 py-2 rounded text-xs outline-none"
                   style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", width: 300 }}
                   autoFocus
                 />
-                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
+                <button onClick={confirmDir} aria-label="确认目录路径" className="px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
               </div>
             )}
             {workingDir && <p className="text-xs mt-2" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
@@ -221,7 +222,7 @@ export function TaskWizard() {
 
       {step === 1 && (
         <div className="flex-1 flex flex-col" style={{ animation: "fadeIn 0.3s ease-out" }}>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3" role="log" aria-label="对话历史" aria-live="polite">
             {messages.length === 0 && (
               <div className="text-center py-10">
                 <p className="text-xs" style={{ color: "var(--text-secondary)" }}>AI 助手将通过对话帮你定义任务的目标和终止条件。</p>
@@ -262,6 +263,7 @@ export function TaskWizard() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="描述你的任务... (Enter 发送, Shift+Enter 换行)"
+                aria-label="任务描述输入"
                 disabled={isLoading}
                 rows={1}
                 className="flex-1 px-3 py-2 rounded text-xs outline-none resize-none"
@@ -270,6 +272,7 @@ export function TaskWizard() {
                 }}
               />
               <button onClick={handleSend} disabled={isLoading}
+                aria-label="发送消息"
                 className="px-4 py-2 rounded text-xs font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
                 发送
               </button>
@@ -314,8 +317,8 @@ export function TaskWizard() {
             )}
           </div>
           <div className="flex gap-3 mt-6">
-            <button onClick={() => setStep(1)} className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>返回修改</button>
-            <button onClick={handleConfirm} className="px-6 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认并开始执行</button>
+            <button onClick={() => setStep(1)} aria-label="返回修改参数" className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>返回修改</button>
+            <button onClick={handleConfirm} aria-label="确认参数并开始执行任务" className="px-6 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认并开始执行</button>
           </div>
         </div>
       )}
