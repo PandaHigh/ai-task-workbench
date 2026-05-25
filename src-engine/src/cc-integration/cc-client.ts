@@ -1,7 +1,49 @@
 import { spawn } from "child_process";
 import { platform, homedir } from "os";
 
-const SAFE_ENV_KEYS = ["PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP"] as const;
+const SAFE_ENV_KEYS = [
+  "PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP",
+  // Claude / Anthropic SDK
+  "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+  "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+  // Shell / Node
+  "SHELL", "NODE_PATH", "NVM_DIR", "USER", "LOGNAME",
+  // TTY
+  "TERM_PROGRAM", "COLORTERM", "TERMINFO",
+  // Proxy
+  "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+] as const;
+
+// PID tracking for orphan detection and cleanup
+const activePids = new Set<number>();
+
+function trackPid(pid: number): void {
+  if (pid > 0) activePids.add(pid);
+}
+
+function untrackPid(pid: number): void {
+  activePids.delete(pid);
+}
+
+export function getActivePids(): number[] {
+  return [...activePids];
+}
+
+export async function killProcessTree(pid: number): Promise<void> {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    // Process already gone
+  }
+}
+
+export async function killAllActiveProcesses(): Promise<void> {
+  for (const pid of activePids) {
+    await killProcessTree(pid);
+  }
+  activePids.clear();
+}
 
 function buildSafeEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
@@ -10,8 +52,21 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
     if (val !== undefined) env[key] = val;
   }
   if (!env.HOME) env.HOME = homedir();
-  if (!env.PATH) env.PATH = "/usr/bin:/bin";
+
+  // Ensure PATH covers common binary locations (including ~/.local/bin for claude CLI)
+  const home = env.HOME;
+  const essentialPaths = [
+    "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/usr/local/bin",
+    "/opt/homebrew/bin", "/opt/homebrew/sbin",
+    `${home}/.local/bin`, `${home}/.local/share/nvm/versions/node/*/bin`,
+  ];
+  const currentPaths = (env.PATH || "").split(":");
+  const merged = new Set([...currentPaths, ...essentialPaths]);
+  env.PATH = [...merged].join(":");
+
   env.LANG = env.LANG || "en_US.UTF-8";
+
+  console.log("[cc-client] buildSafeEnv PATH includes .local/bin:", env.PATH.includes(".local/bin"));
   return env;
 }
 
@@ -45,8 +100,33 @@ export interface CCTaskResult {
 export class CCClient {
   private claudePath: string;
 
-  constructor(claudePath: string = "claude") {
-    this.claudePath = platform() === "win32" && claudePath === "claude" ? "claude.cmd" : claudePath;
+  constructor(claudePath?: string) {
+    if (claudePath) {
+      this.claudePath = claudePath;
+    } else {
+      // Resolve claude binary path at construction time
+      const home = homedir();
+      const candidates = [
+        "claude",
+        `${home}/.local/bin/claude`,
+        "/usr/local/bin/claude",
+        "/opt/homebrew/bin/claude",
+      ];
+      this.claudePath = candidates[0]; // default, will rely on PATH
+      for (const c of candidates.slice(1)) {
+        try {
+          const fs = require("fs");
+          if (fs.existsSync(c)) {
+            this.claudePath = c;
+            break;
+          }
+        } catch { /* skip */ }
+      }
+    }
+    if (platform() === "win32" && this.claudePath === "claude") {
+      this.claudePath = "claude.cmd";
+    }
+    console.log("[cc-client] claudePath resolved to:", this.claudePath);
   }
 
   async executeTask(
@@ -64,9 +144,11 @@ export class CCClient {
     return new Promise((resolve, reject) => {
       const proc = spawn(this.claudePath, args, {
         cwd: options.workingDir,
-        env: buildSafeEnv(),
+        env: { ...process.env, ...buildSafeEnv() },
         stdio: ["ignore", "pipe", "pipe"],
       });
+
+      if (proc.pid) trackPid(proc.pid);
 
       let settled = false;
       let sigkillTimer: ReturnType<typeof setTimeout> | null = null;
@@ -118,6 +200,7 @@ export class CCClient {
         // Flush remaining buffer
         parseAndCollect(stdoutBuffer);
         stdoutBuffer = "";
+        if (proc.pid) untrackPid(proc.pid);
         cleanup();
         if (!settled) {
           settled = true;
@@ -130,6 +213,7 @@ export class CCClient {
       });
 
       proc.on("error", (err) => {
+        if (proc.pid) untrackPid(proc.pid);
         cleanup();
         if (!settled) {
           settled = true;
@@ -166,6 +250,8 @@ export class CCClient {
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
+
+    if (proc.pid) trackPid(proc.pid);
 
     let settled = false;
     let sigkillTimer: ReturnType<typeof setTimeout> | null = null;
@@ -207,6 +293,7 @@ export class CCClient {
     });
 
     proc.on("close", () => {
+      if (proc.pid) untrackPid(proc.pid);
       cleanup();
       // Flush remaining buffer
       if (buffer.trim()) {
@@ -228,6 +315,7 @@ export class CCClient {
     });
 
     proc.on("error", (err) => {
+      if (proc.pid) untrackPid(proc.pid);
       cleanup();
       streamError = err;
       done = true;

@@ -1,4 +1,5 @@
 import { CCClient } from "../cc-integration/cc-client.js";
+import { mkdirSync } from "fs";
 
 interface WizardSession {
   sessionId: string;
@@ -25,6 +26,9 @@ setInterval(() => {
 }, 60000).unref();
 
 export function startSession(workingDir: string): WizardSession {
+  // Ensure workingDir exists before spawning CC
+  try { mkdirSync(workingDir, { recursive: true }); } catch { /* already exists */ }
+
   const session: WizardSession = {
     sessionId: crypto.randomUUID(),
     workingDir,
@@ -97,6 +101,7 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
 
     return { response, shouldExtractParams: shouldExtract };
   } catch (err) {
+    console.warn("[wizard] CC call failed, using fallback:", err instanceof Error ? err.message : err);
     const fallback = generateFallbackResponse(userMessage, session.messages);
     session.messages.push({ role: "assistant", content: fallback });
     const shouldExtract = session.messages.filter((m) => m.role === "user").length >= 3;
