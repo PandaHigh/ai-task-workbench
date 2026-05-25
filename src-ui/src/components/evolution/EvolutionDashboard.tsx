@@ -3,15 +3,16 @@ import { useEvolutionStore } from "../../stores/evolution-store";
 import { useTaskStore } from "../../stores/task-store";
 import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
+import { marked } from "marked";
 
-type TabType = "logs" | "commits" | "lessons";
+type TabType = "logs" | "commits" | "lessons" | "report";
 
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
@@ -27,12 +28,13 @@ export function EvolutionDashboard() {
 
   const [tab, setTab] = useState<TabType>("logs");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
-  const [agentMode, setAgentMode] = useState<"single" | "multi">("single");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQueue, setShowQueue] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const [newTaskText, setNewTaskText] = useState("");
+  const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -66,6 +68,10 @@ export function EvolutionDashboard() {
         console.warn("Failed to load lessons:", err instanceof Error ? err.message : err);
         toast.error("加载经验教训失败");
       }
+      try {
+        const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
+        setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+      } catch { /* ignore */ }
       setLoading(false);
     };
     load();
@@ -133,6 +139,28 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
+  const handleAddTask = async () => {
+    if (!runId || !newTaskText.trim()) return;
+    try {
+      await call("task.create", { runId, content: newTaskText.trim(), type: "user_defined", priority: queue.length + 1 });
+      setNewTaskText("");
+      const qRes = await call("queue.list", { runId });
+      setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+      toast.success("任务已添加到队列");
+    } catch (err) { toast.error(`添加任务失败: ${err instanceof Error ? err.message : err}`); }
+  };
+
+  const handleRetry = async (taskId: string) => {
+    if (!runId) return;
+    try {
+      await call("task.retry", { runId, taskId });
+      const qRes = await call("queue.list", { runId });
+      setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+      const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
+      setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+      toast.success("任务已重新入队");
+    } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : err}`); }
+  };
   const closeDrawers = () => {
     setShowQueue(false);
     setShowPanel(false);
@@ -184,6 +212,17 @@ export function EvolutionDashboard() {
                 <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>拖拽排序</span>
               )}
               <button onClick={() => setShowQueue(false)} className="md:hidden text-xs ml-2" style={{ color: "var(--text-secondary)" }} aria-label="关闭队列">✕</button>
+            </div>
+            {/* Add task input */}
+            <div className="px-2 py-2 border-b" style={{ borderColor: "var(--border)" }}>
+              <form onSubmit={(e) => { e.preventDefault(); handleAddTask(); }} className="flex gap-1">
+                <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="输入新任务..."
+                  className="flex-1 px-2 py-1.5 rounded text-xs"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", outline: "none" }}
+                  aria-label="新任务内容" />
+                <button type="submit" disabled={!newTaskText.trim()} className="px-2 py-1.5 rounded text-xs font-semibold disabled:opacity-30"
+                  style={{ background: "var(--blue)", color: "#0d1117" }} aria-label="添加任务">+</button>
+              </form>
             </div>
             <div role="listbox" aria-label="任务队列，可通过拖拽或 Ctrl+上下箭头排序" className="flex-1 overflow-y-auto p-2 space-y-1" onKeyDown={(e) => {
               if (focusIdx === null || queue.length === 0) return;
@@ -254,18 +293,33 @@ export function EvolutionDashboard() {
                 ))
               )}
             </div>
+            {/* Failed tasks with retry */}
+            {failedTasks.length > 0 && (
+              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
+                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--red)" }}>失败任务 ({failedTasks.length})</h4>
+                <div className="space-y-1">
+                  {failedTasks.map((t) => (
+                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)" }}>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
+                        <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重试</button>
+                      </div>
+                      {t.errorMessage && <p className="mt-0.5 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
             <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
-              {(["logs", "commits", "lessons"] as TabType[]).map((t) => (
+              {(["logs", "commits", "lessons", ...(run?.finalReport ? ["report" as const] : [])] as TabType[]).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
                   background: tab === t ? "var(--bg-tertiary)" : "transparent",
                 }}>
-                  {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : `经验教训 (${lessons.length})`}
+                  {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : t === "lessons" ? `经验教训 (${lessons.length})` : "最终报告"}
                 </button>
               ))}
             </div>
@@ -354,6 +408,11 @@ export function EvolutionDashboard() {
                   </div>
                 )
               )}
+
+              {/* Report Tab — rendered as markdown */}
+              {tab === "report" && run?.finalReport && (
+                <ReportTab content={run.finalReport} />
+              )}
               </>}
 
             </div>
@@ -419,21 +478,6 @@ export function EvolutionDashboard() {
               className="w-full" />
           </div>
 
-          {/* Agent Mode */}
-          <div>
-            <label className="text-xs block mb-2" style={{ color: "var(--text-secondary)" }}>Agent 模式{activeTaskId ? " (应用到选中任务)" : ""}</label>
-            <div className="flex gap-2">
-              <button onClick={() => {
-                setAgentMode("single");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "single" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
-              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "single" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "single" ? "#0d1117" : "var(--text-secondary)" }}>单 Agent</button>
-              <button onClick={() => {
-                setAgentMode("multi");
-                if (activeTaskId) call("task.create", { id: activeTaskId, runId: run?.id, agentMode: "multi" }).catch((err) => { console.warn("Set agent mode failed:", err instanceof Error ? err.message : err); });
-              }} className="flex-1 px-2 py-1.5 rounded text-xs" style={{ background: agentMode === "multi" ? "var(--blue)" : "var(--bg-tertiary)", color: agentMode === "multi" ? "#0d1117" : "var(--text-secondary)" }}>多 Agent</button>
-            </div>
-          </div>
-
           {/* Stats */}
           {run && (
             <div className="pt-2 border-t space-y-3" style={{ borderColor: "var(--border)" }}>
@@ -468,16 +512,6 @@ export function EvolutionDashboard() {
                   </p>
                 ))}
               </div>
-
-              {/* Final Report */}
-              {run.finalReport && (
-                <div>
-                  <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>最终报告</h4>
-                  <div className="glass-card-sm text-xs p-2 max-h-32 overflow-y-auto" style={{ color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
-                    {run.finalReport}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -502,4 +536,16 @@ function levelColor(level: string): string {
     case "info": return "var(--blue)";
     default: return "var(--text-secondary)";
   }
+}
+
+function ReportTab({ content }: { content: string }) {
+  const html = useMemo(() => marked.parse(content, { async: false }) as string, [content]);
+
+  return (
+    <div
+      className="markdown-body text-sm leading-relaxed"
+      style={{ color: "var(--text-primary)", animation: "fadeIn 0.3s ease-out" }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
