@@ -58,7 +58,9 @@ function validateWorkingDir(dir: string): string {
   if (!dir || typeof dir !== "string") {
     throw new Error("workingDir is required and must be a string");
   }
-  const resolved = resolve(dir);
+  // Expand ~/ to home directory
+  const expanded = dir.startsWith("~/") ? dir.replace("~", homedir()) : dir;
+  const resolved = resolve(expanded);
   const normalizedLower = normalize(resolved.toLowerCase());
 
   for (const sysDir of SYSTEM_DIRS) {
@@ -79,19 +81,24 @@ function validateWorkingDir(dir: string): string {
 // ─── Config constraints ────────────────────────────────────────────────
 
 const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> = {
-  maxBudgetUsd: { min: 0, max: 1000 },
-  maxEvalLoops: { min: 1, max: 100 },
-  stagnationThreshold: { min: 0, max: 1 },
+  maxBudgetUsd: { min: 0, max: 10000 },
+  maxEvaluationCycles: { min: 1, max: 10000 },
+  stagnationWindow: { min: 2, max: 100 },
+  qualityThreshold: { min: 0.1, max: 1.0 },
+  maxTurns: { min: 1, max: 500 },
+  maxAutoRetries: { min: 0, max: 10 },
   maxConcurrentTasks: { min: 1, max: 10 },
 };
 
 const ALLOWED_CONFIG_KEYS = new Set([
   "maxBudgetUsd",
-  "maxEvalLoops",
-  "stagnationThreshold",
+  "maxEvaluationCycles",
+  "stagnationWindow",
+  "qualityThreshold",
+  "maxTurns",
+  "maxAutoRetries",
   "maxConcurrentTasks",
   "defaultModel",
-  "defaultAgentMode",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -108,6 +115,32 @@ export function shutdown(): void {
     executor.stop();
     activeExecutors.delete(runId);
   }
+}
+
+export function recoverStaleRuns(): { runsReset: number; tasksReset: number } {
+  let runsReset = 0;
+  let tasksReset = 0;
+  const transientStatuses = ["running", "scoring", "committing", "reverting"] as const;
+
+  const runs = store.listRuns();
+  for (const run of runs) {
+    if (run.status === "running") {
+      run.status = "paused";
+      store.saveRun(run);
+      runsReset++;
+    }
+    const tasks = store.listTasks(run.id);
+    for (const task of tasks) {
+      if (transientStatuses.includes(task.status as typeof transientStatuses[number])) {
+        store.updateTask(run.id, task.id, {
+          status: "pending",
+          errorMessage: `Crash recovery: task was ${task.status} at engine restart`,
+        });
+        tasksReset++;
+      }
+    }
+  }
+  return { runsReset, tasksReset };
 }
 
 type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
@@ -216,13 +249,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!store.getRun(runId)) {
       throw new RpcValidationError(`Run not found: ${runId}`);
     }
-    const { type, priority, timeoutMinutes, agentMode, promptJson } = params as Record<string, unknown>;
+    const { type, priority, timeoutMinutes, promptJson } = params as Record<string, unknown>;
     const task = queueManager.enqueue(runId, {
       content,
       type: (type ?? "user_defined") as "user_defined" | "smart_task",
       ...(priority !== undefined && { priority: Number(priority) }),
       ...(timeoutMinutes !== undefined && { timeoutMinutes: Number(timeoutMinutes) }),
-      ...(agentMode !== undefined && { agentMode: String(agentMode) as "single" | "multi" }),
       ...(promptJson !== undefined && { promptJson: String(promptJson) }),
     });
     store.saveTask(runId, task);
@@ -311,6 +343,38 @@ export const methodHandlers: Record<string, MethodHandler> = {
       executor.cancelTask(taskId, runId);
     }
     return { status: "cancelled" };
+  },
+
+  "task.retry": async (params) => {
+    const runId = requireString(params, "runId");
+    const taskId = requireString(params, "taskId");
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run ${runId} not found`);
+    const tasks = store.listTasks(runId);
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) throw new RpcValidationError(`Task ${taskId} not found`);
+    if (task.status !== "failed" && task.status !== "reverted" && task.status !== "cancelled") {
+      throw new RpcValidationError(`Task ${taskId} status '${task.status}' — can only retry failed/reverted/cancelled`);
+    }
+    store.updateTask(runId, taskId, {
+      status: "pending", score: undefined, scoreDetails: undefined,
+      result: undefined, errorMessage: undefined, completedAt: undefined,
+      durationMs: undefined, costUsd: undefined,
+    });
+    const restored = queueManager.enqueue(runId, {
+      content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
+    });
+    store.saveTask(runId, restored);
+    if (run.status !== "running" && !activeExecutors.has(runId)) {
+      run.status = "running";
+      run.startedAt = run.startedAt || Date.now();
+      store.saveRun(run);
+      const ex = new Executor(queueManager, notify, runId);
+      activeExecutors.set(runId, ex);
+      ex.start(run).finally(() => { activeExecutors.delete(runId); });
+    }
+    return { taskId, status: "pending", newQueueTaskId: restored.id };
   },
 
   "task.setTimeout": async (params) => {

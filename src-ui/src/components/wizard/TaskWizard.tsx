@@ -1,12 +1,13 @@
 import { useWizardStore } from "../../stores/wizard-store";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useToast } from "../common/Toast";
 import { Spinner } from "../common/Spinner";
 import { pageEnterStyle } from "../../hooks/useAnimations";
+import { open } from "@tauri-apps/plugin-dialog";
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
@@ -57,6 +58,10 @@ export function TaskWizard() {
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
 
+  const defaultDir = useCallback(() => {
+    return "~/ai-workspace";
+  }, []);
+
   // Track last assistant message for typewriter effect
   useEffect(() => {
     let idx = -1;
@@ -70,6 +75,48 @@ export function TaskWizard() {
     setShowDirInput(true);
   };
 
+  const handleUseDefault = () => {
+    const dir = defaultDir();
+    setDirInput(dir);
+    setWorkingDir(dir);
+    startWizardSession(dir);
+  };
+
+  const handleBrowse = async () => {
+    // Try Tauri dialog first
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (selected) {
+        const dir = typeof selected === "string" ? selected : (selected as string[])[0];
+        if (dir) {
+          setDirInput(dir);
+          setWorkingDir(dir);
+          startWizardSession(dir);
+          return;
+        }
+      }
+      return;
+    } catch { /* not Tauri, fall through */ }
+
+    // Try Web File System Access API
+    if ("showDirectoryPicker" in window) {
+      try {
+        const handle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name: string }> }).showDirectoryPicker();
+        if (handle?.name) {
+          const dir = handle.name;
+          setDirInput(dir);
+          setDirError("");
+          toast.info(`浏览器安全限制无法获取完整路径，请手动输入完整路径。目录名: ${dir}`);
+          setShowDirInput(true);
+          return;
+        }
+      } catch { /* user cancelled or not supported */ }
+    }
+
+    // Fallback: show manual input
+    setShowDirInput(true);
+  };
+
   const validateDir = (value: string) => {
     if (!value.trim()) {
       setDirError("目录路径不能为空");
@@ -79,8 +126,8 @@ export function TaskWizard() {
       setDirError("目录路径至少 2 个字符");
       return false;
     }
-    if (!/^\/[\w\-./ ]+$/.test(value.trim()) && !/^[A-Za-z]:[\\/\w\-./ ]+$/.test(value.trim())) {
-      setDirError("请输入有效的目录路径（如 /home/user/project 或 C:\\Users\\project）");
+    if (!/^~?\/[\w\-./ ]+$/.test(value.trim()) && !/^[A-Za-z]:[\\/\w\-./ ]+$/.test(value.trim())) {
+      setDirError("请输入有效的目录路径（如 ~/project、/home/user/project 或 C:\\Users\\project）");
       return false;
     }
     setDirError("");
@@ -177,7 +224,6 @@ export function TaskWizard() {
           type: "user_defined",
           priority: 1,
           timeoutMinutes: 60,
-          agentMode: "single",
         }],
       })) as ExecutionRun;
 
@@ -251,13 +297,28 @@ export function TaskWizard() {
         <div className="flex-1 flex items-center justify-center max-md:pb-16" role="tabpanel"
           id="wizard-panel-0" aria-labelledby="wizard-step-0"
           style={{ animation: "fadeIn 0.4s ease-out" }}>
-          <div className="text-center px-4">
-            <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
+          <div className="text-center px-4 max-w-md w-full">
+            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
+
+            {/* Default directory card */}
+            <div className="glass-card p-4 mb-4 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>默认目录</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(88, 166, 255, 0.15)", color: "var(--blue)" }}>推荐</span>
+              </div>
+              <p className="text-sm mb-3 font-mono" style={{ color: "var(--green)" }}>{defaultDir()}</p>
+              <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>使用默认目录</button>
+            </div>
+
+            {/* Browse + manual input */}
             {!showDirInput ? (
-              <button onClick={handleSelectDir} className="px-6 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>输入目录路径</button>
+              <div className="flex gap-3">
+                <button onClick={handleBrowse} className="flex-1 px-4 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>浏览选择目录</button>
+                <button onClick={handleSelectDir} className="flex-1 px-4 py-3 rounded text-sm" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>手动输入路径</button>
+              </div>
             ) : (
               <div className="flex gap-2 justify-center flex-wrap">
-                <div className="flex flex-col max-md:w-full">
+                <div className="flex flex-col flex-1 max-md:w-full">
                   <input
                     type="text"
                     value={dirInput}
@@ -266,25 +327,25 @@ export function TaskWizard() {
                     placeholder="/path/to/project"
                     required
                     minLength={2}
-                    pattern="\/[\w\-./ ]+|[A-Za-z]:[\\\/\w\-./ ]+"
-                    className="px-3 py-2 rounded text-xs outline-none max-md:w-full"
+                    className="w-full px-3 py-2 rounded text-xs outline-none"
                     style={{
                       background: "var(--bg-tertiary)", color: "var(--text-primary)",
                       border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
-                      width: 300,
                     }}
                     autoFocus
                     aria-invalid={!!dirError}
                     aria-describedby={dirError ? "dir-error" : undefined}
                   />
                   {dirError && (
-                    <p id="dir-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{dirError}</p>
+                    <p id="dir-error" className="text-xs mt-1 text-left" style={{ color: "var(--red)" }} role="alert">{dirError}</p>
                   )}
                 </div>
-                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
+                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold shrink-0" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
+                <button onClick={() => setShowDirInput(false)} className="px-3 py-2 rounded text-xs shrink-0" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>取消</button>
               </div>
             )}
-            {workingDir && <p className="text-xs mt-2" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
+
+            {workingDir && <p className="text-xs mt-3" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
           </div>
         </div>
       )}
