@@ -57,6 +57,7 @@ export function TaskWizard() {
   const [dirError, setDirError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
     return "~/ai-workspace";
@@ -70,6 +71,11 @@ export function TaskWizard() {
     }
     setLastAssistantIdx(idx);
   }, [messages]);
+
+  // Auto-scroll to bottom when messages change or loading state changes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   const handleSelectDir = () => {
     setShowDirInput(true);
@@ -351,7 +357,7 @@ export function TaskWizard() {
       )}
 
       {step === 1 && (
-        <div className="flex-1 flex flex-col max-md:pb-16" role="tabpanel"
+        <div className="flex-1 flex flex-col overflow-hidden max-md:pb-16" role="tabpanel"
           id="wizard-panel-1" aria-labelledby="wizard-step-1"
           style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -387,6 +393,7 @@ export function TaskWizard() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
           <div className="p-4 border-t max-md:p-3" style={{ borderColor: "var(--border)" }}>
             <div className="flex gap-2">
@@ -401,27 +408,33 @@ export function TaskWizard() {
                     }
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="描述你的任务... (Enter 发送, Shift+Enter 换行)"
+                  placeholder="描述你的任务..."
                   disabled={isLoading}
                   required
                   minLength={2}
-                  rows={1}
-                  className="w-full px-3 py-2 rounded text-xs outline-none resize-none"
+                  rows={5}
+                  className="w-full px-5 py-4 rounded-xl text-base outline-none resize-none leading-relaxed"
                   style={{
                     background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                    border: inputError ? "1px solid var(--red)" : "1px solid var(--border)",
+                    border: inputError ? "2px solid var(--red)" : "2px solid var(--blue)",
+                    boxShadow: "0 0 12px rgba(88, 166, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3)",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
                   }}
                   aria-invalid={!!inputError}
                   aria-describedby={inputError ? "chat-error" : undefined}
                 />
-                {inputError && (
-                  <p id="chat-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{inputError}</p>
-                )}
+                <div className="flex items-center justify-between mt-1">
+                  {inputError ? (
+                    <p id="chat-error" className="text-xs" style={{ color: "var(--red)" }} role="alert">{inputError}</p>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Enter 发送 · Shift+Enter 换行</span>
+                  )}
+                  <button onClick={handleSend} disabled={isLoading}
+                    className="px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
+                    发送
+                  </button>
+                </div>
               </div>
-              <button onClick={handleSend} disabled={isLoading}
-                className="px-4 py-2 rounded text-xs font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
-                发送
-              </button>
             </div>
           </div>
         </div>

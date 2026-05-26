@@ -2,7 +2,6 @@ import type {
   TaskStatus,
   RunStatus,
   TaskType,
-  AgentMode,
   LessonCategory,
 } from "./enums.js";
 
@@ -13,7 +12,6 @@ export interface TaskDefinition {
   priority: number;
   content: string;
   timeoutMinutes: number;
-  agentMode: AgentMode;
   promptJson: string;
   status: TaskStatus;
   sessionId?: string;
@@ -26,6 +24,9 @@ export interface TaskDefinition {
   completedAt?: number;
   durationMs?: number;
   costUsd?: number;
+  errorMessage?: string;
+  retryCount?: number;
+  lastError?: string;
 }
 
 export interface ExecutionRun {
@@ -137,6 +138,5 @@ export interface CreateTaskParams {
   type: TaskType;
   priority?: number;
   timeoutMinutes?: number;
-  agentMode?: AgentMode;
   promptJson?: string;
 }

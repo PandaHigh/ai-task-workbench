@@ -82,6 +82,9 @@ function cleanupTmpFiles(dir: string): void {
   }
 }
 
+const MAX_LOG_ENTRIES = 1000;
+const MAX_HISTORY_ENTRIES = 500;
+
 export class Store {
   private dataDir: string;
   private runsDir: string;
@@ -169,8 +172,8 @@ export class Store {
     const file = path.join(this.runDir(runId), "logs.json");
     const logs = readJsonFile<TaskLog[]>(file, []);
     logs.push({ ...log, id: logs.length + 1 } as TaskLog);
-    // Keep last 1000 logs in file
-    const trimmed = logs.slice(-1000);
+    // Keep last MAX_LOG_ENTRIES logs in file
+    const trimmed = logs.length > MAX_LOG_ENTRIES ? logs.slice(-MAX_LOG_ENTRIES) : logs;
     writeJsonFile(file, trimmed);
   }
 
@@ -192,7 +195,8 @@ export class Store {
     const file = path.join(this.runDir(runId), "commits.json");
     const commits = readJsonFile<GitCommit[]>(file, []);
     commits.push({ ...commit, id: commits.length + 1 } as GitCommit);
-    writeJsonFile(file, commits);
+    const trimmed = commits.length > MAX_HISTORY_ENTRIES ? commits.slice(-MAX_HISTORY_ENTRIES) : commits;
+    writeJsonFile(file, trimmed);
   }
 
   getCommits(runId: string, limit?: number): GitCommit[] {
@@ -207,7 +211,8 @@ export class Store {
     const file = path.join(this.runDir(runId), "lessons.json");
     const lessons = readJsonFile<LessonLearned[]>(file, []);
     lessons.push({ ...lesson, id: lessons.length + 1 } as LessonLearned);
-    writeJsonFile(file, lessons);
+    const trimmed = lessons.length > MAX_HISTORY_ENTRIES ? lessons.slice(-MAX_HISTORY_ENTRIES) : lessons;
+    writeJsonFile(file, trimmed);
   }
 
   getLessons(runId: string, category?: string): LessonLearned[] {
@@ -225,7 +230,8 @@ export class Store {
     const file = path.join(this.runDir(runId), "scores.json");
     const scores = readJsonFile<Array<{ taskId: string; score: ScoreDetails; timestamp: number }>>(file, []);
     scores.push({ taskId, score, timestamp: Date.now() });
-    writeJsonFile(file, scores);
+    const trimmed = scores.length > MAX_HISTORY_ENTRIES ? scores.slice(-MAX_HISTORY_ENTRIES) : scores;
+    writeJsonFile(file, trimmed);
   }
 
   getScores(runId: string): Array<{ taskId: string; score: ScoreDetails; timestamp: number }> {

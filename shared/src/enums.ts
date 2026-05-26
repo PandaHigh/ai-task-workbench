@@ -18,8 +18,6 @@ export type RunStatus =
 
 export type TaskType = "user_defined" | "smart_task";
 
-export type AgentMode = "single" | "multi";
-
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export type LogSource = "cc" | "engine" | "git" | "scorer" | "wizard";

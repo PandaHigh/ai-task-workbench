@@ -1,5 +1,6 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns } from "./json-rpc/methods.js";
+import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 
 let isShuttingDown = false;
 
@@ -12,6 +13,11 @@ async function main() {
 
   wsServer.start();
 
+  const recovery = recoverStaleRuns();
+  if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
+    console.log(`[engine] Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset} tasks reset to pending`);
+  }
+
   const gracefulShutdown = async () => {
     if (isShuttingDown) {
       console.warn("\nForce exit (second signal)");
@@ -19,6 +25,9 @@ async function main() {
     }
     isShuttingDown = true;
     console.log("\nShutting down gracefully...");
+
+    await killAllActiveProcesses();
+
     let shutdownOk = true;
     try {
       shutdown();

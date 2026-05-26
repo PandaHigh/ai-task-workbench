@@ -28,7 +28,6 @@ export class QueueManager {
       priority: params.priority ?? 5,
       content: params.content,
       timeoutMinutes: params.timeoutMinutes ?? 60,
-      agentMode: params.agentMode ?? "single",
       promptJson: params.promptJson ?? "",
       status: "pending",
       createdAt: Date.now(),

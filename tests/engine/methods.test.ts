@@ -550,9 +550,9 @@ describe("RPC Methods", () => {
 
     it("should enforce numeric constraints on maxBudgetUsd", async () => {
       await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: -1 }))
-        .rejects.toThrow("between 0 and 1000");
-      await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: 2000 }))
-        .rejects.toThrow("between 0 and 1000");
+        .rejects.toThrow("between 0 and 10000");
+      await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: 20000 }))
+        .rejects.toThrow("between 0 and 10000");
       await expect(methodHandlers["config.set"]({ key: "maxBudgetUsd", value: "abc" }))
         .rejects.toThrow("finite number");
     });

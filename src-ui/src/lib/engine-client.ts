@@ -16,8 +16,9 @@ class EngineClient {
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        resolve();
+      if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+        if (this.ws!.readyState === WebSocket.OPEN) resolve();
+        else this.ws!.onopen = () => { this.connected = true; this.reconnectAttempts = 0; resolve(); };
         return;
       }
 

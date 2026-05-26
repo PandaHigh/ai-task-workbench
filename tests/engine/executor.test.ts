@@ -66,7 +66,7 @@ function createMockQueueManager(): MockQueueManager {
   return {
     _tasks: tasks,
     enqueue: vi.fn((runId: string, t: Partial<TaskDefinition>) => {
-      const task: TaskDefinition = { id: `task-${tasks.length}`, runId, type: "user_defined", priority: 1, timeoutMinutes: 60, agentMode: "single", promptJson: "", status: "pending", createdAt: Date.now(), ...t };
+      const task: TaskDefinition = { id: `task-${tasks.length}`, runId, type: "user_defined", priority: 1, timeoutMinutes: 60, promptJson: "", status: "pending", createdAt: Date.now(), ...t };
       tasks.push(task);
       return task;
     }),
@@ -145,7 +145,7 @@ describe("Executor core loop (mocked)", () => {
     let dequeueCount = 0;
     queueManager.dequeue.mockImplementation((runId: string) => {
       dequeueCount++;
-      if (dequeueCount === 1) return { id: "t-1", runId, content: "Add health endpoint", type: "user_defined", timeoutMinutes: 60, agentMode: "single" };
+      if (dequeueCount === 1) return { id: "t-1", runId, content: "Add health endpoint", type: "user_defined", timeoutMinutes: 60 };
       return null; // Empty queue triggers evaluation
     });
 
@@ -275,7 +275,7 @@ describe("Executor buildSystemPrompt", () => {
       goals: ["g1"],
       terminationConditions: ["done"],
       lastTenCommits: [{ hash: "abc1234", message: "init", timestamp: 1000, isAiCommit: true }],
-      nextFiveTasks: [{ type: "user_defined", content: "next task", runId: "run-1", id: "t1", priority: 1, timeoutMinutes: 60, agentMode: "single", promptJson: "", status: "pending", createdAt: Date.now() }],
+      nextFiveTasks: [{ type: "user_defined", content: "next task", runId: "run-1", id: "t1", priority: 1, timeoutMinutes: 60, promptJson: "", status: "pending", createdAt: Date.now() }],
       lessonsLearned: [{ id: 1, runId: "run-1", category: "failure", lesson: "avoid X", createdAt: Date.now() }],
     };
     const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt(task, context);

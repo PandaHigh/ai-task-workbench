@@ -17,7 +17,7 @@ type TabType = "logs" | "commits" | "lessons" | "report";
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
-  const { call } = useEngine();
+  const { connected, call } = useEngine();
   const { tasks } = useTaskStore();
   const run = tasks.find((t) => t.id === runId);
 
@@ -31,16 +31,19 @@ export function EvolutionDashboard() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoading = loading || !connected;
   const [showQueue, setShowQueue] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
-  // Load data on mount
+  // Load data on mount — wait for engine connection
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !connected) return;
     reset();
     setLoading(true);
 
@@ -71,11 +74,27 @@ export function EvolutionDashboard() {
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+        setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
       } catch { /* ignore */ }
       setLoading(false);
     };
     load();
-  }, [runId]);
+  }, [runId, connected]);
+
+  // Periodically refresh all tasks (completed/failed) and queue while running
+  useEffect(() => {
+    if (!runId || !connected) return;
+    const interval = setInterval(async () => {
+      try {
+        const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
+        setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
+        setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+        const qRes = await call("queue.list", { runId });
+        setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [runId, call]);
 
   // Auto-scroll logs
   useEffect(() => {
@@ -213,17 +232,7 @@ export function EvolutionDashboard() {
               )}
               <button onClick={() => setShowQueue(false)} className="md:hidden text-xs ml-2" style={{ color: "var(--text-secondary)" }} aria-label="关闭队列">✕</button>
             </div>
-            {/* Add task input */}
-            <div className="px-2 py-2 border-b" style={{ borderColor: "var(--border)" }}>
-              <form onSubmit={(e) => { e.preventDefault(); handleAddTask(); }} className="flex gap-1">
-                <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="输入新任务..."
-                  className="flex-1 px-2 py-1.5 rounded text-xs"
-                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", outline: "none" }}
-                  aria-label="新任务内容" />
-                <button type="submit" disabled={!newTaskText.trim()} className="px-2 py-1.5 rounded text-xs font-semibold disabled:opacity-30"
-                  style={{ background: "var(--blue)", color: "#0d1117" }} aria-label="添加任务">+</button>
-              </form>
-            </div>
+            {/* Add task input removed — now in modal */}
             <div role="listbox" aria-label="任务队列，可通过拖拽或 Ctrl+上下箭头排序" className="flex-1 overflow-y-auto p-2 space-y-1" onKeyDown={(e) => {
               if (focusIdx === null || queue.length === 0) return;
               if (e.key === "ArrowUp" && e.ctrlKey && focusIdx > 0) {
@@ -236,7 +245,7 @@ export function EvolutionDashboard() {
                 setFocusIdx(focusIdx + 1);
               }
             }}>
-              {loading ? (
+              {showLoading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 4 }, (_, i) => (
                     <Skeleton key={i} variant="card" height={56} />
@@ -293,6 +302,26 @@ export function EvolutionDashboard() {
                 ))
               )}
             </div>
+            {/* Completed tasks */}
+            {completedTasks.length > 0 && (
+              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
+                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</h4>
+                <div className="space-y-1">
+                  {completedTasks.map((t) => (
+                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.15)" }}>
+                      <div className="flex items-start gap-2">
+                        <span className="shrink-0 text-[10px] mt-0.5" style={{ color: "var(--green)" }}>✓</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{t.content}</span>
+                      </div>
+                      <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                        <span>{t.type === "user_defined" ? "用户" : "智能"}</span>
+                        {t.completedAt && <span>{new Date(t.completedAt).toLocaleTimeString()}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Failed tasks with retry */}
             {failedTasks.length > 0 && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
@@ -310,6 +339,21 @@ export function EvolutionDashboard() {
                 </div>
               </div>
             )}
+            {/* Add task button — fixed at bottom of queue panel */}
+            <div className="px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
+              <button
+                onClick={() => { setNewTaskText(""); setShowAddModal(true); }}
+                className="w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                style={{
+                  background: "var(--green)",
+                  color: "#0d1117",
+                  boxShadow: "0 2px 8px rgba(63, 185, 80, 0.3)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                }}
+              >
+                + 新增任务
+              </button>
+            </div>
           </div>
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
@@ -325,7 +369,7 @@ export function EvolutionDashboard() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 font-mono text-xs max-md:p-2" style={{ background: "#010409" }}>
-              {loading ? (
+              {showLoading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 8 }, (_, i) => (
                     <Skeleton key={i} variant="text" height={16} />
@@ -370,7 +414,7 @@ export function EvolutionDashboard() {
                           )}
                           <span style={{ color: "var(--text-secondary)" }}>{formatTimestamp(c.timestamp)}</span>
                         </div>
-                        <p className="truncate" style={{ color: "var(--text-primary)" }}>{c.message}</p>
+                        <p className="whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{c.message}</p>
                         {c.taskId && (
                           <p className="mt-1 text-[10px]" style={{ color: "var(--text-secondary)" }}>Task: {c.taskId.substring(0, 8)}</p>
                         )}
@@ -524,6 +568,83 @@ export function EvolutionDashboard() {
           style={{ background: "rgba(0,0,0,0.5)", zIndex: 49 }}
           onClick={closeDrawers}
         />
+      )}
+
+      {/* Add Task Modal */}
+      {showAddModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="新增任务"
+          style={{
+            position: "fixed", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)",
+            zIndex: 10000,
+          }}
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-secondary)", border: "1px solid var(--border)",
+              borderRadius: "12px", padding: "24px", minWidth: "340px", maxWidth: "480px", width: "90%",
+              animation: "slideUp 0.2s ease-out",
+            }}
+          >
+            <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
+              新增任务
+            </h3>
+            <textarea
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              placeholder="描述你的任务..."
+              rows={4}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  if (newTaskText.trim()) { handleAddTask(); setShowAddModal(false); }
+                }
+                if (e.key === "Escape") { setShowAddModal(false); }
+              }}
+              style={{
+                width: "100%", padding: "12px 14px", borderRadius: "8px",
+                background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                border: "2px solid var(--blue)", outline: "none",
+                fontSize: "14px", lineHeight: 1.6, resize: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <p style={{ margin: "6px 0 0", fontSize: "11px", color: "var(--text-secondary)" }}>
+              Ctrl+Enter 快速提交
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  padding: "8px 16px", background: "transparent",
+                  border: "1px solid var(--border)", borderRadius: "8px",
+                  color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px",
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => { if (newTaskText.trim()) { handleAddTask(); setShowAddModal(false); } }}
+                disabled={!newTaskText.trim()}
+                style={{
+                  padding: "8px 20px", background: "var(--green)",
+                  border: "none", borderRadius: "8px",
+                  color: "#0d1117", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                  opacity: newTaskText.trim() ? 1 : 0.4,
+                }}
+              >
+                确认添加
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -40,6 +40,7 @@ export type EngineMethod =
   | "task.pause"
   | "task.resume"
   | "task.cancel"
+  | "task.retry"
   | "task.setTimeout"
   | "queue.list"
   | "queue.reorder"

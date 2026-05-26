@@ -70,7 +70,7 @@ describe("Store (JSON file)", () => {
       const task = {
         id: "task-1", runId: "run-1", type: "user_defined" as const,
         priority: 1, content: "Test task", timeoutMinutes: 60,
-        agentMode: "single" as const, status: "pending" as const, createdAt: Date.now(),
+        status: "pending" as const, createdAt: Date.now(),
       };
 
       store.saveTask("run-1", task);
@@ -88,7 +88,7 @@ describe("Store (JSON file)", () => {
       store.saveTask("run-1", {
         id: "task-1", runId: "run-1", type: "smart_task" as const,
         priority: 5, content: "Test", timeoutMinutes: 60,
-        agentMode: "single" as const, status: "pending" as const, createdAt: Date.now(),
+        status: "pending" as const, createdAt: Date.now(),
       });
 
       store.updateTask("run-1", "task-1", { status: "running" });
@@ -105,7 +105,7 @@ describe("Store (JSON file)", () => {
       store.saveTask("run-1", {
         id: "task-1", runId: "run-1", type: "smart_task" as const,
         priority: 5, content: "Test", timeoutMinutes: 60,
-        agentMode: "single" as const, status: "pending" as const, createdAt: Date.now(),
+        status: "pending" as const, createdAt: Date.now(),
       });
 
       store.appendLog("run-1", {
@@ -162,7 +162,7 @@ describe("Store (JSON file)", () => {
       store.saveTask("run-1", {
         id: "task-1", runId: "run-1", type: "user_defined" as const,
         priority: 1, content: "Test", timeoutMinutes: 60,
-        agentMode: "single" as const, status: "pending" as const, createdAt: Date.now(),
+        status: "pending" as const, createdAt: Date.now(),
       });
 
       store.updateTask("run-1", "task-1", { status: "running", costUsd: undefined });

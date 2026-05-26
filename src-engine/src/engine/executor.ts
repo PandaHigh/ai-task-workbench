@@ -5,11 +5,29 @@ import { Store } from "../db/store.js";
 import type { QueueManager } from "./queue-manager.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
-const DEFAULT_MAX_EVALUATION_CYCLES = 20;
+const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
 const DEFAULT_MAX_BUDGET_USD = 50;
 const DEFAULT_STAGNATION_WINDOW = 5;
 const DEFAULT_MAX_TURNS = 50;
-const CYCLE_COOLDOWN_MS = 10000;
+const DEFAULT_MAX_AUTO_RETRIES = 3;
+const CYCLE_COOLDOWN_MS = 5000;
+
+const TRANSIENT_ERROR_PATTERNS = [
+  "timed out",
+  "econnreset",
+  "econnrefused",
+  "etimedout",
+  "sigterm",
+  "sigkill",
+  "aborted",
+  "enoent",
+  "econnaborted",
+];
+
+function isTransientError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return TRANSIENT_ERROR_PATTERNS.some((p) => lower.includes(p));
+}
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 
@@ -27,6 +45,7 @@ export class Executor {
     maxBudgetUsd: number;
     stagnationWindow: number;
     maxTurns: number;
+    maxAutoRetries: number;
   };
 
   constructor(
@@ -42,9 +61,10 @@ export class Executor {
       maxBudgetUsd: DEFAULT_MAX_BUDGET_USD,
       stagnationWindow: DEFAULT_STAGNATION_WINDOW,
       maxTurns: DEFAULT_MAX_TURNS,
+      maxAutoRetries: DEFAULT_MAX_AUTO_RETRIES,
     };
     try {
-      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns"] as const;
+      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries"] as const;
       for (const key of keys) {
         const val = this.store.getConfig(key) as number | undefined;
         if (val !== undefined && val !== null) {
@@ -135,6 +155,19 @@ export class Executor {
     if (!this.running) return false;
     // Guard: stagnation detection
     this.progressHistory.push(evaluation.overallProgress);
+    // Trim progressHistory to prevent unbounded growth
+    const maxHistory = this.config.stagnationWindow * 2;
+    if (this.progressHistory.length > maxHistory) {
+      this.progressHistory = this.progressHistory.slice(-maxHistory);
+    }
+    // Reset evaluation cycles when progress is being made
+    if (this.progressHistory.length >= 2) {
+      const prev = this.progressHistory[this.progressHistory.length - 2];
+      const curr = this.progressHistory[this.progressHistory.length - 1];
+      if (curr > prev + 0.01) {
+        this.evaluationCycles = Math.floor(this.evaluationCycles / 2);
+      }
+    }
     if (this.isStagnant()) {
       this.log(run.id, "engine", "warn", `Progress stalled at ${(evaluation.overallProgress * 100).toFixed(0)}% for ${this.config.stagnationWindow} cycles. Stopping.`);
       await this.finalize(run, `Progress stalled at ${(evaluation.overallProgress * 100).toFixed(0)}%.`);
@@ -235,52 +268,17 @@ export class Executor {
       const context = await this.buildContext(task, run, gitManager);
       const systemPrompt = this.buildSystemPrompt(task, context);
 
-      this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}... (${task.agentMode === "multi" ? "multi-agent" : "single-agent"})`, task.id);
+      this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}...`);
 
-      let result;
-
-      if (task.agentMode === "multi") {
-        // Multi-agent: run 2-3 parallel CC processes on subtasks, then merge
-        const subtasks = await this.splitTaskForMultiAgent(task, run);
-        const subResults = await Promise.all(
-          subtasks.map((sub, idx) => {
-            const subAbort = new AbortController();
-            this.abortControllers.set(`${task.id}-sub-${idx}`, subAbort);
-            return this.ccClient.executeTask(sub, {
-              workingDir: run.workingDir,
-              timeoutMinutes: Math.max(Math.floor(task.timeoutMinutes * 0.7), 10),
-              maxTurns: Math.max(Math.floor(this.config.maxTurns / subtasks.length), 5),
-              systemPrompt,
-              abortSignal: subAbort.signal,
-              allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-            }).finally(() => this.abortControllers.delete(`${task.id}-sub-${idx}`));
-          })
-        );
-
-        // Merge results
-        const totalCost = subResults.reduce((s, r) => s + r.totalCostUsd, 0);
-        const totalDuration = subResults.reduce((s, r) => s + r.durationMs, 0);
-        const mergedResult = subResults.map((r, i) => `--- Sub-task ${i + 1} ---\n${r.result}`).join("\n\n");
-        result = {
-          result: mergedResult,
-          sessionId: subResults[0]?.sessionId || "",
-          totalCostUsd: totalCost,
-          durationMs: totalDuration,
-          numTurns: subResults.reduce((s, r) => s + r.numTurns, 0),
-          messages: subResults.flatMap((r) => r.messages),
-        };
-      } else {
-        // Single-agent: standard execution
-        result = await this.ccClient.executeTask(task.content, {
-          workingDir: run.workingDir,
-          sessionId: task.sessionId,
-          timeoutMinutes: task.timeoutMinutes,
-          maxTurns: this.config.maxTurns,
-          systemPrompt,
-          abortSignal: abortController.signal,
-          allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-        });
-      }
+      const result = await this.ccClient.executeTask(task.content, {
+        workingDir: run.workingDir,
+        sessionId: task.sessionId,
+        timeoutMinutes: task.timeoutMinutes,
+        maxTurns: this.config.maxTurns,
+        systemPrompt,
+        abortSignal: abortController.signal,
+        allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+      });
 
       this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
@@ -337,14 +335,40 @@ export class Executor {
           score: score.overall, createdAt: Date.now(),
         });
         const finalStatus: TaskStatus = revertSucceeded ? "reverted" : "failed";
-        this.store.updateTask(run.id, task.id, { status: finalStatus, completedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus });
+        const failReason = `Score: ${(score.overall * 100).toFixed(0)}% (threshold: ${(this.config.qualityThreshold * 100).toFixed(0)}%). ${score.reasoning}${!revertSucceeded ? " | Revert also failed" : ""}`;
+        this.store.updateTask(run.id, task.id, { status: finalStatus, completedAt: Date.now(), errorMessage: failReason });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus, reason: failReason });
       }
     } catch (err) {
       const msg = this.errorToMessage(err);
-      this.log(run.id, "engine", "error", `Task failed: ${msg}`, task.id);
-      this.store.updateTask(run.id, task.id, { status: "failed" });
-      this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", error: msg });
+      const currentTask = this.store.getTask(run.id, task.id);
+      const currentRetries = currentTask?.retryCount ?? 0;
+      const maxRetries = this.config.maxAutoRetries;
+
+      if (isTransientError(msg) && currentRetries < maxRetries) {
+        const backoffMs = Math.min(30000 * Math.pow(2, currentRetries), 300000);
+        this.log(run.id, "engine", "warn",
+          `Transient error (retry ${currentRetries + 1}/${maxRetries}): ${msg.substring(0, 100)}. Retrying in ${backoffMs / 1000}s.`,
+          task.id);
+        this.store.updateTask(run.id, task.id, {
+          status: "pending",
+          retryCount: currentRetries + 1,
+          lastError: msg.substring(0, 500),
+        });
+        const requeued = this.queueManager.enqueue(run.id, {
+          content: task.content,
+          type: task.type,
+          priority: task.priority,
+          timeoutMinutes: task.timeoutMinutes,
+        });
+        this.store.saveTask(run.id, requeued);
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${maxRetries}` });
+        try { await this.sleep(backoffMs); } catch { /* interrupted by stop */ }
+      } else {
+        this.log(run.id, "engine", "error", `Task failed permanently: ${msg}`, task.id);
+        this.store.updateTask(run.id, task.id, { status: "failed", errorMessage: msg, completedAt: Date.now() });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", error: msg });
+      }
     } finally {
       this.abortControllers.delete(task.id);
     }
@@ -366,23 +390,6 @@ export class Executor {
       nextFiveTasks,
       lessonsLearned: lessons,
     };
-  }
-
-  private async splitTaskForMultiAgent(task: TaskDefinition, run: ExecutionRun): Promise<string[]> {
-    try {
-      const splitResult = await this.ccClient.executeTask(
-        `Split this task into 2-3 independent subtasks that can be executed in parallel. Each subtask should focus on a different aspect.\nTask: ${task.content}\nGoals: ${run.goals.join(", ")}\nRespond ONLY with a JSON array of strings, each being a subtask description. No other text.`,
-        { workingDir: run.workingDir, timeoutMinutes: 2, maxTurns: 3, allowedTools: ["Read", "Glob", "Grep"] },
-      );
-      const parsed = JSON.parse(this.extractJson(splitResult.result));
-      if (Array.isArray(parsed) && parsed.length >= 2) {
-        return parsed.map((s: unknown) => String(s));
-      }
-    } catch (splitErr) {
-      console.warn("[executor] multi-agent task splitting failed, using original task:", splitErr instanceof Error ? splitErr.message : splitErr);
-    }
-    // Fallback: just use the original task as single subtask
-    return [task.content];
   }
 
   private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
