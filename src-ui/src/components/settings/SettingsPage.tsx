@@ -32,6 +32,7 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [origValues, setOrigValues] = useState<OrigValues | null>(null);
+  const [publicUrl, setPublicUrl] = useState("");
 
   const isDirty = origValues != null && (
     origValues.qualityThreshold !== qualityThreshold
@@ -88,10 +89,18 @@ export function SettingsPage() {
         toast.error("加载 Claude 路径失败");
       }
 
+      let pu = "";
+      try {
+        const res = await call("config.get", { key: "publicUrl" });
+        const val = (res as Record<string, unknown> | null)?.value;
+        if (val) pu = String(val);
+      } catch { /* ignore */ }
+
       if (cancelled) return;
       setQualityThreshold(qt);
       setDefaultTimeout(dt);
       setClaudePath(cp);
+      setPublicUrl(pu);
       setOrigValues({ qualityThreshold: qt, defaultTimeout: dt, claudePath: cp });
       setLoaded(true);
     };
@@ -109,6 +118,7 @@ export function SettingsPage() {
       await call("config.set", { key: "qualityThreshold", value: qualityThreshold });
       await call("config.set", { key: "defaultTimeout", value: defaultTimeout });
       await call("config.set", { key: "claudePath", value: claudePath });
+      await call("config.set", { key: "publicUrl", value: publicUrl });
       setOrigValues({ qualityThreshold, defaultTimeout, claudePath });
       setSaved(true);
       toast.success("设置已保存");
@@ -218,6 +228,26 @@ export function SettingsPage() {
           {claudePathError && (
             <p id="claude-path-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{claudePathError}</p>
           )}
+        </div>
+
+        {/* Share settings */}
+        <div className="glass-card p-4">
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>分享设置</h3>
+          <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+            公网访问地址，用于生成分享链接（如使用 ngrok 或端口转发后的地址）
+          </p>
+          <input type="text" value={publicUrl}
+            onChange={(e) => setPublicUrl(e.target.value)}
+            placeholder="https://my-tunnel.ngrok.io"
+            className="w-full px-3 py-2 rounded text-xs outline-none"
+            style={{
+              background: "var(--bg-tertiary)", color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
+          />
+          <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+            留空则使用 http://localhost:9731
+          </p>
         </div>
 
         {/* Save button */}

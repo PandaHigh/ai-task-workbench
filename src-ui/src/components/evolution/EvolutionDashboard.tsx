@@ -14,6 +14,28 @@ import { marked } from "marked";
 
 type TabType = "logs" | "commits" | "lessons" | "report";
 
+const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(59,130,246,0.15)" },
+  paused: { label: "已暂停", color: "var(--yellow)", bg: "rgba(234,179,8,0.15)" },
+  achieved: { label: "已达成", color: "var(--green)", bg: "rgba(34,197,94,0.15)" },
+  unmet: { label: "未达成", color: "var(--red)", bg: "rgba(239,68,68,0.15)" },
+  budget_exhausted: { label: "预算耗尽", color: "var(--red)", bg: "rgba(239,68,68,0.15)" },
+};
+
+function formatGoalDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function formatGoalTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 0 : 1)}K`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
@@ -38,8 +60,20 @@ export function EvolutionDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
+  const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+
+  const handleShare = async () => {
+    if (!runId) return;
+    try {
+      const result = await call("share.create", { runId }) as { token: string; url: string };
+      await navigator.clipboard.writeText(result.url);
+      toast.success("分享链接已复制到剪贴板");
+    } catch (err) {
+      toast.error(`创建分享链接失败: ${err instanceof Error ? err.message : err}`);
+    }
+  };
 
   // Load data on mount — wait for engine connection
   useEffect(() => {
@@ -71,10 +105,17 @@ export function EvolutionDashboard() {
         console.warn("Failed to load lessons:", err instanceof Error ? err.message : err);
         toast.error("加载经验教训失败");
       }
+
+      try {
+        const historyLogs = (await call("run.logs", { runId })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
+        historyLogs.forEach((log) => addLog(log));
+      } catch { /* ignore */ }
+
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
+        setRunningTask(allTasks.find((t) => t.status === "running") || null);
       } catch { /* ignore */ }
       setLoading(false);
     };
@@ -89,6 +130,7 @@ export function EvolutionDashboard() {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+        setRunningTask(allTasks.find((t) => t.status === "running") || null);
         const qRes = await call("queue.list", { runId });
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       } catch { /* ignore */ }
@@ -177,7 +219,8 @@ export function EvolutionDashboard() {
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
       setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
-      toast.success("任务已重新入队");
+      setRunningTask(allTasks.find((t) => t.status === "running") || null);
+      toast.success("任务已开始执行");
     } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : err}`); }
   };
   const closeDrawers = () => {
@@ -200,12 +243,20 @@ export function EvolutionDashboard() {
         >
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80 shrink-0" style={{ color: "var(--text-secondary)" }} aria-label="返回">←</button>
-            <h2 className="text-sm font-bold truncate">自进化看板</h2>
+            <h2 className="text-sm font-bold truncate">任务看板</h2>
             <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
             {run && <span className="text-xs px-2 py-0.5 rounded hidden md:inline" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
             <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Share button */}
+            <button
+              onClick={handleShare}
+              className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
+              style={{ background: "var(--blue)", color: "#0d1117" }}
+            >
+              分享
+            </button>
             {/* Mobile drawer toggles */}
             <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 队列</button>
             <button onClick={() => { setShowPanel(true); setShowQueue(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开控制面板">⚙ 面板</button>
@@ -302,6 +353,22 @@ export function EvolutionDashboard() {
                 ))
               )}
             </div>
+            {/* Running task indicator */}
+            {runningTask && (
+              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
+                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid var(--blue)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>●</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{runningTask.content}</span>
+                  </div>
+                  <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                    <span style={{ color: "var(--blue)" }}>执行中</span>
+                    <span>{runningTask.type === "user_defined" ? "用户" : "智能"}</span>
+                    {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Completed tasks */}
             {completedTasks.length > 0 && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
@@ -556,6 +623,114 @@ export function EvolutionDashboard() {
                   </p>
                 ))}
               </div>
+
+              {/* Goal State Panel */}
+              {run.goalStatus && run.goalStatus !== "unmet" && (
+                <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>目标状态</h4>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: GOAL_STATUS_LABELS[run.goalStatus]?.bg ?? "var(--bg-secondary)",
+                        color: GOAL_STATUS_LABELS[run.goalStatus]?.color ?? "var(--text-secondary)",
+                      }}
+                    >
+                      {GOAL_STATUS_LABELS[run.goalStatus]?.label ?? run.goalStatus}
+                    </span>
+                  </div>
+
+                  {(run.goalEvaluationCycles ?? 0) > 0 && (
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span style={{ color: "var(--text-secondary)" }}>评估周期</span>
+                        <span>{run.goalEvaluationCycles}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span style={{ color: "var(--text-secondary)" }}>已用时间</span>
+                        <span>{formatGoalDuration(run.goalTimeElapsedMs ?? 0)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {run.goalBudgetTokens && (
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span style={{ color: "var(--text-secondary)" }}>Token 预算</span>
+                        <span>{formatGoalTokens(run.goalTokensUsed ?? 0)} / {formatGoalTokens(run.goalBudgetTokens)}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(((run.goalTokensUsed ?? 0) / run.goalBudgetTokens) * 100, 100)}%`,
+                            background: (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.8 ? "var(--red)"
+                              : (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.5 ? "var(--yellow)"
+                              : "var(--green)",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {run.goalLastEvalReason && (
+                    <div className="text-xs p-2 rounded" style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}>
+                      {run.goalLastEvalReason}
+                    </div>
+                  )}
+
+                  {run.goalEvidence && run.goalEvidence.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {run.goalEvidence.slice(-8).map((e, i) => (
+                        <p key={i} className="text-xs flex items-start gap-1">
+                          <span style={{ color: "var(--blue)" }}>•</span>
+                          <span style={{ color: "var(--text-secondary)" }}>{e}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    {run.goalStatus === "pursuing" && (
+                      <>
+                        <button
+                          className="text-xs px-2 py-1 rounded transition-colors"
+                          style={{ background: "var(--bg-primary)", color: "var(--yellow)", border: "1px solid var(--border)" }}
+                          onClick={() => call("run.pauseGoal", { runId: run.id }).catch(() => {})}
+                        >暂停</button>
+                        <button
+                          className="text-xs px-2 py-1 rounded transition-colors"
+                          style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
+                          onClick={() => call("run.clearGoal", { runId: run.id }).then(() => {
+                            useTaskStore.getState().updateTask(run.id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
+                          }).catch(() => {})}
+                        >清除</button>
+                      </>
+                    )}
+                    {run.goalStatus === "paused" && (
+                      <>
+                        <button
+                          className="text-xs px-2 py-1 rounded transition-colors"
+                          style={{ background: "var(--bg-primary)", color: "var(--green)", border: "1px solid var(--border)" }}
+                          onClick={() => call("run.resumeGoal", { runId: run.id }).catch(() => {})}
+                        >恢复</button>
+                        <button
+                          className="text-xs px-2 py-1 rounded transition-colors"
+                          style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
+                          onClick={() => call("run.clearGoal", { runId: run.id }).then(() => {
+                            useTaskStore.getState().updateTask(run.id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
+                          }).catch(() => {})}
+                        >清除</button>
+                      </>
+                    )}
+                    {(run.goalStatus === "achieved" || run.goalStatus === "budget_exhausted") && (
+                      <span className="text-xs" style={{ color: run.goalStatus === "achieved" ? "var(--green)" : "var(--red)" }}>
+                        {run.goalStatus === "achieved" ? "已达成" : "预算耗尽"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

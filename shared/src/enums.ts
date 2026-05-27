@@ -25,3 +25,5 @@ export type LogSource = "cc" | "engine" | "git" | "scorer" | "wizard";
 export type LessonCategory = "failure" | "success" | "optimization";
 
 export type RobotMood = "idle" | "thinking" | "working" | "celebrating" | "error";
+
+export type GoalStatus = "pursuing" | "paused" | "achieved" | "unmet" | "budget_exhausted";

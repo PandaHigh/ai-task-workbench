@@ -1,12 +1,22 @@
 import { WebSocketServer, WebSocket, type Data } from "ws";
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "http";
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
 import { RPC_ERRORS } from "@ai-workbench/shared";
 import { methodHandlers, RpcValidationError } from "./json-rpc/methods.js";
+import { ShareStore } from "./db/share-store.js";
+import { Store } from "./db/store.js";
+import { QueueManager } from "./engine/queue-manager.js";
 
 const PORT = 9731;
+const HOST = process.env.ENGINE_HOST || "0.0.0.0";
 const HEARTBEAT_INTERVAL_MS = 30000;
 
+const shareStore = new ShareStore();
+const store = new Store();
+const queueManager = new QueueManager();
+
 export class WsServer {
+  private httpServer: ReturnType<typeof createServer>;
   private wss: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
   private clientAlive: WeakMap<WebSocket, boolean> = new WeakMap();
@@ -14,16 +24,21 @@ export class WsServer {
   private heartbeatIntervalMs: number;
 
   constructor(options?: { heartbeatIntervalMs?: number }) {
-    this.wss = new WebSocketServer({ port: PORT });
     this.heartbeatIntervalMs = options?.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
+    this.httpServer = createServer(this.handleHttpRequest.bind(this));
+    this.wss = new WebSocketServer({ server: this.httpServer });
   }
 
   start(): void {
-    this.wss.on("error", (err: NodeJS.ErrnoException) => {
+    this.httpServer.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         console.error(`[engine] Port ${PORT} is already in use. Another engine instance may be running.`);
         process.exit(1);
       }
+      console.error(`[engine] Server error: ${err.message}`);
+    });
+
+    this.wss.on("error", (err: NodeJS.ErrnoException) => {
       console.error(`[engine] WebSocket server error: ${err.message}`);
     });
 
@@ -73,7 +88,11 @@ export class WsServer {
       }
     }, this.heartbeatIntervalMs);
 
-    console.log(`[engine] WebSocket server listening on ws://localhost:${PORT}`);
+    this.httpServer.listen(PORT, HOST, () => {
+      console.log(`[engine] Server listening on http://${HOST}:${PORT}`);
+    });
+
+    shareStore.cleanup();
   }
 
   broadcast(method: string, params: Record<string, unknown>): void {
@@ -96,6 +115,203 @@ export class WsServer {
     }
     for (const s of stale) this.clients.delete(s);
   }
+
+  // ─── HTTP Request Handler ──────────────────────────────────────────────
+
+  private handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+    const url = req.url || "/";
+    const method = req.method || "GET";
+
+    // CORS preflight
+    if (method === "OPTIONS") {
+      this.setCorsHeaders(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // Share API
+    if (url.startsWith("/api/share/")) {
+      this.setCorsHeaders(res);
+      this.handleShareApi(req, res, url, method);
+      return;
+    }
+
+    // Non-API paths: in production serve static files, in dev proxy to Vite
+    this.serveFrontend(req, res, url);
+  }
+
+  private setCorsHeaders(res: ServerResponse): void {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+
+  private handleShareApi(req: IncomingMessage, res: ServerResponse, url: string, method: string): void {
+    const parts = url.replace("/api/share/", "").split("/");
+    const token = parts[0];
+    const resource = parts[1] || "run";
+
+    if (!token) {
+      this.sendJson(res, 400, { error: "Missing share token" });
+      return;
+    }
+
+    const share = shareStore.getByToken(token);
+    if (!share) {
+      this.sendJson(res, 404, { error: "Share not found or expired" });
+      return;
+    }
+
+    const runId = share.runId;
+
+    if (method === "GET") {
+      this.handleShareGet(res, runId, resource);
+    } else if (method === "POST") {
+      this.handleSharePost(req, res, runId, resource);
+    } else {
+      this.sendJson(res, 405, { error: "Method not allowed" });
+    }
+  }
+
+  private handleShareGet(res: ServerResponse, runId: string, resource: string): void {
+    try {
+      switch (resource) {
+        case "run": {
+          const run = store.getRun(runId);
+          if (!run) { this.sendJson(res, 404, { error: "Run not found" }); return; }
+          const { workingDir: _, ...safe } = run;
+          this.sendJson(res, 200, safe);
+          break;
+        }
+        case "tasks":
+          this.sendJson(res, 200, store.listTasks(runId));
+          break;
+        case "commits":
+          this.sendJson(res, 200, store.getCommits(runId));
+          break;
+        case "lessons":
+          this.sendJson(res, 200, store.getLessons(runId));
+          break;
+        case "queue":
+          this.sendJson(res, 200, { runId, queue: queueManager.list(runId) });
+          break;
+        case "report":
+          this.sendJson(res, 200, store.getReport(runId));
+          break;
+        case "logs":
+          this.sendJson(res, 200, store.getLogs(runId));
+          break;
+        default:
+          this.sendJson(res, 404, { error: `Unknown resource: ${resource}` });
+      }
+    } catch (err) {
+      this.sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal error" });
+    }
+  }
+
+  private handleSharePost(req: IncomingMessage, res: ServerResponse, runId: string, resource: string): void {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const params = body ? JSON.parse(body) : {};
+        switch (resource) {
+          case "task.create": {
+            if (!params.content) { this.sendJson(res, 400, { error: "Missing content" }); return; }
+            const task = queueManager.enqueue(runId, {
+              content: params.content,
+              type: params.type ?? "user_defined",
+              ...(params.priority !== undefined && { priority: Number(params.priority) }),
+              ...(params.timeoutMinutes !== undefined && { timeoutMinutes: Number(params.timeoutMinutes) }),
+            });
+            store.saveTask(runId, task);
+            this.sendJson(res, 200, task);
+            break;
+          }
+          case "task.start": {
+            // For remote share: just update status, actual execution runs on the owner's engine
+            this.sendJson(res, 200, { status: "accepted" });
+            break;
+          }
+          case "task.retry": {
+            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            const tasks = store.listTasks(runId);
+            const task = tasks.find((t) => t.id === params.taskId);
+            if (!task) { this.sendJson(res, 404, { error: "Task not found" }); return; }
+            store.updateTask(runId, params.taskId, {
+              status: "pending", score: null, scoreDetails: null,
+              result: null, errorMessage: null, completedAt: null,
+              durationMs: null, costUsd: null,
+            });
+            const restored = queueManager.enqueue(runId, {
+              content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
+            });
+            store.saveTask(runId, restored);
+            this.sendJson(res, 200, { taskId: params.taskId, newQueueTaskId: restored.id });
+            break;
+          }
+          case "task.pause":
+          case "task.cancel":
+            this.sendJson(res, 200, { status: "accepted" });
+            break;
+          case "run.stop":
+            this.sendJson(res, 200, { status: "accepted" });
+            break;
+          case "queue.reorder": {
+            if (!Array.isArray(params.taskIds)) { this.sendJson(res, 400, { error: "Missing taskIds" }); return; }
+            queueManager.reorder(runId, params.taskIds);
+            this.sendJson(res, 200, { runId, order: params.taskIds });
+            break;
+          }
+          case "task.setTimeout": {
+            if (!params.taskId || typeof params.minutes !== "number") {
+              this.sendJson(res, 400, { error: "Missing taskId or minutes" }); return;
+            }
+            store.updateTask(runId, params.taskId, { timeoutMinutes: params.minutes });
+            this.sendJson(res, 200, { taskId: params.taskId, timeoutMinutes: params.minutes });
+            break;
+          }
+          default:
+            this.sendJson(res, 404, { error: `Unknown resource: ${resource}` });
+        }
+      } catch (err) {
+        this.sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal error" });
+      }
+    });
+  }
+
+  private serveFrontend(req: IncomingMessage, res: ServerResponse, url: string): void {
+    // In dev mode, proxy to Vite dev server so the browser stays on port 9731
+    if (process.env.NODE_ENV !== "production") {
+      const proxyReq = httpRequest({
+        hostname: "localhost",
+        port: 1420,
+        path: url,
+        method: req.method,
+        headers: { ...req.headers, host: "localhost:1420" },
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on("error", () => {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Vite dev server not available");
+      });
+      req.pipe(proxyReq);
+      return;
+    }
+    // In production, serve built frontend files
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end("<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: npm run build</p></body></html>");
+  }
+
+  private sendJson(res: ServerResponse, status: number, data: unknown): void {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(data));
+  }
+
+  // ─── WebSocket Message Handler ─────────────────────────────────────────
 
   private async handleMessage(ws: WebSocket, raw: string): Promise<void> {
     let message: unknown;
@@ -170,6 +386,7 @@ export class WsServer {
     }
     this.clients.clear();
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
+    this.httpServer.close();
   }
 
   private isValidRequest(msg: unknown): msg is RpcRequest {

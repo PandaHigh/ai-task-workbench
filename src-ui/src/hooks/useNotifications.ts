@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
-import type { ExecutionRun, TaskDefinition } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition, GoalStatus } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -24,6 +24,12 @@ export function useNotifications() {
         }
         case "task.status": {
           const { taskId, status } = params as { taskId: string; status: string };
+          const { setActiveTask } = useEvolutionStore.getState();
+          if (status === "running") {
+            setActiveTask(taskId);
+          } else if (["completed", "failed", "reverted", "cancelled"].includes(status)) {
+            setActiveTask(null);
+          }
           addLog({
             id: Date.now(),
             timestamp: Date.now(),
@@ -75,6 +81,30 @@ export function useNotifications() {
         case "log.entry": {
           const entry = params as { level: string; source: string; message: string };
           addLog({ id: Date.now(), timestamp: Date.now(), ...entry });
+          break;
+        }
+        case "goal.updated": {
+          const { runId, goal } = params as {
+            runId: string;
+            goal: {
+              status: string;
+              tokensUsed: number;
+              budgetTokens: number;
+              timeElapsedMs: number;
+              evaluationCycles: number;
+              lastEvaluationReason: string;
+              evidence: string[];
+            };
+          };
+          updateTask(runId, {
+            goalStatus: goal.status as GoalStatus,
+            goalTokensUsed: goal.tokensUsed,
+            goalBudgetTokens: goal.budgetTokens,
+            goalTimeElapsedMs: goal.timeElapsedMs,
+            goalEvaluationCycles: goal.evaluationCycles,
+            goalLastEvalReason: goal.lastEvaluationReason,
+            goalEvidence: goal.evidence,
+          });
           break;
         }
       }

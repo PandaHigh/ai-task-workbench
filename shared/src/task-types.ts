@@ -3,6 +3,7 @@ import type {
   RunStatus,
   TaskType,
   LessonCategory,
+  GoalStatus,
 } from "./enums.js";
 
 export interface TaskDefinition {
@@ -40,6 +41,38 @@ export interface ExecutionRun {
   totalCostUsd: number;
   totalTasksCompleted: number;
   finalReport?: string;
+  source?: "remote";
+  remoteUrl?: string;
+  remoteToken?: string;
+  lastSyncedAt?: number;
+
+  // Unified goal state (absorbed from GoalSession)
+  goalStatus?: GoalStatus;
+  goalBudgetTokens?: number;
+  goalTokensUsed?: number;
+  goalTimeStartedAt?: number;
+  goalTimeElapsedMs?: number;
+  goalEvaluationCycles?: number;
+  goalLastEvalReason?: string;
+  goalEvidence?: string[];
+}
+
+export interface ShareToken {
+  token: string;
+  runId: string;
+  label: string;
+  createdAt: number;
+  expiresAt: number | null;
+}
+
+export interface Subscription {
+  runId: string;
+  remoteUrl: string;
+  remoteToken: string;
+  remoteRunId: string;
+  label: string;
+  subscribedAt: number;
+  lastSyncedAt: number;
 }
 
 export interface TaskQueueEntry {
@@ -139,4 +172,14 @@ export interface CreateTaskParams {
   priority?: number;
   timeoutMinutes?: number;
   promptJson?: string;
+}
+
+// ─── Goal types ──────────────────────────────────────────────────────────
+
+export interface GoalEvaluationResult {
+  achieved: boolean;
+  reason: string;
+  evidence: string[];
+  progress: number;
+  nextSteps: string;
 }

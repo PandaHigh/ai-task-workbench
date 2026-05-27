@@ -160,8 +160,17 @@ export class Store {
     if (idx >= 0) {
       const cleanUpdates = Object.fromEntries(
         Object.entries(updates).filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, v === null ? undefined : v])
       );
-      tasks[idx] = { ...tasks[idx], ...cleanUpdates };
+      const merged = { ...tasks[idx] };
+      for (const [k, v] of Object.entries(cleanUpdates)) {
+        if (v === undefined) {
+          delete (merged as Record<string, unknown>)[k];
+        } else {
+          (merged as Record<string, unknown>)[k] = v;
+        }
+      }
+      tasks[idx] = merged as TaskDefinition;
       writeJsonFile(path.join(this.runDir(runId), "tasks.json"), tasks);
     }
   }

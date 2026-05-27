@@ -1,14 +1,28 @@
 import type { CreateRunParams, ExecutionRun } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
+import { ShareStore } from "../db/share-store.js";
+import { SubscriptionStore } from "../db/subscription-store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
 import * as wizardHandler from "../wizard/wizard-handler.js";
+import * as remoteProxy from "../remote/remote-proxy.js";
 import { resolve, normalize } from "path";
 import { homedir, tmpdir } from "os";
 
+const PORT = 9731;
+
 const store = new Store();
+const shareStore = new ShareStore();
+const subscriptionStore = new SubscriptionStore();
 const queueManager = new QueueManager();
 const activeExecutors = new Map<string, Executor>();
+
+// ─── Remote run detection ────────────────────────────────────────────────
+
+function getRemoteInfo(runId: string): { url: string; token: string } | null {
+  const sub = subscriptionStore.getByRunId(runId);
+  return sub ? { url: sub.remoteUrl, token: sub.remoteToken } : null;
+}
 
 // ─── Validation helpers ────────────────────────────────────────────────
 
@@ -99,6 +113,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "maxAutoRetries",
   "maxConcurrentTasks",
   "defaultModel",
+  "publicUrl",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -115,6 +130,18 @@ export function shutdown(): void {
     executor.stop();
     activeExecutors.delete(runId);
   }
+}
+
+function serializeGoalState(run: ExecutionRun): Record<string, unknown> {
+  return {
+    status: run.goalStatus ?? "unmet",
+    tokensUsed: run.goalTokensUsed ?? 0,
+    budgetTokens: run.goalBudgetTokens ?? 500_000,
+    timeElapsedMs: run.goalTimeElapsedMs ?? 0,
+    evaluationCycles: run.goalEvaluationCycles ?? 0,
+    lastEvaluationReason: run.goalLastEvalReason ?? "",
+    evidence: run.goalEvidence ?? [],
+  };
 }
 
 export function recoverStaleRuns(): { runsReset: number; tasksReset: number } {
@@ -149,7 +176,38 @@ type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unk
 
 export const methodHandlers: Record<string, MethodHandler> = {
   "run.list": async () => {
-    return store.listRuns();
+    const localRuns = store.listRuns();
+    const subs = subscriptionStore.list();
+    const remoteRuns: ExecutionRun[] = [];
+    for (const sub of subs) {
+      try {
+        const remoteRun = await remoteProxy.fetchRemoteRun(sub.remoteUrl, sub.remoteToken);
+        remoteRuns.push({
+          ...remoteRun,
+          id: sub.runId,
+          source: "remote",
+          remoteUrl: sub.remoteUrl,
+          remoteToken: sub.remoteToken,
+          lastSyncedAt: sub.lastSyncedAt,
+        });
+      } catch {
+        // Remote unreachable — include cached metadata from subscription
+        remoteRuns.push({
+          id: sub.runId,
+          workingDir: "",
+          goals: [sub.label || "Remote dashboard (offline)"],
+          terminationConditions: [],
+          status: "idle",
+          totalCostUsd: 0,
+          totalTasksCompleted: 0,
+          source: "remote",
+          remoteUrl: sub.remoteUrl,
+          remoteToken: sub.remoteToken,
+          lastSyncedAt: sub.lastSyncedAt,
+        });
+      }
+    }
+    return [...localRuns, ...remoteRuns];
   },
 
   "run.create": async (params) => {
@@ -198,24 +256,44 @@ export const methodHandlers: Record<string, MethodHandler> = {
   "run.tasks": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) return remoteProxy.fetchRemoteTasks(remote.url, remote.token);
     return store.listTasks(runId);
   },
 
   "run.commits": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) return remoteProxy.fetchRemoteCommits(remote.url, remote.token);
     return store.getCommits(runId);
   },
 
   "run.lessons": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) return remoteProxy.fetchRemoteLessons(remote.url, remote.token);
     return store.getLessons(runId);
+  },
+
+  "run.logs": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) return remoteProxy.fetchRemoteLogs(remote.url, remote.token);
+    const limit = typeof params.limit === "number" ? params.limit : 200;
+    return store.getLogs(runId, undefined, limit);
   },
 
   "run.stop": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) {
+      await remoteProxy.remoteRunStop(remote.url, remote.token);
+      return { status: "stopped" };
+    }
     const executor = activeExecutors.get(runId);
     if (executor) {
       executor.stop();
@@ -246,6 +324,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const runId = requireString(params, "runId");
     validateRunId(runId);
     const content = requireNonEmptyString(params, "content");
+    const remote = getRemoteInfo(runId);
+    if (remote) {
+      return remoteProxy.remoteTaskCreate(remote.url, remote.token, {
+        content,
+        type: (params.type ?? "user_defined") as string,
+        ...(params.priority !== undefined && { priority: Number(params.priority) }),
+        ...(params.timeoutMinutes !== undefined && { timeoutMinutes: Number(params.timeoutMinutes) }),
+      });
+    }
     if (!store.getRun(runId)) {
       throw new RpcValidationError(`Run not found: ${runId}`);
     }
@@ -349,6 +436,11 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const runId = requireString(params, "runId");
     const taskId = requireString(params, "taskId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) {
+      await remoteProxy.remoteTaskRetry(remote.url, remote.token, taskId);
+      return { taskId, status: "pending" };
+    }
     const run = store.getRun(runId);
     if (!run) throw new RpcValidationError(`Run ${runId} not found`);
     const tasks = store.listTasks(runId);
@@ -358,9 +450,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
       throw new RpcValidationError(`Task ${taskId} status '${task.status}' — can only retry failed/reverted/cancelled`);
     }
     store.updateTask(runId, taskId, {
-      status: "pending", score: undefined, scoreDetails: undefined,
-      result: undefined, errorMessage: undefined, completedAt: undefined,
-      durationMs: undefined, costUsd: undefined,
+      status: "pending", score: null, scoreDetails: null,
+      result: null, errorMessage: null, completedAt: null,
+      durationMs: null, costUsd: null,
     });
     const restored = queueManager.enqueue(runId, {
       content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
@@ -372,7 +464,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       store.saveRun(run);
       const ex = new Executor(queueManager, notify, runId);
       activeExecutors.set(runId, ex);
-      ex.start(run).finally(() => { activeExecutors.delete(runId); });
+      // Defer executor start so the RPC response (queue refresh) is sent first
+      setImmediate(() => ex.start(run).finally(() => { activeExecutors.delete(runId); }));
     }
     return { taskId, status: "pending", newQueueTaskId: restored.id };
   },
@@ -381,6 +474,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const runId = requireString(params, "runId");
     const taskId = requireString(params, "taskId");
     validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (remote) {
+      const { minutes } = params as { minutes: number };
+      await remoteProxy.remoteTaskSetTimeout(remote.url, remote.token, taskId, minutes);
+      return { taskId, timeoutMinutes: minutes };
+    }
     const { minutes } = params as { minutes: number };
     if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
       throw new RpcValidationError("Timeout must be a finite number between 1 and 1440 minutes");
@@ -456,5 +555,133 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     store.setConfig(key, value);
     return { key, value, saved: true };
+  },
+
+  // ─── Share methods ───────────────────────────────────────────────────────
+
+  "share.create": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const remote = getRemoteInfo(runId);
+    if (!store.getRun(runId) && !remote) {
+      throw new RpcValidationError(`Run not found: ${runId}`);
+    }
+    if (remote) {
+      return { token: remote.token, url: `${remote.url}/#/share/${remote.token}`, apiUrl: `${remote.url}/api/share/${remote.token}`, createdAt: Date.now() };
+    }
+    const label = typeof params.label === "string" ? params.label : "";
+    const token = shareStore.create(runId, label);
+    const publicUrl = store.getConfig("publicUrl") || `http://localhost:${PORT}`;
+    const directUrl = `${publicUrl}/#/share/${token.token}`;
+    const apiUrl = `${publicUrl}/api/share/${token.token}`;
+    return { token: token.token, url: directUrl, apiUrl, createdAt: token.createdAt };
+  },
+
+  "share.list": async (params) => {
+    const runId = typeof params.runId === "string" ? params.runId : undefined;
+    if (runId) validateRunId(runId);
+    return shareStore.list(runId);
+  },
+
+  "share.revoke": async (params) => {
+    const token = requireString(params, "token");
+    const revoked = shareStore.revoke(token);
+    if (!revoked) throw new RpcValidationError("Token not found");
+    return { revoked: true };
+  },
+
+  "share.subscribe": async (params) => {
+    const url = requireNonEmptyString(params, "url");
+    // Parse: http://<host>:<port>/api/share/<token>
+    const match = url.match(/^(https?:\/\/[^/]+)\/api\/share\/([a-f0-9-]+)$/i);
+    if (!match) {
+      throw new RpcValidationError("Invalid share URL format. Expected: http://<host>:<port>/api/share/<token>");
+    }
+    const [, remoteUrl, remoteToken] = match;
+
+    // Fetch remote run metadata
+    let remoteRun: ExecutionRun;
+    try {
+      remoteRun = await remoteProxy.fetchRemoteRun(remoteUrl, remoteToken);
+    } catch (err) {
+      throw new RpcValidationError(`Failed to fetch remote run: ${err instanceof Error ? err.message : err}`);
+    }
+
+    const localRunId = `remote-${remoteRun.id.slice(0, 8)}-${Date.now().toString(36)}`;
+    const sub = subscriptionStore.subscribe({
+      runId: localRunId,
+      remoteUrl,
+      remoteToken,
+      remoteRunId: remoteRun.id,
+      label: remoteRun.goals[0] || "Remote dashboard",
+    });
+
+    return {
+      runId: sub.runId,
+      remoteRun: {
+        ...remoteRun,
+        id: sub.runId,
+        source: "remote",
+        remoteUrl,
+        remoteToken,
+        lastSyncedAt: sub.lastSyncedAt,
+      },
+    };
+  },
+
+  "share.unsubscribe": async (params) => {
+    const runId = requireString(params, "runId");
+    const removed = subscriptionStore.unsubscribe(runId);
+    if (!removed) throw new RpcValidationError(`Subscription not found for runId: ${runId}`);
+    return { unsubscribed: true };
+  },
+
+  "share.subscriptions": async () => {
+    return subscriptionStore.list();
+  },
+
+  // ─── Unified goal lifecycle methods ─────────────────────────────────────────
+
+  "run.pauseGoal": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+    if (run.goalStatus !== "pursuing") throw new RpcValidationError(`No pursuing goal for run: ${runId}`);
+    run.goalTimeElapsedMs = Date.now() - (run.goalTimeStartedAt ?? Date.now());
+    run.goalStatus = "paused";
+    store.saveRun(run);
+    const goalState = serializeGoalState(run);
+    notify("goal.updated", { runId: run.id, goal: goalState });
+    return { goalStatus: run.goalStatus };
+  },
+
+  "run.resumeGoal": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+    if (run.goalStatus !== "paused") throw new RpcValidationError(`No paused goal for run: ${runId}`);
+    run.goalTimeStartedAt = Date.now() - (run.goalTimeElapsedMs ?? 0);
+    run.goalStatus = "pursuing";
+    store.saveRun(run);
+    const goalState = serializeGoalState(run);
+    notify("goal.updated", { runId: run.id, goal: goalState });
+    return { goalStatus: run.goalStatus };
+  },
+
+  "run.clearGoal": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+    if (!run.goalStatus || run.goalStatus === "unmet") throw new RpcValidationError(`No active goal for run: ${runId}`);
+    run.goalStatus = "unmet";
+    run.goalEvidence = [];
+    run.goalLastEvalReason = "";
+    store.saveRun(run);
+    const goalState = serializeGoalState(run);
+    notify("goal.updated", { runId: run.id, goal: goalState });
+    return { cleared: true };
   },
 };

@@ -23,6 +23,24 @@ describe("RPC Methods", () => {
       };
     });
 
+    vi.doMock("../../src-engine/src/db/share-store.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src-engine/src/db/share-store.js")>();
+      return {
+        ShareStore: vi.fn(function (this: unknown) {
+          return new actual.ShareStore(testDir);
+        }),
+      };
+    });
+
+    vi.doMock("../../src-engine/src/db/subscription-store.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src-engine/src/db/subscription-store.js")>();
+      return {
+        SubscriptionStore: vi.fn(function (this: unknown) {
+          return new actual.SubscriptionStore(testDir);
+        }),
+      };
+    });
+
     const mod = await import("../../src-engine/src/json-rpc/methods.js");
     methodHandlers = mod.methodHandlers;
     mod.setNotifyFn(() => {});

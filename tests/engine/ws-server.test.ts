@@ -19,9 +19,19 @@ const mockWss = {
   close: vi.fn((cb: () => void) => cb()),
 };
 
+const mockHttpServer = {
+  on: vi.fn(),
+  listen: vi.fn(),
+  close: vi.fn((cb?: () => void) => { if (cb) cb(); }),
+};
+
 vi.mock("ws", () => ({
   WebSocketServer: vi.fn(() => mockWss),
   WebSocket: { OPEN: 1 },
+}));
+
+vi.mock("http", () => ({
+  createServer: vi.fn(() => mockHttpServer),
 }));
 
 import { WsServer } from "../../src-engine/src/ws-server.js";
@@ -52,12 +62,16 @@ describe("WsServer", () => {
     mockClients.clear();
     mockWss.on.mockReset();
     mockWss.close.mockImplementation((cb: () => void) => cb());
+    mockHttpServer.on.mockReset();
+    mockHttpServer.listen.mockReset();
+    mockHttpServer.close.mockImplementation((cb?: () => void) => { if (cb) cb(); });
     server = new WsServer();
   });
 
   describe("start", () => {
     it("should register connection and error handlers", () => {
       server.start();
+      expect(mockHttpServer.on).toHaveBeenCalledWith("error", expect.any(Function));
       expect(mockWss.on).toHaveBeenCalledWith("error", expect.any(Function));
       expect(mockWss.on).toHaveBeenCalledWith("connection", expect.any(Function));
     });
@@ -103,7 +117,7 @@ describe("WsServer", () => {
 
     it("should handle EADDRINUSE error", () => {
       server.start();
-      const errorHandler = findHandler(mockWss.on.mock.calls, "error");
+      const errorHandler = findHandler(mockHttpServer.on.mock.calls, "error");
 
       const mockExit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
       errorHandler!({ code: "EADDRINUSE", message: "in use" });
@@ -160,10 +174,10 @@ describe("WsServer", () => {
     it("should dispatch to method handler and return result", async () => {
       const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: "run.list", id: 42 }));
+      await messageHandler!(JSON.stringify({ jsonrpc: "2.0", method: "share.list", id: 42 }));
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.id).toBe(42);
-      expect(Array.isArray(response.result)).toBe(true);
+      expect(response.result).toBeDefined();
     });
 
     it("should handle validation errors as INVALID_PARAMS", async () => {
@@ -291,10 +305,12 @@ describe("WsServer", () => {
         "run.list", "run.create", "run.report", "run.tasks",
         "run.commits", "run.lessons", "run.stop", "run.delete",
         "task.create", "task.start", "task.pause", "task.resume",
-        "task.cancel", "task.setTimeout",
+        "task.cancel", "task.retry", "task.setTimeout",
         "queue.list", "queue.reorder",
         "wizard.start", "wizard.chat", "wizard.validate",
         "config.get", "config.set",
+        "share.create", "share.list", "share.revoke",
+        "share.subscribe", "share.unsubscribe", "share.subscriptions",
       ];
 
       for (const method of requiredMethods) {

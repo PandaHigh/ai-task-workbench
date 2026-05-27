@@ -27,6 +27,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
   const [now, setNow] = useState(Date.now());
 
   const cfg = STATUS_CFG[task.status] ?? STATUS_CFG.idle;
+  const isRemote = task.source === "remote";
 
   useEffect(() => {
     if (task.status !== "running") return;
@@ -69,6 +70,14 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
                 {cfg.label}
               </span>
+              {isRemote && (
+                <span
+                  className="status-badge ml-1"
+                  style={{ background: "rgba(88, 166, 255, 0.15)", color: "var(--blue)" }}
+                >
+                  共享
+                </span>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                   {elapsed}
@@ -93,7 +102,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
             {/* Footer */}
             <div className="mt-auto text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="truncate">{task.workingDir.split("/").pop()}</span>
+                <span className="truncate">{(task.workingDir || "").split("/").pop()}</span>
                 <span>目标: {task.goals.length} | 已完成: {task.totalTasksCompleted}</span>
               </div>
               {task.totalCostUsd > 0 && (

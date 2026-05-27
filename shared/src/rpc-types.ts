@@ -53,10 +53,20 @@ export type EngineMethod =
   | "run.tasks"
   | "run.commits"
   | "run.lessons"
+  | "run.logs"
   | "run.stop"
   | "run.delete"
   | "config.get"
-  | "config.set";
+  | "config.set"
+  | "share.create"
+  | "share.list"
+  | "share.revoke"
+  | "share.subscribe"
+  | "share.unsubscribe"
+  | "share.subscriptions"
+  | "run.pauseGoal"
+  | "run.resumeGoal"
+  | "run.clearGoal";
 
 export type EngineNotification =
   | "task.progress"
@@ -65,4 +75,5 @@ export type EngineNotification =
   | "queue.updated"
   | "run.status"
   | "log.entry"
-  | "git.commit";
+  | "git.commit"
+  | "goal.updated";

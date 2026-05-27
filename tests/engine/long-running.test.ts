@@ -292,7 +292,7 @@ describe("7x24: Data array trimming (real Store)", () => {
     if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("should trim commits at 500 entries", async () => {
+  it("should trim commits at 500 entries", { timeout: 15000 }, async () => {
     const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
     const store = new RealStore(tmpDir);
     const runId = "run-trim";

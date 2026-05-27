@@ -36,6 +36,7 @@ export class Executor {
   private store: Store;
   private abortControllers: Map<string, AbortController> = new Map();
   private running = false;
+  private currentRun: ExecutionRun | null = null;
   private evaluationCycles = 0;
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
@@ -78,11 +79,26 @@ export class Executor {
 
   async start(run: ExecutionRun): Promise<void> {
     this.running = true;
+    this.currentRun = run;
     this.stopController = new AbortController();
     this.evaluationCycles = 0;
     this.progressHistory = [];
     this.broadcast("run.status", { runId: run.id, status: "running" });
     this.log(run.id, "engine", "info", "Execution loop started");
+
+    // Initialize unified goal state
+    if (!run.goalStatus && run.goals.length > 0) {
+      run.goalStatus = "pursuing";
+      run.goalBudgetTokens = 500_000;
+      run.goalTokensUsed = 0;
+      run.goalTimeStartedAt = Date.now();
+      run.goalTimeElapsedMs = 0;
+      run.goalEvaluationCycles = 0;
+      run.goalLastEvalReason = "";
+      run.goalEvidence = [];
+      this.store.saveRun(run);
+      this.broadcast("goal.updated", { runId: run.id, goal: this.serializeGoalState(run) });
+    }
 
     try {
       while (this.running) {
@@ -177,6 +193,13 @@ export class Executor {
     if (evaluation.isComplete) {
       this.log(run.id, "engine", "info", `Goals complete! Progress: ${(evaluation.overallProgress * 100).toFixed(0)}%`);
       await this.finalize(run);
+      return false;
+    }
+
+    // Check if unified goal state shows budget exhausted
+    if (run.goalStatus === "budget_exhausted") {
+      this.log(run.id, "engine", "warn", "Goal budget exhausted — wrapping up");
+      await this.finalize(run, `Goal budget exhausted. ${run.goalLastEvalReason || ""}`);
       return false;
     }
 
@@ -365,6 +388,12 @@ export class Executor {
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${maxRetries}` });
         try { await this.sleep(backoffMs); } catch { /* interrupted by stop */ }
       } else {
+        // Clean up any partial changes left by the crashed CC process
+        try {
+          await gitManager.checkoutClean();
+        } catch (cleanupErr) {
+          this.log(run.id, "git", "warn", `Working dir cleanup failed: ${this.errorToMessage(cleanupErr)}`, task.id);
+        }
         this.log(run.id, "engine", "error", `Task failed permanently: ${msg}`, task.id);
         this.store.updateTask(run.id, task.id, { status: "failed", errorMessage: msg, completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", error: msg });
@@ -394,6 +423,13 @@ export class Executor {
 
   private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
     const parts: string[] = [];
+
+    const goalPrompt = this.buildGoalContinuationPrompt();
+    if (goalPrompt) {
+      parts.push(goalPrompt);
+      parts.push("");
+    }
+
     if (context.lastTenCommits.length > 0) {
       parts.push("Recent git commits:");
       for (const c of context.lastTenCommits) parts.push(`  ${c.hash.substring(0, 7)} ${c.message}`);
@@ -410,14 +446,84 @@ export class Executor {
   }
 
   private async evaluateGoal(run: ExecutionRun): Promise<GoalEvaluation> {
+    const evidence = run.goalEvidence ?? [];
+    const evaluationCycles = (run.goalEvaluationCycles ?? 0) + 1;
+
     const result = await this.ccClient.executeTask(
-      `Evaluate whether the following goals have been achieved based on the current state of the project.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}\nTermination conditions:\n${run.terminationConditions.map((c, i) => `${i + 1}. ${c}`).join("\n")}\nCheck the actual files. Respond ONLY with JSON:\n{ "isComplete": boolean, "progressReport": string, "completedGoals": string[], "remainingGoals": string[], "overallProgress": 0.0_to_1.0 }`,
+      `You are a goal evaluator. Your job is to audit whether the following goals have been ACTUALLY achieved based on REAL evidence.
+
+GOALS:
+${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}
+
+TERMINATION CONDITIONS:
+${run.terminationConditions.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+
+PREVIOUS EVIDENCE COLLECTED:
+${evidence.length > 0 ? evidence.map((e, i) => `${i + 1}. ${e}`).join("\n") : "(none yet)"}
+
+INSTRUCTIONS:
+1. Check the ACTUAL files, test results, and project state — do NOT infer or assume.
+2. Do NOT accept proxy signals as completion (passing tests alone ≠ done, implementation effort ≠ done).
+3. Build a checklist mapping the goals' requirements to concrete evidence.
+4. Verify coverage comprehensively before declaring success.
+5. If you cannot verify something, state what is missing.
+
+Respond ONLY with valid JSON:
+{
+  "isComplete": boolean,
+  "progressReport": "short summary of overall progress",
+  "completedGoals": ["goal that was completed"],
+  "remainingGoals": ["goal that is still remaining"],
+  "overallProgress": 0.0_to_1.0,
+  "achieved": boolean,
+  "reason": "short explanation of why achieved or not",
+  "evidence": ["concrete piece of evidence 1", "concrete piece of evidence 2"],
+  "nextSteps": "if not achieved, what specific actions to take next"
+}`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
+
     try {
-      return JSON.parse(this.extractJson(result.result)) as GoalEvaluation;
+      const parsed = JSON.parse(this.extractJson(result.result));
+
+      // Update unified goal state
+      run.goalEvaluationCycles = evaluationCycles;
+      if (parsed.evidence?.length) {
+        run.goalEvidence = [...evidence.slice(-20), ...parsed.evidence];
+      }
+      if (parsed.reason) {
+        run.goalLastEvalReason = parsed.reason;
+      }
+      if (parsed.achieved) {
+        run.goalStatus = "achieved";
+      }
+
+      // Token budget tracking (approximate from CC result)
+      if (result.totalCostUsd > 0 && run.goalBudgetTokens) {
+        // Rough estimate: ~$0.003 per 1K tokens
+        const estimatedTokens = Math.round((result.totalCostUsd / 0.003) * 1000);
+        run.goalTokensUsed = (run.goalTokensUsed ?? 0) + estimatedTokens;
+        if (run.goalTokensUsed >= run.goalBudgetTokens) {
+          run.goalStatus = "budget_exhausted";
+          run.goalLastEvalReason = `Token budget exhausted: ${run.goalTokensUsed}/${run.goalBudgetTokens}`;
+        }
+      }
+
+      this.store.saveRun(run);
+      this.broadcast("goal.updated", { runId: run.id, goal: this.serializeGoalState(run) });
+
+      return {
+        isComplete: parsed.isComplete ?? false,
+        progressReport: parsed.progressReport ?? "",
+        completedGoals: parsed.completedGoals ?? [],
+        remainingGoals: parsed.remainingGoals ?? run.goals,
+        overallProgress: parsed.overallProgress ?? 0,
+      } as GoalEvaluation;
     } catch (parseErr) {
       console.warn("[executor] failed to parse goal evaluation result:", parseErr instanceof Error ? parseErr.message : parseErr);
+      run.goalEvaluationCycles = evaluationCycles;
+      run.goalLastEvalReason = "Evaluation parse failed";
+      this.store.saveRun(run);
       return { isComplete: false, progressReport: "Evaluation parse failed", completedGoals: [], remainingGoals: run.goals, overallProgress: 0 };
     }
   }
@@ -501,13 +607,41 @@ export class Executor {
 
   private errorToMessage(err: unknown): string {
     if (err instanceof Error) {
-      return err.stack || err.message;
+      return err.message;
     }
     return String(err);
   }
 
   private broadcast(method: string, params: Record<string, unknown>): void {
     this.notify(method, params);
+  }
+
+  private buildGoalContinuationPrompt(): string {
+    const run = this.currentRun;
+    if (!run || run.goalStatus !== "pursuing" || !run.goalEvidence) return "";
+
+    const objective = run.goals.join("\n");
+    const evidence = run.goalEvidence;
+    return `[GOAL CONTEXT — This task is part of an ongoing goal pursuit]
+OBJECTIVE: ${objective}
+EVALUATION CYCLE: ${run.goalEvaluationCycles ?? 0}
+LAST EVALUATION: ${run.goalLastEvalReason || "(first cycle)"}
+COLLECTED EVIDENCE SO FAR:
+${evidence.length > 0 ? evidence.map((e, i) => `${i + 1}. ${e}`).join("\n") : "(none yet)"}
+
+IMPORTANT: After completing this task, you should verify your work contributes to the objective above. Focus on producing concrete, verifiable results.`;
+  }
+
+  private serializeGoalState(run: ExecutionRun): Record<string, unknown> {
+    return {
+      status: run.goalStatus ?? "unmet",
+      tokensUsed: run.goalTokensUsed ?? 0,
+      budgetTokens: run.goalBudgetTokens ?? 500_000,
+      timeElapsedMs: run.goalTimeElapsedMs ?? 0,
+      evaluationCycles: run.goalEvaluationCycles ?? 0,
+      lastEvaluationReason: run.goalLastEvalReason ?? "",
+      evidence: run.goalEvidence ?? [],
+    };
   }
 
   cancelTask(taskId: string, runId: string): void {
@@ -517,6 +651,10 @@ export class Executor {
   }
 
   stop(): void {
+    if (this.currentRun?.goalStatus === "pursuing") {
+      this.currentRun.goalTimeElapsedMs = Date.now() - (this.currentRun.goalTimeStartedAt ?? Date.now());
+      this.store.saveRun(this.currentRun);
+    }
     this.running = false;
     this.stopController?.abort();
     for (const [id, controller] of this.abortControllers) {

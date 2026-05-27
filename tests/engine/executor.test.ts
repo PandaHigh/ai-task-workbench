@@ -346,3 +346,100 @@ describe("Executor config loading", () => {
     expect(config.maxBudgetUsd).toBe(50);
   });
 });
+
+describe("Executor + Goal integration", () => {
+  let queueManager: MockQueueManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queueManager = createMockQueueManager();
+    mockStore.getLessons.mockReturnValue([]);
+    mockStore.listTasks.mockReturnValue([]);
+    mockStore.getCommits.mockReturnValue([]);
+  });
+
+  it("should include goal continuation prompt in buildSystemPrompt when goal is active", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-1");
+
+    // Set currentRun with active goal state
+    const run = { id: "run-goal-1", goals: ["All tests pass and no lint errors"], goalStatus: "pursuing", goalEvidence: [], goalEvaluationCycles: 0, goalLastEvalReason: "" } as any;
+    (executor as any).currentRun = run;
+
+    const context: TaskContext = {
+      workingDir: "/tmp",
+      goals: ["All tests pass and no lint errors"],
+      terminationConditions: ["done"],
+      lastTenCommits: [],
+      nextFiveTasks: [],
+      lessonsLearned: [],
+    };
+
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context);
+    expect(prompt).toContain("GOAL CONTEXT");
+    expect(prompt).toContain("All tests pass and no lint errors");
+  });
+
+  it("should NOT include goal continuation prompt when no goal is set", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-no-goal");
+
+    const context: TaskContext = {
+      workingDir: "/tmp",
+      goals: ["g1"],
+      terminationConditions: ["done"],
+      lastTenCommits: [],
+      nextFiveTasks: [],
+      lessonsLearned: [],
+    };
+
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context);
+    expect(prompt).not.toContain("GOAL CONTEXT");
+  });
+
+  it("should include evidence in continuation prompt after evaluation", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-2");
+
+    const run = {
+      id: "run-goal-2",
+      goals: ["Build feature X"],
+      goalStatus: "pursuing",
+      goalEvidence: ["src/feature.ts exists", "2 tests passing"],
+      goalEvaluationCycles: 1,
+      goalLastEvalReason: "Feature partially implemented",
+    } as any;
+    (executor as any).currentRun = run;
+
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context_empty);
+    expect(prompt).toContain("src/feature.ts exists");
+    expect(prompt).toContain("Feature partially implemented");
+  });
+
+  it("should not include continuation prompt for paused goal", async () => {
+    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-3");
+
+    const run = {
+      id: "run-goal-3",
+      goals: ["Paused goal"],
+      goalStatus: "paused",
+      goalEvidence: [],
+      goalEvaluationCycles: 0,
+      goalLastEvalReason: "",
+    } as any;
+    (executor as any).currentRun = run;
+
+    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context_empty);
+    expect(prompt).not.toContain("GOAL CONTEXT");
+  });
+});
+
+const context_empty: TaskContext = {
+  workingDir: "/tmp",
+  goals: [],
+  terminationConditions: [],
+  lastTenCommits: [],
+  nextFiveTasks: [],
+  lessonsLearned: [],
+};

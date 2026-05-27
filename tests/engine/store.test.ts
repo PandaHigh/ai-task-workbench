@@ -170,6 +170,26 @@ describe("Store (JSON file)", () => {
       expect(task!.status).toBe("running");
       // costUsd should remain the original value, not be overwritten with undefined
     });
+
+    it("should clear fields when passed null", () => {
+      store.saveRun({
+        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
+        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+      });
+      store.saveTask("run-1", {
+        id: "task-1", runId: "run-1", type: "user_defined" as const,
+        priority: 1, content: "Test", timeoutMinutes: 60,
+        status: "failed" as const, createdAt: Date.now(),
+        errorMessage: "some error", score: 0.3, completedAt: Date.now(),
+      });
+
+      store.updateTask("run-1", "task-1", { status: "pending", errorMessage: null, score: null, completedAt: null });
+      const task = store.getTask("run-1", "task-1");
+      expect(task!.status).toBe("pending");
+      expect(task!.errorMessage).toBeUndefined();
+      expect(task!.score).toBeUndefined();
+      expect(task!.completedAt).toBeUndefined();
+    });
   });
 
   describe("deleteRun safety", () => {

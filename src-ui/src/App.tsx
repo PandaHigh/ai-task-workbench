@@ -4,6 +4,7 @@ import { MainDashboard } from "./components/dashboard/MainDashboard";
 import { TaskWizard } from "./components/wizard/TaskWizard";
 import { EvolutionDashboard } from "./components/evolution/EvolutionDashboard";
 import { SettingsPage } from "./components/settings/SettingsPage";
+import { ShareDashboard } from "./components/share/ShareDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/common/Toast";
 import { useEngine } from "./hooks/useEngine";
@@ -31,17 +32,22 @@ export function App() {
 
   return (
     <ToastProvider>
-      <AppShell>
-        <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<MainDashboard />} />
-            <Route path="/wizard" element={<TaskWizard />} />
-            <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </ErrorBoundary>
-      </AppShell>
+      <Routes>
+        <Route path="/share/:token" element={<ErrorBoundary><ShareDashboard /></ErrorBoundary>} />
+        <Route path="*" element={
+          <AppShell>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<MainDashboard />} />
+                <Route path="/wizard" element={<TaskWizard />} />
+                <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
+          </AppShell>
+        } />
+      </Routes>
     </ToastProvider>
   );
 }
