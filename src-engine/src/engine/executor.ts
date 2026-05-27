@@ -287,7 +287,7 @@ export class Executor {
     this.abortControllers.set(task.id, abortController);
 
     try {
-      await gitManager.initIfNeeded();
+      await gitManager.ensureInit();
       const context = await this.buildContext(task, run, gitManager);
       const systemPrompt = this.buildSystemPrompt(task, context);
 

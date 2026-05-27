@@ -123,12 +123,17 @@ export class CCClient {
         try {
           const msg = JSON.parse(text.trim());
           messages.push(msg);
-          if (msg.type === "result" && msg.subtype === "success") {
-            result = msg.result || "";
-            sessionId = msg.session_id || "";
-            totalCostUsd = msg.total_cost_usd || 0;
-            durationMs = msg.duration_ms || 0;
-            numTurns = msg.num_turns || 0;
+          if (msg.type === "result") {
+            if (msg.subtype === "success") {
+              result = msg.result || "";
+              sessionId = msg.session_id || "";
+              totalCostUsd = msg.total_cost_usd || 0;
+              durationMs = msg.duration_ms || 0;
+              numTurns = msg.num_turns || 0;
+            } else {
+              // Capture error results from stream-json output
+              stderrBuffer += `[CC ${msg.subtype || "error"}] ${msg.result || msg.error || JSON.stringify(msg)}`;
+            }
           }
         } catch (parseErr) {
           console.warn(`[cc-client] Non-JSON line from CC stdout, skipping: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
@@ -157,7 +162,37 @@ export class CCClient {
           if (code === 0 || result) {
             resolve({ result, sessionId, totalCostUsd, durationMs, numTurns, messages });
           } else {
-            reject(new Error(`CC process exited with code ${code}: ${stderrBuffer}`));
+            // Fallback: CC exited non-zero but may have done useful work.
+            // Try to extract result from assistant messages in the stream.
+            const assistantTexts = messages
+              .filter((m) => m.type === "assistant")
+              .map((m) => typeof m.content === "string" ? m.content : (m.content as Array<{text: string}>)?.map?.(c => c.text)?.join?.("") || "")
+              .filter(Boolean);
+            const fallbackResult = assistantTexts.length > 0
+              ? assistantTexts[assistantTexts.length - 1]
+              : "";
+
+            if (fallbackResult) {
+              console.warn(`[cc-client] CC exited with code ${code} but has ${messages.length} messages — using last assistant message as fallback result`);
+              resolve({
+                result: fallbackResult,
+                sessionId,
+                totalCostUsd,
+                durationMs,
+                numTurns,
+                messages,
+              });
+            } else {
+              const errorParts = [`CC process exited with code ${code}`];
+              if (stderrBuffer) errorParts.push(stderrBuffer);
+              // Include error messages from stream-json output
+              const streamErrors = messages
+                .filter((m) => m.type === "result" && m.subtype !== "success")
+                .map((m) => m.result || m.error || "")
+                .filter(Boolean);
+              if (streamErrors.length) errorParts.push(streamErrors.join("; "));
+              reject(new Error(errorParts.join(": ")));
+            }
           }
         }
       });

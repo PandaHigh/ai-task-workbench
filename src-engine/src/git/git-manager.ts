@@ -1,3 +1,4 @@
+import { mkdirSync } from "fs";
 import simpleGit, { type SimpleGit } from "simple-git";
 
 export interface GitManagerOptions {
@@ -6,13 +7,27 @@ export interface GitManagerOptions {
 
 export class GitManager {
   private git: SimpleGit;
+  private _initialized = false;
 
   constructor(options: GitManagerOptions) {
+    // Ensure directory exists
+    mkdirSync(options.workingDir, { recursive: true });
     this.git = simpleGit(options.workingDir);
   }
 
+  async ensureInit(): Promise<void> {
+    if (this._initialized) return;
+    const isRepo = await this.git.checkIsRepo();
+    if (!isRepo) {
+      await this.git.init();
+      await this.git.addConfig("user.name", "AI Task Workbench");
+      await this.git.addConfig("user.email", "ai-workbench@local");
+    }
+    this._initialized = true;
+  }
+
   async autoCommit(taskId: string, taskContent: string): Promise<string> {
-    await this.git.add("-u");
+    await this.git.add("-A");
 
     const shortId = taskId.substring(0, 6);
     const summary = taskContent.length > 50
@@ -35,8 +50,16 @@ export class GitManager {
   }
 
   async checkoutClean(): Promise<void> {
-    await this.git.raw(["checkout", "--", "."]);
-    await this.git.raw(["clean", "-fd"]);
+    try {
+      await this.git.raw(["checkout", "--", "."]);
+    } catch {
+      // No tracked files to checkout (fresh repo) — that's OK
+    }
+    try {
+      await this.git.raw(["clean", "-fd"]);
+    } catch {
+      // Nothing to clean — that's OK
+    }
   }
 
   async getLastNCommits(n: number): Promise<Array<{
@@ -62,12 +85,4 @@ export class GitManager {
     return this.git.diff([hash]);
   }
 
-  async initIfNeeded(): Promise<void> {
-    const isRepo = await this.git.checkIsRepo();
-    if (!isRepo) {
-      await this.git.init();
-      await this.git.addConfig("user.name", "AI Task Workbench");
-      await this.git.addConfig("user.email", "ai-workbench@local");
-    }
-  }
 }

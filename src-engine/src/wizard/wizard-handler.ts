@@ -52,13 +52,19 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
   const systemPrompt = `你是一个AI任务规划助手。你的任务是通过与用户对话，帮助他们清晰地定义一个AI编程任务。
 
 你需要收集以下信息：
-1. **任务内容**：用户想让AI完成什么具体的编程工作？
-2. **任务目标**：成功的标准是什么？期望的最终结果是什么？
-3. **终止条件**：什么情况下认为这个任务完成了？
+1. **任务内容**：用户想让AI完成什么具体的编程工作？（描述要做什么事）
+2. **任务目标**：期望的最终结果是什么？交付物是什么？（描述期望的结果状态）
+3. **终止条件**：什么具体、可验证的标志说明任务完成了？（描述可检查的条件，如"所有测试通过"、"文件X生成"、"功能Y可正常使用"）
 4. **完成后动作**：任务完成后是否需要执行什么（比如运行测试、部署等）？
 
+重要区分：
+- "目标"是期望达成的结果（如"实现用户登录功能"）
+- "终止条件"是可验证的检查点（如"登录接口返回200"、"未登录用户被正确拦截"）
+- 目标和终止条件不能相同，也不能互相复制
+
 对话策略：
-- 先问任务内容，再追问目标和终止条件
+- 如果用户一句话描述了所有内容，你要主动帮用户拆分出不同的目标和终止条件
+- 如果用户只说了"做什么"，追问"怎么算做完了？有什么可以检查的？"
 - 如果用户的描述模糊，主动追问细节
 - 当收集完所有信息后，用以下格式总结：
 
@@ -126,14 +132,15 @@ export function extractParams(sessionId: string): {
     .filter((m) => m.role === "user")
     .map((m) => m.content);
 
-  return {
-    content: userTexts[0] || "未命名任务",
-    goals: userTexts.length > 1 ? [userTexts[1]] : ["完成用户描述的任务"],
-    terminationConditions: userTexts.length > 2
-      ? [userTexts[2]]
-      : ["任务目标全部达成"],
-    postCompletionAction: "无",
-  };
+  const content = userTexts[0] || "未命名任务";
+  const goals = userTexts.length > 1
+    ? [userTexts[1]]
+    : [`完成${content}`];
+  const terminationConditions = userTexts.length > 2
+    ? [userTexts[2]]
+    : [`所有目标均已达成并验证通过`];
+
+  return { content, goals, terminationConditions, postCompletionAction: "无" };
 }
 
 export function validateParams(params: ReturnType<typeof extractParams>): {
@@ -146,6 +153,12 @@ export function validateParams(params: ReturnType<typeof extractParams>): {
   if (!params.content?.trim()) errors.push("任务内容不能为空");
   if (!params.goals?.length) errors.push("至少需要一个目标");
   if (!params.terminationConditions?.length) errors.push("至少需要一个终止条件");
+
+  const goalsText = params.goals?.join("").trim().toLowerCase() ?? "";
+  const termsText = params.terminationConditions?.join("").trim().toLowerCase() ?? "";
+  if (goalsText && termsText && goalsText === termsText) {
+    errors.push("目标和终止条件不能完全相同，请区分期望结果和可验证的检查点");
+  }
 
   return { valid: errors.length === 0, errors };
 }
