@@ -144,6 +144,15 @@ export class Store {
     return this.listTasks(runId).find((t) => t.id === taskId);
   }
 
+  deleteTask(runId: string, taskId: string): boolean {
+    const tasks = this.listTasks(runId);
+    const idx = tasks.findIndex((t) => t.id === taskId);
+    if (idx === -1) return false;
+    tasks.splice(idx, 1);
+    writeJsonFile(path.join(this.runDir(runId), "tasks.json"), tasks);
+    return true;
+  }
+
   saveTask(runId: string, task: TaskDefinition): void {
     const tasks = this.listTasks(runId);
     const idx = tasks.findIndex((t) => t.id === task.id);

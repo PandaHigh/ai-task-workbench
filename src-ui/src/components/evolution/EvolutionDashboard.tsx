@@ -19,6 +19,7 @@ import { ExecutionModeSelector } from "./ExecutionModeSelector";
 import { PresencePanel } from "./PresencePanel";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { TaskComments } from "./TaskComments";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "report";
 
@@ -78,6 +79,7 @@ export function EvolutionDashboard() {
   const [showPanel, setShowPanel] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; content: string } | null>(null);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
@@ -272,6 +274,23 @@ export function EvolutionDashboard() {
       toast.success("任务已开始执行");
     } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : err}`); }
   };
+
+  const handleDeleteTask = (taskId: string, content: string) => {
+    setDeleteTarget({ id: taskId, content });
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!runId || !deleteTarget) return;
+    try {
+      await call("queue.remove", { runId, taskId: deleteTarget.id });
+      const qRes = await call("queue.list", { runId });
+      setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+      const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
+      setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
+      toast.success("任务已删除");
+    } catch (err) { toast.error(`删除任务失败: ${err instanceof Error ? err.message : err}`); }
+    finally { setDeleteTarget(null); }
+  };
   const closeDrawers = () => {
     setShowQueue(false);
     setShowPanel(false);
@@ -376,7 +395,7 @@ export function EvolutionDashboard() {
                     onDrop={() => { if (dragIdx !== null && dragIdx !== i) moveTask(dragIdx, i); setDragIdx(null); }}
                     onDragEnd={() => setDragIdx(null)}
                     onFocus={() => setFocusIdx(i)}
-                    className="px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
+                    className="group px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
                     style={{
                       background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",
                       border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
@@ -394,6 +413,13 @@ export function EvolutionDashboard() {
                         color: task.type === "user_defined" ? "#0d1117" : "var(--text-secondary)",
                       }}>{i + 1}</span>
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id, task.content); }}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
+                        style={{ color: "var(--red)", border: "1px solid transparent" }}
+                        aria-label="删除任务"
+                        title="删除任务"
+                      >删除</button>
                     </div>
                     <div className="mt-1 flex gap-2" style={{ color: "var(--text-secondary)" }}>
                       <span>{task.type === "user_defined" ? "用户" : "智能"}</span>
@@ -454,7 +480,10 @@ export function EvolutionDashboard() {
                     <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)" }}>
                       <div className="flex items-center justify-between gap-1">
                         <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
-                        <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重试</button>
+                        <div className="flex gap-1">
+                          <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重试</button>
+                          <button onClick={() => handleDeleteTask(t.id, t.content)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--red)", color: "#fff" }}>删除</button>
+                        </div>
                       </div>
                       {t.errorMessage && <p className="mt-0.5 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
                     </div>
@@ -921,6 +950,16 @@ export function EvolutionDashboard() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除任务"
+        message={`确定要删除任务「${deleteTarget?.content ?? ""}」吗？此操作不可撤销。`}
+        confirmLabel="删除"
+        variant="danger"
+        onConfirm={confirmDeleteTask}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
     </>
   );

@@ -529,6 +529,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { runId, order: taskIds };
   },
 
+  "queue.remove": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const removed = queueManager.remove(runId, taskId);
+    if (removed) store.deleteTask(runId, taskId);
+    return { runId, taskId, removed };
+  },
+
   "wizard.start": async (params) => {
     const workingDir = requireNonEmptyString(params, "workingDir");
     const safeWorkingDir = validateWorkingDir(workingDir);
