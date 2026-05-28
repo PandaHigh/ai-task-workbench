@@ -23,7 +23,7 @@ export function Terminal({ children, className = "" }: TerminalProps) {
       aria-live="polite"
       aria-label="终端输出"
       className={`font-mono text-xs leading-relaxed overflow-y-auto ${className}`}
-      style={{ background: "#010409", padding: "16px" }}
+      style={{ background: "var(--bg-tertiary)", padding: "16px" }}
     >
       {children}
     </div>
@@ -131,7 +131,7 @@ export function VirtualizedTerminal({ lines, className = "" }: VirtualizedTermin
       aria-live="polite"
       aria-label="终端输出"
       className={`font-mono text-xs leading-relaxed overflow-y-auto ${className}`}
-      style={{ background: "#010409", padding: "16px" }}
+      style={{ background: "var(--bg-tertiary)", padding: "16px" }}
       onScroll={handleScroll}
     >
       <div style={{ height: lines.length * lineH, position: "relative" }}>

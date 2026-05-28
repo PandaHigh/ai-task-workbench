@@ -70,7 +70,7 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
           onClick={handleSubmit}
           disabled={!text.trim()}
           className="px-2 py-1 rounded text-xs font-mono disabled:opacity-40"
-          style={{ background: "var(--blue)", color: "#0d1117" }}
+          style={{ background: "var(--blue)", color: "#fff" }}
         >
           发送
         </button>

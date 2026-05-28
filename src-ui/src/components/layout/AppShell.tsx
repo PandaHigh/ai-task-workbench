@@ -1,6 +1,7 @@
 import { type ReactNode, useState, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { useKeyboard, setToggleHelp } from "../../hooks/useKeyboard";
+import { useTheme } from "../../hooks/useTheme";
 import { ShortcutHelp } from "../common/ShortcutHelp";
 
 interface AppShellProps {
@@ -10,6 +11,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [showHelp, setShowHelp] = useState(false);
   useKeyboard();
+  useTheme();
 
   const toggleHelpPanel = useCallback(() => setShowHelp((v) => !v), []);
   setToggleHelp(toggleHelpPanel);

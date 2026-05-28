@@ -5,13 +5,13 @@ interface RobotMascotProps {
   size?: number;
 }
 
-export function RobotMascot({ mood, size = 48 }: RobotMascotProps) {
+export function RobotMascot({ mood, size = 56 }: RobotMascotProps) {
   const moodStyles: Record<RobotMood, { anim: string; eyeColor: string; glow: string }> = {
-    idle: { anim: "animate-float", eyeColor: "var(--blue)", glow: "none" },
+    idle: { anim: "", eyeColor: "var(--blue-light)", glow: "none" },
     thinking: { anim: "animate-pulse-slow", eyeColor: "var(--yellow)", glow: "none" },
-    working: { anim: "animate-spin-slow", eyeColor: "var(--green)", glow: "0 0 20px var(--green)" },
-    celebrating: { anim: "animate-float", eyeColor: "var(--green)", glow: "0 0 30px var(--green)" },
-    error: { anim: "", eyeColor: "var(--red)", glow: "0 0 20px var(--red)" },
+    working: { anim: "", eyeColor: "var(--green)", glow: "none" },
+    celebrating: { anim: "", eyeColor: "var(--green)", glow: "none" },
+    error: { anim: "", eyeColor: "var(--red)", glow: "none" },
   };
 
   const style = moodStyles[mood];
@@ -22,24 +22,23 @@ export function RobotMascot({ mood, size = 48 }: RobotMascotProps) {
       style={{
         width: size,
         height: size,
-        filter: style.glow !== "none" ? `drop-shadow(${style.glow})` : undefined,
       }}
     >
       <svg viewBox="0 0 48 48" width={size} height={size} role="img" aria-label={`Robot mascot, ${mood} mood`}>
         {/* Body */}
         <rect
           x="12" y="18" width="24" height="20" rx="4"
-          fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1.5"
+          fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1"
         />
         {/* Head */}
         <rect
           x="14" y="8" width="20" height="16" rx="6"
-          fill="var(--bg-secondary)" stroke="var(--border)" strokeWidth="1.5"
+          fill="var(--bg-secondary)" stroke="var(--border)" strokeWidth="1"
         />
         {/* Antenna */}
         <line
           x1="24" y1="8" x2="24" y2="3"
-          stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round"
+          stroke="var(--text-secondary)" strokeWidth="1" strokeLinecap="round"
         />
         <circle
           cx="24" cy="3" r="2"

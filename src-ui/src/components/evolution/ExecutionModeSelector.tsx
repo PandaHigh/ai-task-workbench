@@ -48,7 +48,7 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
             border: mode === "sequential" ? "1px solid var(--blue)" : "1px solid var(--border)",
           }}
         >
-          串行
+          逐个执行
         </button>
         <button
           onClick={() => handleModeChange("parallel")}
@@ -60,7 +60,7 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
             border: mode === "parallel" ? "1px solid var(--blue)" : "1px solid var(--border)",
           }}
         >
-          并行
+          同时执行
         </button>
       </div>
       {mode === "parallel" && (
@@ -74,7 +74,7 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
             -
           </button>
           <span className="text-xs font-mono flex-1 text-center" style={{ color: "var(--text-secondary)" }}>
-            {concurrent} agents
+            同时 {concurrent} 个
           </span>
           <button
             onClick={() => handleConcurrentChange(concurrent + 1)}

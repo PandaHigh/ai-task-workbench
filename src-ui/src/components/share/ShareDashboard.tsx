@@ -96,17 +96,19 @@ export function ShareDashboard() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: isRunning ? "var(--green)" : run?.status === "completed" ? "var(--blue)" : "var(--text-secondary)" }} />
           <h2 className="text-sm font-bold truncate">{run?.goals?.[0] || "分享看板"}</h2>
-          <span className="text-xs px-2 py-0.5 rounded shrink-0" style={{ background: "rgba(88, 166, 255, 0.15)", color: "var(--blue)" }}>共享</span>
+          <span className="text-xs px-2 py-0.5 rounded shrink-0" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>共享</span>
           <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
         </div>
         <div className="flex items-center gap-2">
           {isRunning ? (
-            <button onClick={handleStop} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>暂停</button>
-          ) : run?.status !== "completed" ? (
-            <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>开始执行</button>
-          ) : null}
+            <button onClick={handleStop} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--yellow)", color: "#fff" }}>暂停</button>
+          ) : run?.status === "completed" ? (
+            <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--green)", color: "#fff" }}>继续运行</button>
+          ) : (
+            <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--green)", color: "#fff" }}>开始执行</button>
+          )}
           <span className="status-badge" style={{
-            background: isRunning ? "rgba(63, 185, 80, 0.15)" : run?.status === "completed" ? "rgba(88, 166, 255, 0.15)" : "rgba(125, 133, 144, 0.15)",
+            background: isRunning ? "rgba(16, 185, 129, 0.15)" : run?.status === "completed" ? "rgba(77, 107, 254, 0.15)" : "rgba(125, 133, 144, 0.15)",
             color: isRunning ? "var(--green)" : run?.status === "completed" ? "var(--blue)" : "var(--text-secondary)",
           }}>
             {isRunning ? "运行中" : run?.status === "completed" ? "已完成" : run?.status === "failed" ? "失败" : "空闲"}
@@ -144,7 +146,7 @@ export function ShareDashboard() {
                 <div className="text-[10px] font-bold mt-3 mb-1 px-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</div>
                 {completedTasks.map(t => (
                   <div key={t.id} className="px-3 py-2 rounded text-xs" style={{
-                    background: "rgba(63, 185, 80, 0.06)",
+                    background: "rgba(16, 185, 129, 0.06)",
                     borderLeft: "3px solid var(--green)",
                   }}>
                     <div className="flex items-start gap-2">
@@ -164,12 +166,12 @@ export function ShareDashboard() {
                 <div className="text-[10px] font-bold mt-3 mb-1 px-1" style={{ color: "var(--red)" }}>失败 ({failedTasks.length})</div>
                 {failedTasks.map(t => (
                   <div key={t.id} className="px-3 py-2 rounded text-xs" style={{
-                    background: "rgba(248, 81, 73, 0.06)",
+                    background: "rgba(239, 68, 68, 0.06)",
                     borderLeft: "3px solid var(--red)",
                   }}>
                     <div className="flex items-center justify-between gap-1">
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
-                      <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重试</button>
+                      <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>重试</button>
                     </div>
                     {t.errorMessage && <p className="mt-1 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
                   </div>
@@ -182,7 +184,7 @@ export function ShareDashboard() {
           </div>
           <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
             <button onClick={() => setShowAddModal(true)} className="w-full px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
-              style={{ background: "var(--green)", color: "#0d1117", boxShadow: "0 2px 8px rgba(63, 185, 80, 0.3)" }}>
+              style={{ background: "var(--green)", color: "#fff", boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)" }}>
               + 新增任务
             </button>
           </div>
@@ -226,7 +228,7 @@ export function ShareDashboard() {
                     <div className="flex items-center gap-2 mb-1">
                       <code style={{ color: "var(--blue)" }}>{c.hash?.slice(0, 7) || "—"}</code>
                       {c.isAiCommit && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(63, 185, 80, 0.15)", color: "var(--green)" }}>#AI</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--green)" }}>#AI</span>
                       )}
                       <span style={{ color: "var(--text-secondary)" }}>{formatTimestamp(c.timestamp)}</span>
                     </div>
@@ -245,8 +247,8 @@ export function ShareDashboard() {
                   <div key={l.id} className="glass-card-sm px-3 py-2">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="px-1.5 py-0.5 rounded text-[10px]" style={{
-                        background: l.category === "failure" ? "rgba(248, 81, 73, 0.15)" :
-                          l.category === "success" ? "rgba(63, 185, 80, 0.15)" : "rgba(210, 153, 34, 0.15)",
+                        background: l.category === "failure" ? "rgba(239, 68, 68, 0.15)" :
+                          l.category === "success" ? "rgba(16, 185, 129, 0.15)" : "rgba(210, 153, 34, 0.15)",
                         color: l.category === "failure" ? "var(--red)" :
                           l.category === "success" ? "var(--green)" : "var(--yellow)",
                       }}>{l.category}</span>
@@ -364,7 +366,7 @@ export function ShareDashboard() {
             <p className="text-[11px] mb-3" style={{ color: "var(--text-secondary)" }}>Ctrl+Enter 快速提交</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowAddModal(false)} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>取消</button>
-              <button onClick={handleAddTask} disabled={!newTaskText.trim()} className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#0d1117" }}>确认添加</button>
+              <button onClick={handleAddTask} disabled={!newTaskText.trim()} className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#fff" }}>确认添加</button>
             </div>
           </div>
         </div>

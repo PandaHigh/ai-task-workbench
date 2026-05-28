@@ -222,6 +222,52 @@ describe("RPC Methods", () => {
       expect(task.content).toBe("Implement feature X");
       expect(task.runId).toBe(run.id);
     });
+
+    it("should auto-restart executor when adding task to completed run", async () => {
+      const run = await createRun();
+      const { Store } = await import("../../src-engine/src/db/store.js");
+      const store = new Store(testDir);
+
+      // Mark run as completed
+      run.status = "completed";
+      run.completedAt = Date.now();
+      run.finalReport = "All done";
+      store.saveRun(run);
+
+      // Add a new task to the completed run
+      const task = await methodHandlers["task.create"]({
+        runId: run.id,
+        content: "New task after completion",
+        type: "user_defined",
+        priority: 1,
+      }) as Record<string, unknown>;
+      expect(task.content).toBe("New task after completion");
+
+      // Verify run was reset to running
+      const updatedRun = store.getRun(run.id);
+      expect(updatedRun?.status).toBe("running");
+      expect(updatedRun?.completedAt).toBeUndefined();
+      expect(updatedRun?.finalReport).toBeUndefined();
+    });
+
+    it("should not auto-restart when adding task to idle run", async () => {
+      const run = await createRun();
+      // Run is idle by default
+      expect(run.status).toBe("idle");
+
+      await methodHandlers["task.create"]({
+        runId: run.id,
+        content: "Task for idle run",
+        type: "user_defined",
+        priority: 1,
+      });
+
+      const { Store } = await import("../../src-engine/src/db/store.js");
+      const store = new Store(testDir);
+      const updatedRun = store.getRun(run.id);
+      // Should stay idle, not auto-start
+      expect(updatedRun?.status).toBe("idle");
+    });
   });
 
   describe("task.start", () => {
@@ -230,15 +276,33 @@ describe("RPC Methods", () => {
         .rejects.toThrow("not found");
     });
 
-    it("should reject completed run", async () => {
+    it("should allow restarting completed run and reset state", async () => {
       const run = await createRun();
       const { Store } = await import("../../src-engine/src/db/store.js");
       const store = new Store(testDir);
       run.status = "completed";
+      run.completedAt = Date.now();
+      run.finalReport = "done";
       store.saveRun(run);
 
-      await expect(methodHandlers["task.start"]({ runId: run.id }))
-        .rejects.toThrow("already completed");
+      const result = await methodHandlers["task.start"]({ runId: run.id }) as Record<string, unknown>;
+      expect(result.status).toBe("running");
+
+      // Verify completion state was cleared
+      const updatedRun = store.getRun(run.id);
+      expect(updatedRun?.completedAt).toBeUndefined();
+      expect(updatedRun?.finalReport).toBeUndefined();
+    });
+
+    it("should allow restarting failed run", async () => {
+      const run = await createRun();
+      const { Store } = await import("../../src-engine/src/db/store.js");
+      const store = new Store(testDir);
+      run.status = "failed";
+      store.saveRun(run);
+
+      const result = await methodHandlers["task.start"]({ runId: run.id }) as Record<string, unknown>;
+      expect(result.status).toBe("running");
     });
 
     it("should start a run and set status to running", async () => {

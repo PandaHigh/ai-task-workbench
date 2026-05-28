@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { RobotMascot } from "./RobotMascot";
 import { TaskCard } from "./TaskCard";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
@@ -35,7 +34,7 @@ export function MainDashboard() {
     setImporting(true);
     try {
       await call("share.subscribe", { url: importUrl.trim() });
-      toast.success("远程看板导入成功");
+      toast.success("任务导入成功");
       setShowImportModal(false);
       setImportUrl("");
       loadTasks();
@@ -50,30 +49,36 @@ export function MainDashboard() {
     <div className="flex-1 overflow-y-auto p-6" style={pageEnterStyle()}>
       <div
         className="flex items-center justify-between mb-6"
-        style={{ animation: "slideUp 0.4s ease-out" }}
+        style={{ animation: "slideUp 0.3s ease-out" }}
       >
         <div>
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            任务总览
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+            我的任务
           </h2>
           <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            {connected ? `已连接引擎 · ${tasks.length} 个任务` : "引擎未连接"}
+            {connected ? `AI 已就绪 · 共 ${tasks.length} 个任务` : "AI 未连接"}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowImportModal(true)}
-            className="text-xs px-3 py-1.5 rounded font-semibold"
-            style={{ background: "var(--blue)", color: "#0d1117" }}
+            className="text-xs"
+            style={{ color: "var(--text-secondary)", background: "none", border: "none", textDecoration: "underline" }}
           >
-            + 导入分享
+            导入
           </button>
-          <RobotMascot mood={connected ? "idle" : "error"} />
+          <button
+            onClick={() => navigate("/wizard")}
+            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            style={{ background: "var(--blue)", color: "#fff", border: "none" }}
+          >
+            新建
+          </button>
         </div>
       </div>
 
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 6 }, (_, i) => (
             <Skeleton key={i} variant="card" height={120} />
           ))}
@@ -82,17 +87,17 @@ export function MainDashboard() {
 
       {!loading && tasks.length === 0 && (
         <EmptyState
-          title="还没有任务"
-          description="创建你的第一个 AI 任务开始使用"
-          action={{ label: "+ 新建任务", onClick: () => navigate("/wizard") }}
+          title="欢迎使用 Forge"
+          description="点击下方按钮，告诉我你想做什么"
+          action={{ label: "开始第一个任务", onClick: () => navigate("/wizard") }}
           variant="default"
         />
       )}
 
       {!loading && tasks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {tasks.map((task, i) => (
-            <div key={task.id} style={staggerItemStyle(i, 60)}>
+            <div key={task.id} style={staggerItemStyle(i, 40)}>
               <TaskCard task={task} onDelete={() => loadTasks()} />
             </div>
           ))}
@@ -107,28 +112,28 @@ export function MainDashboard() {
           onClick={() => setShowImportModal(false)}
         >
           <div
-            className="glass-card p-6 w-full max-w-md"
-            style={{ animation: "slideUp 0.3s ease-out" }}
+            className="card p-6 w-full max-w-md"
+            style={{ animation: "slideUp 0.2s ease-out" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-bold mb-3">导入分享看板</h3>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>导入任务</h3>
             <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>
-              粘贴分享链接以导入远程任务看板
+              粘贴别人分享给你的链接
             </p>
             <input
               type="text"
               value={importUrl}
               onChange={(e) => setImportUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleImport()}
-              placeholder="http://host:9731/api/share/token..."
-              className="w-full px-3 py-2 rounded text-xs outline-none mb-3"
+              placeholder="粘贴分享链接..."
+              className="w-full px-3 py-2 rounded-md text-xs outline-none mb-3"
               style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
               autoFocus
             />
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setShowImportModal(false)}
-                className="px-3 py-1.5 rounded text-xs"
+                className="px-3 py-1.5 rounded-md text-xs"
                 style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
               >
                 取消
@@ -136,8 +141,8 @@ export function MainDashboard() {
               <button
                 onClick={handleImport}
                 disabled={importing || !importUrl.trim()}
-                className="px-4 py-1.5 rounded text-xs font-semibold disabled:opacity-50"
-                style={{ background: "var(--green)", color: "#0d1117" }}
+                className="px-4 py-1.5 rounded-md text-xs font-medium disabled:opacity-50"
+                style={{ background: "var(--blue)", color: "#fff" }}
               >
                 {importing ? "导入中..." : "导入"}
               </button>

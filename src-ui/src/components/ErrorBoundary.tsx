@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={this.handleRetry}
               style={{
-                padding: "6px 16px", background: "var(--blue)", color: "#0d1117",
+                padding: "6px 16px", background: "var(--blue)", color: "#fff",
                 border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
               }}
             >

@@ -44,7 +44,13 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
   );
 }
 
-const STEP_LABELS = ["选择目录", "AI 对话", "确认参数"] as const;
+const STEP_LABELS = ["准备工作", "告诉 AI", "确认任务"] as const;
+
+const SUGGESTION_PILLS = [
+  "帮我写一个网站",
+  "优化我的代码",
+  "修复 bug",
+];
 
 export function TaskWizard() {
   const navigate = useNavigate();
@@ -62,13 +68,13 @@ export function TaskWizard() {
   const [dirError, setDirError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
     return "~/ai-workspace";
   }, []);
 
-  // Track last assistant message for typewriter effect
   useEffect(() => {
     let idx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -77,7 +83,6 @@ export function TaskWizard() {
     setLastAssistantIdx(idx);
   }, [messages]);
 
-  // Auto-scroll to bottom when messages change or loading state changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -94,7 +99,6 @@ export function TaskWizard() {
   };
 
   const handleBrowse = async () => {
-    // Try Tauri dialog first
     try {
       const selected = await open({ directory: true, multiple: false });
       if (selected) {
@@ -109,7 +113,6 @@ export function TaskWizard() {
       return;
     } catch { /* not Tauri, fall through */ }
 
-    // Try Web File System Access API
     if ("showDirectoryPicker" in window) {
       try {
         const handle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name: string }> }).showDirectoryPicker();
@@ -124,7 +127,6 @@ export function TaskWizard() {
       } catch { /* user cancelled or not supported */ }
     }
 
-    // Fallback: show manual input
     setShowDirInput(true);
   };
 
@@ -160,6 +162,10 @@ export function TaskWizard() {
     } catch (err) {
       toast.error(`启动向导失败: ${err}`);
     }
+  };
+
+  const handleSuggestionClick = (text: string) => {
+    setInput(text);
   };
 
   const handleSend = async () => {
@@ -286,15 +292,13 @@ export function TaskWizard() {
       >
         <div className="flex items-center gap-3">
           <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
-          <h2 className="text-sm font-bold">新建 AI 任务</h2>
+          <h2 className="text-sm font-bold">创建新任务</h2>
         </div>
-        {/* Desktop step indicators - hidden on mobile (shown in bottom bar) */}
         <div className="flex gap-2 mt-3 max-md:hidden" role="tablist" aria-label="任务创建步骤">
           {renderStepIndicator()}
         </div>
       </div>
 
-      {/* Mobile bottom step bar */}
       <div
         className="hidden max-md:flex fixed bottom-0 left-0 right-0 z-50 px-4 py-3 justify-around"
         role="tablist"
@@ -309,23 +313,21 @@ export function TaskWizard() {
           id="wizard-panel-0" aria-labelledby="wizard-step-0"
           style={{ animation: "fadeIn 0.4s ease-out" }}>
           <div className="text-center px-4 max-w-md w-full">
-            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>选择 AI 任务的工作目录</p>
+            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>选择你的项目文件夹</p>
 
-            {/* Default directory card */}
             <div className="glass-card p-4 mb-4 text-left">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>默认目录</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(88, 166, 255, 0.15)", color: "var(--blue)" }}>推荐</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>推荐使用</span>
               </div>
               <p className="text-sm mb-3 font-mono" style={{ color: "var(--green)" }}>{defaultDir()}</p>
-              <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>使用默认目录</button>
+              <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>使用默认位置</button>
             </div>
 
-            {/* Browse + manual input */}
             {!showDirInput ? (
               <div className="flex gap-3">
-                <button onClick={handleBrowse} className="flex-1 px-4 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>浏览选择目录</button>
-                <button onClick={handleSelectDir} className="flex-1 px-4 py-3 rounded text-sm" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>手动输入路径</button>
+                <button onClick={handleBrowse} className="flex-1 px-4 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>选择文件夹</button>
+                <button onClick={handleSelectDir} className="flex-1 px-4 py-3 rounded text-sm max-md:hidden" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>输入路径</button>
               </div>
             ) : (
               <div className="flex gap-2 justify-center flex-wrap">
@@ -351,7 +353,7 @@ export function TaskWizard() {
                     <p id="dir-error" className="text-xs mt-1 text-left" style={{ color: "var(--red)" }} role="alert">{dirError}</p>
                   )}
                 </div>
-                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold shrink-0" style={{ background: "var(--green)", color: "#0d1117" }}>确认</button>
+                <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold shrink-0" style={{ background: "var(--green)", color: "#fff" }}>确认</button>
                 <button onClick={() => setShowDirInput(false)} className="px-3 py-2 rounded text-xs shrink-0" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>取消</button>
               </div>
             )}
@@ -368,7 +370,19 @@ export function TaskWizard() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
               <div className="text-center py-10">
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>AI 助手将通过对话帮你定义任务的目标和终止条件。</p>
+                <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>告诉我你想要完成什么，我会帮你规划。</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {SUGGESTION_PILLS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => handleSuggestionClick(s)}
+                      className="px-3 py-1.5 rounded-full text-xs"
+                      style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {messages.map((msg, i) => {
@@ -419,7 +433,7 @@ export function TaskWizard() {
                     }
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="描述你的任务..."
+                  placeholder="你想做什么？"
                   disabled={isLoading}
                   required
                   minLength={2}
@@ -428,7 +442,7 @@ export function TaskWizard() {
                   style={{
                     background: "var(--bg-tertiary)", color: "var(--text-primary)",
                     border: inputError ? "2px solid var(--red)" : "2px solid var(--blue)",
-                    boxShadow: "0 0 12px rgba(88, 166, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3)",
+                    boxShadow: "0 0 12px rgba(77, 107, 254, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3)",
                     transition: "border-color 0.2s, box-shadow 0.2s",
                   }}
                   aria-invalid={!!inputError}
@@ -441,7 +455,7 @@ export function TaskWizard() {
                     <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Enter 发送 · Shift+Enter 换行</span>
                   )}
                   <button onClick={handleSend} disabled={isLoading}
-                    className="px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#0d1117" }}>
+                    className="px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#fff" }}>
                     发送
                   </button>
                 </div>
@@ -459,14 +473,14 @@ export function TaskWizard() {
             className="glass-card p-4"
             style={{ animation: "slideUp 0.35s ease-out" }}
           >
-            <h3 className="text-sm font-bold mb-3">任务参数</h3>
+            <h3 className="text-sm font-bold mb-3">任务详情</h3>
             <div className="space-y-3 text-xs">
               <div>
-                <span style={{ color: "var(--text-secondary)" }}>工作目录:</span>
+                <span style={{ color: "var(--text-secondary)" }}>项目:</span>
                 <span className="ml-2" style={{ color: "var(--blue)" }}>{workingDir}</span>
               </div>
               <div>
-                <span style={{ color: "var(--text-secondary)" }}>任务内容:</span>
+                <span style={{ color: "var(--text-secondary)" }}>内容:</span>
                 <p className="mt-1" style={{ color: "var(--text-primary)" }}>{taskParams.content}</p>
               </div>
               <div>
@@ -475,22 +489,35 @@ export function TaskWizard() {
                   {taskParams.goals.map((g, i) => <li key={i} style={{ color: "var(--green)" }}>• {g}</li>)}
                 </ul>
               </div>
-              <div>
-                <span style={{ color: "var(--text-secondary)" }}>终止条件:</span>
-                <ul className="mt-1 space-y-1">
-                  {taskParams.terminationConditions.map((c, i) => <li key={i} style={{ color: "var(--yellow)" }}>• {c}</li>)}
-                </ul>
-              </div>
             </div>
+
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="mt-3 text-xs underline"
+              style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              {showAdvanced ? "收起详细设置" : "查看详细设置"}
+            </button>
+            {showAdvanced && (
+              <div className="mt-2 text-xs">
+                <div>
+                  <span style={{ color: "var(--text-secondary)" }}>完成标准:</span>
+                  <ul className="mt-1 space-y-1">
+                    {taskParams.terminationConditions.map((c, i) => <li key={i} style={{ color: "var(--yellow)" }}>• {c}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             {errors.length > 0 && (
-              <div className="mt-4 p-3 rounded" style={{ background: "rgba(248, 81, 73, 0.1)" }}>
+              <div className="mt-4 p-3 rounded" style={{ background: "rgba(239, 68, 68, 0.1)" }}>
                 {errors.map((e, i) => <p key={i} className="text-xs" style={{ color: "var(--red)" }}>{e}</p>)}
               </div>
             )}
           </div>
           <div className="flex gap-3 mt-6">
-            <button onClick={() => setStep(1)} className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>返回修改</button>
-            <button onClick={handleConfirm} className="px-6 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>确认并开始执行</button>
+            <button onClick={() => setStep(1)} className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>继续对话</button>
+            <button onClick={handleConfirm} className="px-8 py-3 rounded text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>开始</button>
           </div>
         </div>
       )}

@@ -23,11 +23,11 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "report";
 
 const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(59,130,246,0.15)" },
+  pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(77, 107, 254,0.15)" },
   paused: { label: "已暂停", color: "var(--yellow)", bg: "rgba(234,179,8,0.15)" },
-  achieved: { label: "已达成", color: "var(--green)", bg: "rgba(34,197,94,0.15)" },
-  unmet: { label: "未达成", color: "var(--red)", bg: "rgba(239,68,68,0.15)" },
-  budget_exhausted: { label: "预算耗尽", color: "var(--red)", bg: "rgba(239,68,68,0.15)" },
+  achieved: { label: "已达成", color: "var(--green)", bg: "rgba(16, 185, 129,0.15)" },
+  unmet: { label: "进行中", color: "var(--red)", bg: "rgba(239, 68, 68,0.15)" },
+  budget_exhausted: { label: "预算已用完", color: "var(--red)", bg: "rgba(239, 68, 68,0.15)" },
 };
 
 function formatGoalDuration(ms: number): string {
@@ -68,7 +68,8 @@ export function EvolutionDashboard() {
   const setActiveTask = useEvolutionStore((s) => s.setActiveTask);
   const reset = useEvolutionStore((s) => s.reset);
 
-  const [tab, setTab] = useState<TabType>("logs");
+  const [tab, setTab] = useState<TabType>("activity");
+  const [simpleMode, setSimpleMode] = useState(() => localStorage.getItem("ui-mode") !== "detailed");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
@@ -83,6 +84,7 @@ export function EvolutionDashboard() {
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -93,7 +95,7 @@ export function EvolutionDashboard() {
       await navigator.clipboard.writeText(result.url);
       toast.success("分享链接已复制到剪贴板");
     } catch (err) {
-      toast.error(`创建分享链接失败: ${err instanceof Error ? err.message : err}`);
+      toast.error(`创建分享链接出错了: ${err instanceof Error ? err.message : err}`);
     }
   };
 
@@ -135,7 +137,7 @@ export function EvolutionDashboard() {
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       } catch (err) {
         console.warn("Failed to load queue:", err instanceof Error ? err.message : err);
-        toast.error("加载任务队列失败");
+        toast.error("加载任务队列出错了");
       }
 
       try {
@@ -144,7 +146,7 @@ export function EvolutionDashboard() {
         setCommits((c as GitCommit[]) || []);
       } catch (err) {
         console.warn("Failed to load commits:", err instanceof Error ? err.message : err);
-        toast.error("加载提交记录失败");
+        toast.error("加载保存记录出错了");
       }
 
       try {
@@ -153,7 +155,7 @@ export function EvolutionDashboard() {
         setLessons((l as LessonLearned[]) || []);
       } catch (err) {
         console.warn("Failed to load lessons:", err instanceof Error ? err.message : err);
-        toast.error("加载经验教训失败");
+        toast.error("加载经验经验出错了");
       }
 
       try {
@@ -222,10 +224,10 @@ export function EvolutionDashboard() {
     try {
       await call("task.start", { runId });
       setRunning(true);
-      toast.success("任务已开始执行");
+      toast.success("任务已开始");
     } catch (err) {
-      addLog({ id: Date.now(), timestamp: Date.now(), level: "error", source: "engine", message: `启动失败: ${err}` });
-      toast.error(`启动失败: ${err instanceof Error ? err.message : err}`);
+      addLog({ id: Date.now(), timestamp: Date.now(), level: "error", source: "engine", message: `启动出错了: ${err}` });
+      toast.error(`启动出错了: ${err instanceof Error ? err.message : err}`);
     }
   };
 
@@ -238,7 +240,7 @@ export function EvolutionDashboard() {
       toast.info("执行已暂停");
     } catch (err) {
       console.warn("Pause failed:", err instanceof Error ? err.message : err);
-      toast.error("暂停失败");
+      toast.error("暂停出错了");
     }
   };
 
@@ -268,7 +270,7 @@ export function EvolutionDashboard() {
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       toast.success("任务已添加到队列");
-    } catch (err) { toast.error(`添加任务失败: ${err instanceof Error ? err.message : err}`); }
+    } catch (err) { toast.error(`添加任务出错了: ${err instanceof Error ? err.message : err}`); }
   };
 
   const handleRetry = async (taskId: string) => {
@@ -280,8 +282,8 @@ export function EvolutionDashboard() {
       const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
       setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
       setRunningTask(allTasks.find((t) => t.status === "running") || null);
-      toast.success("任务已开始执行");
-    } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : err}`); }
+      toast.success("任务已开始");
+    } catch (err) { toast.error(`重试出错了: ${err instanceof Error ? err.message : err}`); }
   };
 
   const handleDeleteTask = (taskId: string, content: string) => {
@@ -297,7 +299,7 @@ export function EvolutionDashboard() {
       const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
       setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
       toast.success("任务已删除");
-    } catch (err) { toast.error(`删除任务失败: ${err instanceof Error ? err.message : err}`); }
+    } catch (err) { toast.error(`删除任务出错了: ${err instanceof Error ? err.message : err}`); }
     finally { setDeleteTarget(null); }
   };
   const closeDrawers = () => {
@@ -322,7 +324,7 @@ export function EvolutionDashboard() {
         >
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80 shrink-0" style={{ color: "var(--text-secondary)" }} aria-label="返回">←</button>
-            <h2 className="text-sm font-bold truncate">任务看板</h2>
+            <h2 className="text-sm font-bold truncate">任务详情</h2>
             <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
             {run && <span className="text-xs px-2 py-0.5 rounded hidden md:inline" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
             <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
@@ -332,19 +334,19 @@ export function EvolutionDashboard() {
             <button
               onClick={handleShare}
               className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-              style={{ background: "var(--blue)", color: "#0d1117" }}
+              style={{ background: "var(--blue)", color: "#fff" }}
             >
               分享
             </button>
             {/* Mobile drawer toggles */}
-            <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 队列</button>
-            <button onClick={() => { setShowPanel(true); setShowQueue(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开控制面板">⚙ 面板</button>
+            <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 待办</button>
+            <button onClick={() => { setShowPanel(true); setShowQueue(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开操作">⚙ 操作</button>
             <RobotMascot mood={isRunning ? "working" : run?.status === "completed" ? "celebrating" : "idle"} size={32} />
             <span className="status-badge hidden md:inline" style={{
-              background: isRunning ? "rgba(88, 166, 255, 0.15)" : run?.status === "completed" ? "rgba(63, 185, 80, 0.15)" : "rgba(125, 133, 144, 0.15)",
+              background: isRunning ? "rgba(77, 107, 254, 0.15)" : run?.status === "completed" ? "rgba(16, 185, 129, 0.15)" : "rgba(125, 133, 144, 0.15)",
               color: isRunning ? "var(--blue)" : run?.status === "completed" ? "var(--green)" : "var(--text-secondary)",
             }}>
-              {isRunning ? "运行中" : run?.status === "completed" ? "已完成" : run?.status === "failed" ? "失败" : "空闲"}
+              {isRunning ? "工作中" : run?.status === "completed" ? "已完成" : run?.status === "failed" ? "出错了" : "准备中"}
             </span>
           </div>
         </div>
@@ -356,9 +358,9 @@ export function EvolutionDashboard() {
             style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
           >
             <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-              <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务队列 ({queue.length})</h3>
+              <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>待办 ({queue.length})</h3>
               {queue.length > 0 && (
-                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>拖拽排序</span>
+                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}></span>
               )}
               <button onClick={() => setShowQueue(false)} className="md:hidden text-xs ml-2" style={{ color: "var(--text-secondary)" }} aria-label="关闭队列">✕</button>
             </div>
@@ -383,9 +385,9 @@ export function EvolutionDashboard() {
                 </div>
               ) : queue.length === 0 ? (
                 <EmptyState
-                  title="队列为空"
-                  description={!isRunning ? "点击开始执行任务" : undefined}
-                  action={!isRunning ? { label: run?.status === "completed" ? "继续运行" : "开始执行", onClick: handleStart } : undefined}
+                  title="没有待办任务"
+                  description={!isRunning ? "点击开始" : undefined}
+                  action={!isRunning ? { label: run?.status === "completed" ? "继续" : "开始", onClick: handleStart } : undefined}
                   variant="queue"
                 />
               ) : (
@@ -406,7 +408,7 @@ export function EvolutionDashboard() {
                     onFocus={() => setFocusIdx(i)}
                     className="group px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
                     style={{
-                      background: task.id === activeTaskId ? "rgba(88, 166, 255, 0.1)" : dragIdx === i ? "rgba(88, 166, 255, 0.05)" : "var(--bg-tertiary)",
+                      background: task.id === activeTaskId ? "rgba(77, 107, 254, 0.1)" : dragIdx === i ? "rgba(77, 107, 254, 0.05)" : "var(--bg-tertiary)",
                       border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
                       opacity: dragIdx !== null && dragIdx !== i ? 0.7 : dragIdx === i ? 1 : undefined,
                       transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
@@ -428,12 +430,12 @@ export function EvolutionDashboard() {
                         style={{ color: "var(--red)", border: "1px solid transparent" }}
                         aria-label="删除任务"
                         title="删除任务"
-                      >删除</button>
+                      >移除</button>
                     </div>
                     <div className="mt-1 flex gap-2" style={{ color: "var(--text-secondary)" }}>
-                      <span>{task.type === "user_defined" ? "用户" : "智能"}</span>
-                      <span>P{task.priority}</span>
-                      <span>{task.timeoutMinutes}min</span>
+                      <span>{task.type === "user_defined" ? "用户" : "AI"}</span>
+                      {!simpleMode && <span>P{task.priority}</span>}
+                      {!simpleMode && <span>{task.timeoutMinutes}min</span>}
                     </div>
                   </div>
                 ))
@@ -442,14 +444,14 @@ export function EvolutionDashboard() {
             {/* Running task indicator */}
             {runningTask && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
-                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid var(--blue)" }}>
+                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}>
                   <div className="flex items-center gap-2">
                     <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>●</span>
                     <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{runningTask.content}</span>
                   </div>
                   <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                    <span style={{ color: "var(--blue)" }}>执行中</span>
-                    <span>{runningTask.type === "user_defined" ? "用户" : "智能"}</span>
+                    <span style={{ color: "var(--blue)" }}>工作中</span>
+                    <span>{runningTask.type === "user_defined" ? "用户" : "AI"}</span>
                     {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
                   </div>
                 </div>
@@ -466,13 +468,13 @@ export function EvolutionDashboard() {
                 <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</h4>
                 <div className="space-y-1">
                   {completedTasks.map((t) => (
-                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.15)" }}>
+                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.15)" }}>
                       <div className="flex items-start gap-2">
                         <span className="shrink-0 text-[10px] mt-0.5" style={{ color: "var(--green)" }}>✓</span>
                         <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{t.content}</span>
                       </div>
                       <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                        <span>{t.type === "user_defined" ? "用户" : "智能"}</span>
+                        <span>{t.type === "user_defined" ? "用户" : "AI"}</span>
                         {t.completedAt && <span>{new Date(t.completedAt).toLocaleTimeString()}</span>}
                       </div>
                     </div>
@@ -483,15 +485,15 @@ export function EvolutionDashboard() {
             {/* Failed tasks with retry */}
             {failedTasks.length > 0 && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
-                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--red)" }}>失败任务 ({failedTasks.length})</h4>
+                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--red)" }}>出错了 ({failedTasks.length})</h4>
                 <div className="space-y-1">
                   {failedTasks.map((t) => (
-                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)" }}>
+                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
                       <div className="flex items-center justify-between gap-1">
                         <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
                         <div className="flex gap-1">
-                          <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#0d1117" }}>重试</button>
-                          <button onClick={() => handleDeleteTask(t.id, t.content)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--red)", color: "#fff" }}>删除</button>
+                          <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>再试一次</button>
+                          <button onClick={() => handleDeleteTask(t.id, t.content)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--red)", color: "#fff" }}>移除</button>
                         </div>
                       </div>
                       {t.errorMessage && <p className="mt-0.5 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
@@ -507,29 +509,41 @@ export function EvolutionDashboard() {
                 className="w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
                 style={{
                   background: "var(--green)",
-                  color: "#0d1117",
-                  boxShadow: "0 2px 8px rgba(63, 185, 80, 0.3)",
+                  color: "#fff",
+                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
                   transition: "transform 0.15s, box-shadow 0.15s",
                 }}
               >
-                + 新增任务
+                + 添加任务
               </button>
             </div>
           </div>
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
-            <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
-              {(["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]).map((t) => (
+            <div className="px-4 py-2 border-b relative flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+              <div className="flex">
+              {(simpleMode
+                ? (["activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+              ).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
                   background: tab === t ? "var(--bg-tertiary)" : "transparent",
                 }}>
-                  {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : t === "lessons" ? `经验教训 (${lessons.length})` : t === "features" ? `Features (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "活动" : "最终报告"}
+                  {t === "logs" ? `记录 (${logs.length})` : t === "commits" ? `保存 (${commits.length})` : t === "lessons" ? `经验 (${lessons.length})` : t === "features" ? `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "动态" : "报告"}
                 </button>
               ))}
+              </div>
+              <button
+                onClick={() => { const next = !simpleMode; setSimpleMode(next); localStorage.setItem("ui-mode", next ? "simple" : "detailed"); }}
+                className="text-[10px] px-2 py-1 rounded shrink-0"
+                style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
+              >
+                {simpleMode ? "详细" : "简单"}
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs max-md:p-2" style={{ background: "#010409" }}>
+            <div className="flex-1 overflow-y-auto p-4 text-xs max-md:p-2" style={{ background: simpleMode ? "var(--bg-secondary)" : "var(--bg-tertiary)", fontFamily: simpleMode ? "var(--font-sans)" : "var(--font-mono)" }}>
               {showLoading ? (
                 <div className="space-y-2 p-2">
                   {Array.from({ length: 8 }, (_, i) => (
@@ -572,7 +586,7 @@ export function EvolutionDashboard() {
               {/* Commits Tab */}
               {tab === "commits" && (
                 commits.length === 0 ? (
-                  <EmptyState title="暂无 Git 提交记录" description="任务执行后提交会显示在这里" variant="commits" />
+                  <EmptyState title="还没有保存记录" description="任务执行后会在这里记录" variant="commits" />
                 ) : (
                   <div className="space-y-2">
                     {commits.map((c, i) => (
@@ -580,7 +594,7 @@ export function EvolutionDashboard() {
                         <div className="flex items-center gap-2 mb-1">
                           <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "—"}</span>
                           {c.isAiCommit && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(63, 185, 80, 0.15)", color: "var(--green)" }}>#AI</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--green)" }}>#AI</span>
                           )}
                           <span style={{ color: "var(--text-secondary)" }}>{formatTimestamp(c.timestamp)}</span>
                         </div>
@@ -597,21 +611,21 @@ export function EvolutionDashboard() {
               {/* Lessons Tab */}
               {tab === "lessons" && (
                 lessons.length === 0 ? (
-                  <EmptyState title="暂无经验教训" description="任务失败和教训会记录在这里" variant="lessons" />
+                  <EmptyState title="还没有经验记录" description="任务执行的经验会记录在这里" variant="lessons" />
                 ) : (
                   <div className="space-y-2">
                     {lessons.map((l, i) => (
                       <div key={i} className="glass-card-sm px-3 py-2" style={{ ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="px-1.5 py-0.5 rounded text-[10px]" style={{
-                            background: l.category === "failure" ? "rgba(248, 81, 73, 0.15)" :
-                              l.category === "success" ? "rgba(63, 185, 80, 0.15)" : "rgba(210, 153, 34, 0.15)",
+                            background: l.category === "failure" ? "rgba(239, 68, 68, 0.15)" :
+                              l.category === "success" ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
                             color: l.category === "failure" ? "var(--red)" :
                               l.category === "success" ? "var(--green)" : "var(--yellow)",
                           }}>{l.category}</span>
                           {l.score != null && (
                             <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                              Score: {(l.score * 100).toFixed(0)}%
+                              评分: {(l.score * 100).toFixed(0)}%
                             </span>
                           )}
                           <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{formatTimestamp(l.createdAt)}</span>
@@ -628,7 +642,7 @@ export function EvolutionDashboard() {
                 run?.features ? (
                   <FeatureBoard features={run.features} />
                 ) : (
-                  <EmptyState title="暂无 Feature 数据" description="执行开始后自动生成 feature 追踪列表" variant="logs" />
+                  <EmptyState title="还没有检查项" description="任务执行后会自动生成" variant="logs" />
                 )
               )}
 
@@ -654,16 +668,16 @@ export function EvolutionDashboard() {
         style={{ borderColor: "var(--border)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
       >
         <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-          <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>控制面板</h3>
+          <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>操作</h3>
           <button onClick={() => setShowPanel(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }} aria-label="关闭面板">✕</button>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {/* Start / Pause */}
           <div className="flex gap-2">
             {!isRunning ? (
-              <button onClick={handleStart} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>{run?.status === "completed" ? "▶ 继续运行" : "▶ 开始"}</button>
+              <button onClick={handleStart} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>{run?.status === "completed" ? "▶ 继续" : "▶ 开始"}</button>
             ) : (
-              <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
+              <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#fff" }}>⏸ 暂停</button>
             )}
           </div>
 
@@ -671,7 +685,7 @@ export function EvolutionDashboard() {
           {run && budgetUsed > 0 && (
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
+                <span style={{ color: "var(--text-secondary)" }}>费用</span>
                 <span style={{ color: budgetPct > 80 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
               </div>
               <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
@@ -683,8 +697,8 @@ export function EvolutionDashboard() {
             </div>
           )}
 
-          {/* Timeout */}
-          <div>
+          {/* Timeout - hidden in simple mode unless advanced */}
+          {(!simpleMode || showAdvancedPanel) && <div>
             <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
               超时: {timeoutMinutes}min
               {activeTaskId && <button
@@ -696,7 +710,7 @@ export function EvolutionDashboard() {
                   }
                 }}
                 className="ml-2 text-[10px] px-1.5 py-0.5 rounded"
-                style={{ background: "var(--blue)", color: "#0d1117" }}
+                style={{ background: "var(--blue)", color: "#fff" }}
               >应用</button>}
             </label>
             <input type="range" min="1" max="180" value={timeoutMinutes}
@@ -704,18 +718,18 @@ export function EvolutionDashboard() {
               aria-valuemin={1} aria-valuemax={180} aria-valuenow={timeoutMinutes}
               aria-label="任务超时时间"
               className="w-full" />
-          </div>
+          </div>}
 
           {/* Stats */}
           {run && (
             <div className="pt-2 border-t space-y-3" style={{ borderColor: "var(--border)" }}>
               <div>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>运行统计</h4>
+                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>概况</h4>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>已完成</span><span style={{ color: "var(--green)" }}>{run.totalTasksCompleted}</span></div>
-                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>花费</span><span style={{ color: "var(--yellow)" }}>${run.totalCostUsd.toFixed(4)}</span></div>
-                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>提交</span><span style={{ color: "var(--blue)" }}>{commits.length}</span></div>
-                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>教训</span><span style={{ color: "var(--red)" }}>{lessons.length}</span></div>
+                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>费用</span><span style={{ color: "var(--yellow)" }}>${run.totalCostUsd.toFixed(4)}</span></div>
+                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>保存</span><span style={{ color: "var(--blue)" }}>{commits.length}</span></div>
+                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>经验</span><span style={{ color: "var(--red)" }}>{lessons.length}</span></div>
                 </div>
               </div>
 
@@ -732,7 +746,7 @@ export function EvolutionDashboard() {
 
               {/* Termination Conditions */}
               <div>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>终止条件</h4>
+                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>完成标准</h4>
                 {run.terminationConditions.map((c, i) => (
                   <p key={i} className="text-xs mb-1 flex items-start gap-1">
                     <span style={{ color: "var(--yellow)" }}>•</span>
@@ -741,9 +755,11 @@ export function EvolutionDashboard() {
                 ))}
               </div>
 
-              {/* Execution Mode */}
+
+              {/* Execution Mode - advanced only */}
+              {!simpleMode && (
               <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
-                <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>执行模式</h4>
+                <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>运行方式</h4>
                 <ExecutionModeSelector
                   runId={runId ?? ""}
                   currentMode={run.executionMode}
@@ -751,17 +767,33 @@ export function EvolutionDashboard() {
                   disabled={isRunning}
                 />
               </div>
+              )}
 
-              {/* Online Users */}
+              {/* Online Users - advanced only */}
+              {!simpleMode && (
               <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
                 <PresencePanel />
               </div>
+              )}
+
+              {/* Advanced options toggle */}
+              {simpleMode && (
+              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
+                <button
+                  onClick={() => setShowAdvancedPanel(!showAdvancedPanel)}
+                  className="text-xs underline"
+                  style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+                >
+                  {showAdvancedPanel ? "收起高级选项" : "高级选项"}
+                </button>
+              </div>
+              )}
 
               {/* Goal State Panel */}
               {run.goalStatus && run.goalStatus !== "unmet" && (
                 <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--border)" }}>
                   <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>目标状态</h4>
+                    <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>进度</h4>
                     <span
                       className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                       style={{
@@ -776,11 +808,11 @@ export function EvolutionDashboard() {
                   {(run.goalEvaluationCycles ?? 0) > 0 && (
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between">
-                        <span style={{ color: "var(--text-secondary)" }}>评估周期</span>
+                        <span style={{ color: "var(--text-secondary)" }}>评估次数</span>
                         <span>{run.goalEvaluationCycles}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span style={{ color: "var(--text-secondary)" }}>已用时间</span>
+                        <span style={{ color: "var(--text-secondary)" }}>用时</span>
                         <span>{formatGoalDuration(run.goalTimeElapsedMs ?? 0)}</span>
                       </div>
                     </div>
@@ -789,7 +821,7 @@ export function EvolutionDashboard() {
                   {run.goalBudgetTokens && (
                     <div>
                       <div className="flex justify-between text-xs mb-1">
-                        <span style={{ color: "var(--text-secondary)" }}>Token 预算</span>
+                        <span style={{ color: "var(--text-secondary)" }}>AI 用量</span>
                         <span>{formatGoalTokens(run.goalTokensUsed ?? 0)} / {formatGoalTokens(run.goalBudgetTokens)}</span>
                       </div>
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
@@ -858,7 +890,7 @@ export function EvolutionDashboard() {
                     )}
                     {(run.goalStatus === "achieved" || run.goalStatus === "budget_exhausted") && (
                       <span className="text-xs" style={{ color: run.goalStatus === "achieved" ? "var(--green)" : "var(--red)" }}>
-                        {run.goalStatus === "achieved" ? "已达成" : "预算耗尽"}
+                        {run.goalStatus === "achieved" ? "已达成" : "预算已用完"}
                       </span>
                     )}
                   </div>
@@ -883,7 +915,7 @@ export function EvolutionDashboard() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="新增任务"
+          aria-label="添加任务"
           style={{
             position: "fixed", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -901,7 +933,7 @@ export function EvolutionDashboard() {
             }}
           >
             <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-              新增任务
+              添加任务
             </h3>
             <textarea
               value={newTaskText}
@@ -925,7 +957,7 @@ export function EvolutionDashboard() {
               }}
             />
             <p style={{ margin: "6px 0 0", fontSize: "11px", color: "var(--text-secondary)" }}>
-              Ctrl+Enter 快速提交
+              Ctrl+Enter 快速保存
             </p>
             <div style={{ marginTop: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
@@ -972,7 +1004,7 @@ export function EvolutionDashboard() {
                 style={{
                   padding: "8px 20px", background: "var(--green)",
                   border: "none", borderRadius: "8px",
-                  color: "#0d1117", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                  color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600,
                   opacity: newTaskText.trim() ? 1 : 0.4,
                 }}
               >

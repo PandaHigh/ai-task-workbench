@@ -11,8 +11,8 @@ interface OrigValues {
 }
 
 const CONSTRAINTS = {
-  qualityThreshold: { min: 0, max: 1, step: 0.05, label: "质量阈值" },
-  defaultTimeout: { min: 5, max: 180, step: 5, label: "默认超时时间" },
+  qualityThreshold: { min: 0, max: 1, step: 0.05, label: "质量要求" },
+  defaultTimeout: { min: 5, max: 180, step: 5, label: "每个任务最长用时" },
 } as const;
 
 function validateNumber(value: number, min: number, max: number, label: string): string {
@@ -33,6 +33,7 @@ export function SettingsPage() {
   const [loaded, setLoaded] = useState(false);
   const [origValues, setOrigValues] = useState<OrigValues | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const isDirty = origValues != null && (
     origValues.qualityThreshold !== qualityThreshold
@@ -45,7 +46,7 @@ export function SettingsPage() {
 
   const validateClaudePath = useCallback((value: string) => {
     if (!value.trim()) {
-      setClaudePathError("Claude Code 路径不能为空");
+      setClaudePathError("请填写 AI 程序位置");
       return false;
     }
     if (value.trim().length < 1) {
@@ -70,7 +71,7 @@ export function SettingsPage() {
         if (val != null) qt = Number(val);
       } catch (err) {
         console.warn("Failed to load quality threshold:", err instanceof Error ? err.message : err);
-        toast.error("加载质量阈值失败");
+        toast.error("加载质量设置失败");
       }
       try {
         const res = await call("config.get", { key: "defaultTimeout" });
@@ -86,7 +87,7 @@ export function SettingsPage() {
         if (val) cp = String(val);
       } catch (err) {
         console.warn("Failed to load claude path:", err instanceof Error ? err.message : err);
-        toast.error("加载 Claude 路径失败");
+        toast.error("加载 AI 路径失败");
       }
 
       let pu = "";
@@ -130,7 +131,7 @@ export function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-md:p-4" style={pageEnterStyle()}>
-      <h2 className="text-lg font-bold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>设置</h2>
+      <h2 className="text-lg font-semibold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>设置</h2>
 
       {!loaded ? (
         <div className="max-w-lg space-y-6">
@@ -140,26 +141,26 @@ export function SettingsPage() {
         </div>
       ) : (
       <div className="max-w-lg space-y-6">
-        {/* Engine status */}
+        {/* Connection status */}
         <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>引擎状态</h3>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>连接状态</h3>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full" style={{ background: connected ? "var(--green)" : "var(--red)" }} />
             <span className="text-xs" style={{ color: connected ? "var(--green)" : "var(--red)" }}>
-              {connected ? "已连接 (ws://localhost:9731)" : "未连接"}
+              {connected ? "已连接" : "未连接"}
             </span>
           </div>
         </div>
 
         {/* Quality threshold */}
         <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量阈值</h3>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量要求</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            低于此分数的任务将被回滚。当前: {(qualityThreshold * 100).toFixed(0)}%
+            AI 完成的任务需要达到这个质量分数。当前: {(qualityThreshold * 100).toFixed(0)}%
           </p>
           <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
-            aria-label={`质量阈值: 当前 ${(qualityThreshold * 100).toFixed(0)}%，范围 0% 到 100%`}
+            aria-label={`质量要求: 当前 ${(qualityThreshold * 100).toFixed(0)}%，范围 0% 到 100%`}
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(qualityThreshold * 100)}
             className="w-full" />
           <div className="flex items-center gap-2 mt-2">
@@ -172,7 +173,7 @@ export function SettingsPage() {
                 background: "var(--bg-tertiary)", color: "var(--text-primary)",
                 border: qtError ? "1px solid var(--red)" : "1px solid var(--border)",
               }}
-              aria-label="质量阈值数值输入"
+              aria-label="质量要求数值输入"
             />
             {qtError && <span className="text-xs" style={{ color: "var(--red)" }} role="alert">{qtError}</span>}
           </div>
@@ -180,13 +181,13 @@ export function SettingsPage() {
 
         {/* Default timeout */}
         <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>默认超时时间</h3>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>每个任务最长用时</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            每个任务的默认执行超时: {defaultTimeout} 分钟
+            每个任务最多运行 {defaultTimeout} 分钟
           </p>
           <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-            aria-label={`默认超时时间: 当前 ${defaultTimeout} 分钟，范围 5 到 180 分钟`}
+            aria-label={`每个任务最长用时: 当前 ${defaultTimeout} 分钟，范围 5 到 180 分钟`}
             aria-valuemin={5} aria-valuemax={180} aria-valuenow={defaultTimeout}
             className="w-full" />
           <div className="flex items-center gap-2 mt-2">
@@ -199,63 +200,81 @@ export function SettingsPage() {
                 background: "var(--bg-tertiary)", color: "var(--text-primary)",
                 border: dtError ? "1px solid var(--red)" : "1px solid var(--border)",
               }}
-              aria-label="超时时间数值输入"
+              aria-label="最长用时数值输入"
             />
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>分钟</span>
             {dtError && <span className="text-xs" style={{ color: "var(--red)" }} role="alert">{dtError}</span>}
           </div>
         </div>
 
-        {/* Claude path */}
-        <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Claude Code 路径</h3>
-          <input type="text" value={claudePath}
-            onChange={(e) => {
-              setClaudePath(e.target.value);
-              if (claudePathError) validateClaudePath(e.target.value);
-            }}
-            onBlur={() => validateClaudePath(claudePath)}
-            required
-            minLength={1}
-            className="w-full px-3 py-2 rounded text-xs outline-none"
-            style={{
-              background: "var(--bg-tertiary)", color: "var(--text-primary)",
-              border: claudePathError ? "1px solid var(--red)" : "1px solid var(--border)",
-            }}
-            aria-invalid={!!claudePathError}
-            aria-describedby={claudePathError ? "claude-path-error" : undefined}
-          />
-          {claudePathError && (
-            <p id="claude-path-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{claudePathError}</p>
-          )}
-        </div>
-
-        {/* Share settings */}
-        <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>分享设置</h3>
-          <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            公网访问地址，用于生成分享链接（如使用 ngrok 或端口转发后的地址）
-          </p>
-          <input type="text" value={publicUrl}
-            onChange={(e) => setPublicUrl(e.target.value)}
-            placeholder="https://my-tunnel.ngrok.io"
-            className="w-full px-3 py-2 rounded text-xs outline-none"
-            style={{
-              background: "var(--bg-tertiary)", color: "var(--text-primary)",
-              border: "1px solid var(--border)",
-            }}
-          />
-          <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
-            留空则使用 http://localhost:9731
-          </p>
-        </div>
-
         {/* Save button */}
         <button onClick={handleSave} disabled={!isDirty || !!qtError || !!dtError}
           className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40"
-          style={{ background: "var(--blue)", color: "#0d1117" }}>
+          style={{ background: "var(--blue)", color: "#fff" }}>
           {saved ? "已保存" : isDirty ? "保存设置" : "未修改"}
         </button>
+
+        {/* Advanced settings */}
+        <div className="mt-4">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-xs underline"
+            style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+          >
+            {showAdvanced ? "收起高级设置" : "高级设置"}
+          </button>
+        </div>
+
+        {showAdvanced && (
+          <div className="space-y-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
+            {/* Claude path */}
+            <div className="glass-card p-4">
+              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>AI 程序位置</h3>
+              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+                如果你安装的 AI 程序不在默认路径，可以在这里修改
+              </p>
+              <input type="text" value={claudePath}
+                onChange={(e) => {
+                  setClaudePath(e.target.value);
+                  if (claudePathError) validateClaudePath(e.target.value);
+                }}
+                onBlur={() => validateClaudePath(claudePath)}
+                required
+                minLength={1}
+                className="w-full px-3 py-2 rounded text-xs outline-none"
+                style={{
+                  background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                  border: claudePathError ? "1px solid var(--red)" : "1px solid var(--border)",
+                }}
+                aria-invalid={!!claudePathError}
+                aria-describedby={claudePathError ? "claude-path-error" : undefined}
+              />
+              {claudePathError && (
+                <p id="claude-path-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{claudePathError}</p>
+              )}
+            </div>
+
+            {/* Share settings */}
+            <div className="glass-card p-4">
+              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>分享设置</h3>
+              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+                如果你需要把任务分享给别人，填写公网访问地址
+              </p>
+              <input type="text" value={publicUrl}
+                onChange={(e) => setPublicUrl(e.target.value)}
+                placeholder="https://my-tunnel.ngrok.io"
+                className="w-full px-3 py-2 rounded text-xs outline-none"
+                style={{
+                  background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                  border: "1px solid var(--border)",
+                }}
+              />
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+                留空则使用 http://localhost:9731
+              </p>
+            </div>
+          </div>
+        )}
       </div>
       )}
     </div>
