@@ -691,29 +691,4 @@ describe("RPC Methods", () => {
     });
   });
 
-  // ─── Inject Instructions ───────────────────────────────────────────
-
-  describe("approval.inject", () => {
-    it("should reject when no active executor", async () => {
-      const run = await createRun();
-      await expect(methodHandlers["approval.inject"]({ runId: run.id, instructions: "test" }))
-        .rejects.toThrow("No active executor");
-    });
-
-    it("should reject missing runId", async () => {
-      await expect(methodHandlers["approval.inject"]({ instructions: "test" }))
-        .rejects.toThrow();
-    });
-
-    it("should reject path traversal in runId", async () => {
-      await expect(methodHandlers["approval.inject"]({ runId: "../etc", instructions: "test" }))
-        .rejects.toThrow("invalid path characters");
-    });
-
-    it("should reject missing instructions", async () => {
-      const run = await createRun();
-      await expect(methodHandlers["approval.inject"]({ runId: run.id }))
-        .rejects.toThrow();
-    });
-  });
 });

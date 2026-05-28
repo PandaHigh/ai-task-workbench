@@ -24,6 +24,17 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
     }
   };
 
+  const handleConcurrentChange = async (count: number) => {
+    const clamped = Math.max(1, Math.min(10, count));
+    useTaskStore.getState().updateTask(runId, { maxConcurrentAgents: clamped });
+    try {
+      await call("run.setMaxConcurrent", { runId, count: clamped });
+    } catch (err) {
+      useTaskStore.getState().updateTask(runId, { maxConcurrentAgents: concurrent });
+      console.warn("Failed to set max concurrent:", err);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -53,8 +64,26 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
         </button>
       </div>
       {mode === "parallel" && (
-        <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
-          最大并发: {concurrent} agents
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleConcurrentChange(concurrent - 1)}
+            disabled={disabled || concurrent <= 1}
+            className="w-6 h-6 flex items-center justify-center rounded text-xs font-mono transition-colors disabled:opacity-30"
+            style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+          >
+            -
+          </button>
+          <span className="text-xs font-mono flex-1 text-center" style={{ color: "var(--text-secondary)" }}>
+            {concurrent} agents
+          </span>
+          <button
+            onClick={() => handleConcurrentChange(concurrent + 1)}
+            disabled={disabled || concurrent >= 10}
+            className="w-6 h-6 flex items-center justify-center rounded text-xs font-mono transition-colors disabled:opacity-30"
+            style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+          >
+            +
+          </button>
         </div>
       )}
     </div>

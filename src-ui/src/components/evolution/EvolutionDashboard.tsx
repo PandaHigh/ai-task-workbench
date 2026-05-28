@@ -12,7 +12,6 @@ import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 import { marked } from "marked";
 import { ApprovalPanel } from "./ApprovalPanel";
-import { InjectButton } from "./InjectButton";
 import { StreamingOutput } from "./StreamingOutput";
 import { FeatureBoard } from "./FeatureBoard";
 import { ExecutionModeSelector } from "./ExecutionModeSelector";
@@ -74,6 +73,7 @@ export function EvolutionDashboard() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [newTaskPriority, setNewTaskPriority] = useState(5);
   const showLoading = loading || !connected;
   const [showQueue, setShowQueue] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
@@ -259,7 +259,7 @@ export function EvolutionDashboard() {
   const handleAddTask = async () => {
     if (!runId || !newTaskText.trim()) return;
     try {
-      await call("task.create", { runId, content: newTaskText.trim(), type: "user_defined", priority: queue.length + 1 });
+      await call("task.create", { runId, content: newTaskText.trim(), type: "user_defined", priority: newTaskPriority });
       setNewTaskText("");
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
@@ -499,7 +499,7 @@ export function EvolutionDashboard() {
             {/* Add task button — fixed at bottom of queue panel */}
             <div className="px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
               <button
-                onClick={() => { setNewTaskText(""); setShowAddModal(true); }}
+                onClick={() => { setNewTaskText(""); setNewTaskPriority(5); setShowAddModal(true); }}
                 className="w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
                 style={{
                   background: "var(--green)",
@@ -748,11 +748,6 @@ export function EvolutionDashboard() {
                 />
               </div>
 
-              {/* Inject Instructions */}
-              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
-                <InjectButton runId={runId ?? ""} disabled={!isRunning} />
-              </div>
-
               {/* Online Users */}
               <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
                 <PresencePanel />
@@ -928,6 +923,34 @@ export function EvolutionDashboard() {
             <p style={{ margin: "6px 0 0", fontSize: "11px", color: "var(--text-secondary)" }}>
               Ctrl+Enter 快速提交
             </p>
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>优先级</span>
+                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                  {newTaskPriority <= 2 ? "高" : newTaskPriority <= 5 ? "中" : "低"}（数值越小越优先）
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setNewTaskPriority(p)}
+                    style={{
+                      width: "30px", height: "26px", borderRadius: "4px",
+                      border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600,
+                      background: p === newTaskPriority
+                        ? (p <= 2 ? "var(--red)" : p <= 5 ? "var(--blue)" : "var(--text-secondary)")
+                        : "var(--bg-tertiary)",
+                      color: p === newTaskPriority ? "#fff" : "var(--text-secondary)",
+                      opacity: p === newTaskPriority ? 1 : 0.7,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
               <button
                 onClick={() => setShowAddModal(false)}

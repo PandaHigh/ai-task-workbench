@@ -45,8 +45,7 @@ export class Executor {
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
-  private injectedInstructions: string[] = [];
-  private activeWorkers: Map<string, WorkerAgent> = new Map();
+private activeWorkers: Map<string, WorkerAgent> = new Map();
   private worktreeManager: WorktreeManager = new WorktreeManager();
   private config: {
     qualityThreshold: number;
@@ -583,13 +582,6 @@ export class Executor {
   private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
     const parts: string[] = [];
 
-    const injected = this.injectedInstructions.splice(0);
-    if (injected.length > 0) {
-      parts.push("[USER INJECTED INSTRUCTIONS — high priority]");
-      for (const inst of injected) parts.push(`  - ${inst}`);
-      parts.push("");
-    }
-
     const goalPrompt = this.buildGoalContinuationPrompt();
     if (goalPrompt) {
       parts.push(goalPrompt);
@@ -885,11 +877,6 @@ IMPORTANT: After completing this task, you should verify your work contributes t
   resolveApproval(approvalId: string, decision: ApprovalDecision): boolean {
     if (!this.approvalGate) return false;
     return this.approvalGate.resolve(approvalId, decision);
-  }
-
-  injectInstructions(text: string): void {
-    this.injectedInstructions.push(text);
-    this.log(this.runId, "engine", "info", `Instructions injected: ${text.substring(0, 80)}...`);
   }
 
   private resolveRole(roleId?: string): import("@ai-workbench/shared").AgentRole {

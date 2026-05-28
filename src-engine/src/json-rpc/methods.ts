@@ -739,18 +739,6 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { approvalId, resolved: true };
   },
 
-  "approval.inject": async (params) => {
-    const runId = requireString(params, "runId");
-    const instructions = requireString(params, "instructions");
-    validateRunId(runId);
-    const executor = activeExecutors.get(runId);
-    if (!executor) {
-      throw new RpcValidationError(`No active executor for run ${runId}`);
-    }
-    executor.injectInstructions(instructions);
-    return { injected: true };
-  },
-
   // ─── Multi-agent ──────────────────────────────────────────────────────────
 
   "run.setExecutionMode": async (params) => {
@@ -765,6 +753,20 @@ export const methodHandlers: Record<string, MethodHandler> = {
     run.executionMode = mode;
     store.saveRun(run);
     return { runId, executionMode: mode };
+  },
+
+  "run.setMaxConcurrent": async (params) => {
+    const runId = requireString(params, "runId");
+    const count = typeof params.count === "number" ? params.count : 2;
+    if (count < 1 || count > 10) {
+      throw new RpcValidationError("count must be between 1 and 10");
+    }
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+    run.maxConcurrentAgents = count;
+    store.saveRun(run);
+    return { runId, maxConcurrentAgents: count };
   },
 
   "role.list": async () => {
