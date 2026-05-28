@@ -64,7 +64,12 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
           onChange={(e) => setText(e.target.value)}
           placeholder="添加评论..."
           onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) handleSubmit(); }}
-          className="flex-1 bg-black/40 border border-gray-700 rounded px-2 py-1 text-xs font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50"
+          className="flex-1 rounded px-2 py-1 text-xs font-mono outline-none"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+          }}
         />
         <button
           onClick={handleSubmit}

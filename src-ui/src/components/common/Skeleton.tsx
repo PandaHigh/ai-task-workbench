@@ -13,16 +13,13 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
   if (variant === "card") {
     return (
       <div
-        className="skeleton-shimmer"
+        className="skeleton-gradient"
         role="progressbar"
         {...skeletonAria}
         style={{
           width: width || "100%",
           height: height || 120,
-          background: "linear-gradient(90deg, var(--bg-tertiary) 25%, var(--border) 50%, var(--bg-tertiary) 75%)",
-          backgroundSize: "200% 100%",
-          borderRadius: "8px",
-          animation: "shimmer 1.5s infinite",
+          borderRadius: "var(--radius-md)",
         }}
       />
     );
@@ -31,16 +28,13 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
   if (variant === "circle") {
     return (
       <div
-        className="skeleton-shimmer"
+        className="skeleton-gradient"
         role="progressbar"
         {...skeletonAria}
         style={{
           width: width || 40,
           height: height || 40,
           borderRadius: "50%",
-          background: "linear-gradient(90deg, var(--bg-tertiary) 25%, var(--border) 50%, var(--bg-tertiary) 75%)",
-          backgroundSize: "200% 100%",
-          animation: "shimmer 1.5s infinite",
         }}
       />
     );
@@ -51,17 +45,14 @@ export function Skeleton({ variant = "text", width, height, count = 1 }: Skeleto
       {items.map((i) => (
         <div
           key={i}
-          className="skeleton-shimmer"
+          className="skeleton-gradient"
           role="progressbar"
           {...skeletonAria}
           style={{
             width: width || "100%",
             height: height || 14,
             marginBottom: 8,
-            background: "linear-gradient(90deg, var(--bg-tertiary) 25%, var(--border) 50%, var(--bg-tertiary) 75%)",
-            backgroundSize: "200% 100%",
-            borderRadius: "4px",
-            animation: "shimmer 1.5s infinite",
+            borderRadius: "var(--radius-sm)",
           }}
         />
       ))}

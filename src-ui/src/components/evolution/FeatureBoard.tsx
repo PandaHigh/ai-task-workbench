@@ -25,7 +25,7 @@ export function FeatureBoard({ features }: FeatureBoardProps) {
 
   if (features.length === 0) {
     return (
-      <div className="text-gray-600 font-mono text-xs py-4 text-center">
+      <div className="font-mono text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>
         Feature list will be generated when execution starts
       </div>
     );

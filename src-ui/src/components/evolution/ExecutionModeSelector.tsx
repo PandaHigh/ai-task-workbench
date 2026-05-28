@@ -44,7 +44,7 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
           className="flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors disabled:opacity-40"
           style={{
             background: mode === "sequential" ? "var(--blue)" : "var(--bg-tertiary)",
-            color: mode === "sequential" ? "#0d1117" : "var(--text-secondary)",
+            color: mode === "sequential" ? "#fff" : "var(--text-secondary)",
             border: mode === "sequential" ? "1px solid var(--blue)" : "1px solid var(--border)",
           }}
         >
@@ -56,7 +56,7 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
           className="flex-1 px-3 py-1.5 rounded text-xs font-mono transition-colors disabled:opacity-40"
           style={{
             background: mode === "parallel" ? "var(--blue)" : "var(--bg-tertiary)",
-            color: mode === "parallel" ? "#0d1117" : "var(--text-secondary)",
+            color: mode === "parallel" ? "#fff" : "var(--text-secondary)",
             border: mode === "parallel" ? "1px solid var(--blue)" : "1px solid var(--border)",
           }}
         >

@@ -127,7 +127,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-2" aria-label="主导航">
+        <nav className="flex-1 p-2 space-y-0.5" aria-label="主导航">
           {navItems.map((item) => {
             const isActive =
               item.path === "/"
@@ -140,23 +140,9 @@ export function Sidebar() {
                 onClick={() => handleNav(item.path)}
                 aria-current={isActive ? "page" : undefined}
                 aria-label={item.label}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs mb-0.5"
-                style={{
-                  background: isActive ? "var(--bg-tertiary)" : "transparent",
-                  color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                  cursor: "pointer",
-                  border: "none",
-                  fontWeight: isActive ? 500 : 400,
-                  transition: "background 0.15s ease, color 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.background = "var(--bg-tertiary)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.background = "transparent";
-                }}
+                className={`nav-item ${isActive ? "active" : ""}`}
               >
-                <span style={{ opacity: isActive ? 1 : 0.6 }}>{item.icon}</span>
+                <span className="nav-icon">{item.icon}</span>
                 <span>{item.label}</span>
               </button>
             );

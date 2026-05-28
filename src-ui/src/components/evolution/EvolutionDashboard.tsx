@@ -421,7 +421,7 @@ export function EvolutionDashboard() {
                     <div className="flex items-center gap-2">
                       <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0" style={{
                         background: task.type === "user_defined" ? "var(--purple)" : "var(--bg-secondary)",
-                        color: task.type === "user_defined" ? "#0d1117" : "var(--text-secondary)",
+                        color: task.type === "user_defined" ? "#fff" : "var(--text-secondary)",
                       }}>{i + 1}</span>
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
                       <button

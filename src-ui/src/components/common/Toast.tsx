@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -28,11 +28,11 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
-const TOAST_STYLES: Record<ToastType, { bg: string; border: string; icon: string }> = {
-  success: { bg: "rgba(63, 185, 80, 0.15)", border: "#3fb950", icon: "✓" },
-  error: { bg: "rgba(248, 81, 73, 0.15)", border: "#f85149", icon: "✕" },
-  warning: { bg: "rgba(210, 153, 34, 0.15)", border: "#d29922", icon: "⚠" },
-  info: { bg: "rgba(88, 166, 255, 0.15)", border: "#58a6ff", icon: "ℹ" },
+const TOAST_STYLES: Record<ToastType, { border: string; icon: string }> = {
+  success: { border: "var(--green)", icon: "✓" },
+  error: { border: "var(--red)", icon: "✕" },
+  warning: { border: "var(--yellow)", icon: "⚠" },
+  info: { border: "var(--blue)", icon: "ℹ" },
 };
 
 function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
@@ -47,32 +47,32 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
     <div
       role="alert"
       aria-live="assertive"
-      className="toast-item"
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "8px",
+        gap: "10px",
         padding: "10px 16px",
-        background: style.bg,
+        background: "var(--bg-elevated)",
         border: `1px solid ${style.border}`,
-        borderRadius: "8px",
-        backdropFilter: "blur(12px)",
+        borderLeft: `3px solid ${style.border}`,
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-lg)",
         animation: exiting ? "none" : "slideIn 0.3s ease-out",
-        transition: "opacity 0.3s ease, transform 0.3s ease",
+        transition: "opacity 0.2s ease, transform 0.2s ease",
         opacity: exiting ? 0 : 1,
         transform: exiting ? "translateX(100%)" : "translateX(0)",
         minWidth: "260px",
         maxWidth: "380px",
       }}
     >
-      <span style={{ color: style.border, fontWeight: 700, fontSize: "14px" }}>{style.icon}</span>
+      <span style={{ color: style.border, fontWeight: 700, fontSize: "13px" }}>{style.icon}</span>
       <span style={{ flex: 1, fontSize: "13px", color: "var(--text-primary)" }}>{toast.message}</span>
       <button
         onClick={() => onRemove(toast.id)}
         aria-label="关闭通知"
-        style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}
+        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}
       >
-        ✕
+        {"✕"}
       </button>
     </div>
   );
@@ -81,11 +81,9 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
-  const nextIdRef = useRef(0);
 
   const addToast = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.random();
-    nextIdRef.current = id;
     setToasts((prev) => [...prev, { id, type, message }]);
   }, []);
 
@@ -107,7 +105,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         next.delete(id);
         return next;
       });
-    }, 300);
+    }, 200);
   }, []);
 
   return (

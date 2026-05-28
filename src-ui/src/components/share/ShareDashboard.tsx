@@ -131,7 +131,7 @@ export function ShareDashboard() {
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0" style={{
                     background: task.type === "user_defined" ? "var(--purple)" : "var(--bg-secondary)",
-                    color: task.type === "user_defined" ? "#0d1117" : "var(--text-secondary)",
+                    color: task.type === "user_defined" ? "#fff" : "var(--text-secondary)",
                   }}>{i + 1}</span>
                   <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{task.content}</span>
                 </div>
@@ -204,7 +204,7 @@ export function ShareDashboard() {
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "#010409" }}>
+          <div className="flex-1 overflow-y-auto p-4 font-mono text-xs" style={{ background: "var(--bg-tertiary)" }}>
             {tab === "logs" && (
               logs.length === 0 ? (
                 <p className="text-center py-8" style={{ color: "var(--text-secondary)" }}>暂无日志</p>
@@ -265,7 +265,7 @@ export function ShareDashboard() {
             )}
             {tab === "report" && (
               report ? (
-                <div className="prose prose-invert prose-sm max-w-none" style={{ fontFamily: "inherit" }} dangerouslySetInnerHTML={{ __html: marked(report.report) }} />
+                <div className="markdown-body prose-sm max-w-none" style={{ fontFamily: "inherit" }} dangerouslySetInnerHTML={{ __html: marked(report.report) }} />
               ) : (
                 <p className="text-center py-8" style={{ color: "var(--text-secondary)" }}>暂无报告</p>
               )

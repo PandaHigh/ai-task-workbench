@@ -276,7 +276,7 @@ export function TaskWizard() {
         >
           <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{
             background: i <= step ? "var(--blue)" : "var(--bg-tertiary)",
-            color: i <= step ? "#0d1117" : "var(--text-secondary)",
+            color: i <= step ? "#fff" : "var(--text-secondary)",
           }}>{i + 1}</div>
           <span className="text-xs" style={{ color: i <= step ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</span>
         </div>
@@ -399,7 +399,7 @@ export function TaskWizard() {
                 >
                   <div className={`max-w-[80%] px-3 py-2 rounded-lg text-xs ${isAssistant ? "glass-card-sm" : ""}`} style={{
                     background: msg.role === "user" ? "var(--blue)" : undefined,
-                    color: msg.role === "user" ? "#0d1117" : "var(--text-primary)",
+                    color: msg.role === "user" ? "#fff" : "var(--text-primary)",
                   }}>
                     {msg.role === "user" && <span className="whitespace-pre-wrap">{msg.content}</span>}
                     {isTypingTarget && <TypewriterText text={msg.content} />}

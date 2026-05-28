@@ -27,14 +27,18 @@ function formatContent(content: unknown): string {
 }
 
 function MessageBubble({ message }: { message: StreamMessage }) {
+  const baseCls = "flex gap-2 mb-1";
+  const labelCls = "shrink-0 font-mono text-xs";
+  const preCls = "font-mono text-xs whitespace-pre-wrap break-all flex-1";
+
   switch (message.type) {
     case "assistant": {
       const text = formatContent(message.content);
       if (!text) return null;
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-blue-400 shrink-0 font-mono text-xs">CC&gt;</span>
-          <pre className="text-gray-200 font-mono text-xs whitespace-pre-wrap break-all flex-1">{text}</pre>
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--blue)" }}>CC&gt;</span>
+          <pre className={preCls} style={{ color: "var(--text-primary)" }}>{text}</pre>
         </div>
       );
     }
@@ -42,18 +46,18 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       const text = formatContent(message.content);
       if (!text) return null;
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-green-400 shrink-0 font-mono text-xs">&gt;</span>
-          <pre className="text-gray-400 font-mono text-xs whitespace-pre-wrap break-all flex-1">{text}</pre>
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--green)" }}>&gt;</span>
+          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>{text}</pre>
         </div>
       );
     }
     case "tool_use": {
       const input = formatContent(message.content);
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-amber-400 shrink-0 font-mono text-xs">TOOL</span>
-          <pre className="text-gray-400 font-mono text-xs whitespace-pre-wrap break-all flex-1">{input}</pre>
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--yellow)" }}>TOOL</span>
+          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>{input}</pre>
         </div>
       );
     }
@@ -62,18 +66,18 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       if (!output) return null;
       const truncated = output.length > 500 ? output.slice(0, 500) + "..." : output;
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-cyan-400 shrink-0 font-mono text-xs">OUT</span>
-          <pre className="text-gray-500 font-mono text-xs whitespace-pre-wrap break-all flex-1">{truncated}</pre>
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--blue-light)" }}>OUT</span>
+          <pre className={preCls} style={{ color: "var(--text-muted)" }}>{truncated}</pre>
         </div>
       );
     }
     case "result": {
       if (message.subtype === "success") {
         return (
-          <div className="flex gap-2 mb-1 items-center">
-            <span className="text-green-400 shrink-0 font-mono text-xs">OK</span>
-            <span className="text-green-400/70 font-mono text-xs">
+          <div className={`${baseCls} items-center`}>
+            <span className={labelCls} style={{ color: "var(--green)" }}>OK</span>
+            <span className="font-mono text-xs" style={{ color: "var(--green)", opacity: 0.7 }}>
               {message.duration_ms ? `${(message.duration_ms / 1000).toFixed(1)}s` : ""}
               {message.total_cost_usd ? ` $${message.total_cost_usd.toFixed(4)}` : ""}
               {message.num_turns ? ` ${message.num_turns} turns` : ""}
@@ -82,9 +86,9 @@ function MessageBubble({ message }: { message: StreamMessage }) {
         );
       }
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-red-400 shrink-0 font-mono text-xs">ERR</span>
-          <pre className="text-red-300 font-mono text-xs whitespace-pre-wrap break-all flex-1">
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--red)" }}>ERR</span>
+          <pre className={preCls} style={{ color: "var(--red)" }}>
             {message.error || message.result || "Unknown error"}
           </pre>
         </div>
@@ -92,9 +96,9 @@ function MessageBubble({ message }: { message: StreamMessage }) {
     }
     case "system":
       return (
-        <div className="flex gap-2 mb-1">
-          <span className="text-purple-400 shrink-0 font-mono text-xs">SYS</span>
-          <pre className="text-gray-500 font-mono text-xs whitespace-pre-wrap break-all flex-1">
+        <div className={baseCls}>
+          <span className={labelCls} style={{ color: "var(--purple)" }}>SYS</span>
+          <pre className={preCls} style={{ color: "var(--text-muted)" }}>
             {formatContent(message.content)}
           </pre>
         </div>
@@ -115,14 +119,14 @@ export function StreamingOutput({ taskId }: StreamingOutputProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="text-gray-600 font-mono text-xs py-2">
+      <div className="font-mono text-xs py-2" style={{ color: "var(--text-muted)" }}>
         Waiting for output...
       </div>
     );
   }
 
   return (
-    <div className="bg-black/30 rounded p-2 max-h-80 overflow-y-auto">
+    <div className="rounded-lg p-2 max-h-80 overflow-y-auto" style={{ background: "var(--bg-tertiary)" }}>
       {messages.map((msg, i) => (
         <MessageBubble key={i} message={msg as StreamMessage} />
       ))}
