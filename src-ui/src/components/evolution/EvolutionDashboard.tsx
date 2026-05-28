@@ -4,7 +4,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
+import type { TaskDefinition, GitCommit, LessonLearned, ExecutionRun } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
@@ -48,8 +48,10 @@ export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const { connected, call } = useEngine();
-  const { tasks } = useTaskStore();
-  const run = tasks.find((t) => t.id === runId);
+  const tasks = useTaskStore((s) => s.tasks);
+  const storeRun = tasks.find((t) => t.id === runId);
+  const [fetchedRun, setFetchedRun] = useState<ExecutionRun | null>(null);
+  const run = storeRun || fetchedRun;
 
   const queue = useEvolutionStore((s) => s.queue);
   const logs = useEvolutionStore((s) => s.logs);
@@ -96,12 +98,30 @@ export function EvolutionDashboard() {
   // Load data on mount — wait for engine connection
   useEffect(() => {
     if (!runId || !connected) return;
+    let cancelled = false;
     reset();
     setLoading(true);
 
     const load = async () => {
+      // Load run itself (needed when page is refreshed directly — taskStore is empty)
+      if (!storeRun) {
+        try {
+          const allRuns = (await call("run.list")) as ExecutionRun[];
+          if (cancelled) return;
+          useTaskStore.setState({ tasks: allRuns });
+          const found = allRuns.find((r) => r.id === runId);
+          if (found) setFetchedRun(found);
+          else { if (!cancelled) navigate("/"); return; }
+        } catch (err) {
+          console.warn("Failed to load run:", err instanceof Error ? err.message : err);
+          if (!cancelled) navigate("/");
+          return;
+        }
+      }
+
       try {
         const qRes = await call("queue.list", { runId });
+        if (cancelled) return;
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       } catch (err) {
         console.warn("Failed to load queue:", err instanceof Error ? err.message : err);
@@ -110,6 +130,7 @@ export function EvolutionDashboard() {
 
       try {
         const c = await call("run.commits", { runId });
+        if (cancelled) return;
         setCommits((c as GitCommit[]) || []);
       } catch (err) {
         console.warn("Failed to load commits:", err instanceof Error ? err.message : err);
@@ -118,6 +139,7 @@ export function EvolutionDashboard() {
 
       try {
         const l = await call("run.lessons", { runId });
+        if (cancelled) return;
         setLessons((l as LessonLearned[]) || []);
       } catch (err) {
         console.warn("Failed to load lessons:", err instanceof Error ? err.message : err);
@@ -126,21 +148,24 @@ export function EvolutionDashboard() {
 
       try {
         const historyLogs = (await call("run.logs", { runId })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
+        if (cancelled) return;
         setLogs(historyLogs);
       } catch { /* ignore */ }
 
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
+        if (cancelled) return;
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setRunningTask(allTasks.find((t) => t.status === "running") || null);
       } catch { /* ignore */ }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     };
     load();
+    return () => { cancelled = true; };
   }, [runId, connected]);
 
-  // Periodically refresh all tasks (completed/failed) and queue while running
+  // Periodically refresh all tasks (completed/failed), queue, and run data while running
   useEffect(() => {
     if (!runId || !connected) return;
     const interval = setInterval(async () => {
@@ -151,10 +176,16 @@ export function EvolutionDashboard() {
         setRunningTask(allTasks.find((t) => t.status === "running") || null);
         const qRes = await call("queue.list", { runId });
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+        const allRuns = (await call("run.list")) as ExecutionRun[];
+        const freshRun = allRuns.find((r) => r.id === runId);
+        if (freshRun) {
+          setFetchedRun(freshRun);
+          useTaskStore.getState().updateTask(runId, freshRun);
+        }
       } catch { /* ignore */ }
     }, 5000);
     return () => clearInterval(interval);
-  }, [runId, call]);
+  }, [runId, call, connected]);
 
   // Auto-scroll logs
   useEffect(() => {
