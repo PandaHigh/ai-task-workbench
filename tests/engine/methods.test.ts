@@ -157,6 +157,38 @@ describe("RPC Methods", () => {
       const runs = await methodHandlers["run.list"]({});
       expect(runs).toHaveLength(0);
     });
+
+    it("should clean up shares when deleting a run", async () => {
+      const run = await createRun();
+      await methodHandlers["share.create"]({ runId: run.id, label: "test share" });
+      const sharesBefore = await methodHandlers["share.list"]({ runId: run.id }) as unknown[];
+      expect(sharesBefore.length).toBeGreaterThanOrEqual(1);
+
+      await methodHandlers["run.delete"]({ runId: run.id });
+
+      const sharesAfter = await methodHandlers["share.list"]({ runId: run.id }) as unknown[];
+      expect(sharesAfter).toHaveLength(0);
+    });
+
+    it("should clean up subscriptions when deleting a run", async () => {
+      const run = await createRun();
+      const { SubscriptionStore } = await import("../../src-engine/src/db/subscription-store.js");
+      const subStore = new SubscriptionStore(testDir);
+      subStore.subscribe({
+        runId: run.id,
+        remoteUrl: "http://localhost:9999",
+        remoteToken: "tok-123",
+        remoteRunId: "remote-run-1",
+        label: "test sub",
+      });
+      const subsBefore = subStore.list();
+      expect(subsBefore.length).toBeGreaterThanOrEqual(1);
+
+      await methodHandlers["run.delete"]({ runId: run.id });
+
+      const subsAfter = subStore.list();
+      expect(subsAfter).toHaveLength(0);
+    });
   });
 
   describe("task.create validation", () => {

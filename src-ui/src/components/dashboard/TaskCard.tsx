@@ -41,9 +41,17 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
 
   const handleDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
+    if (isRemote) {
+      try {
+        const { engineClient } = await import("../../lib/engine-client");
+        await engineClient.call("share.unsubscribe", { runId: task.id });
+      } catch (err) {
+        console.warn("Failed to unsubscribe:", err instanceof Error ? err.message : err);
+      }
+    }
     await deleteTask(task.id);
     onDelete?.();
-  }, [deleteTask, task.id, onDelete]);
+  }, [deleteTask, task.id, onDelete, isRemote]);
 
   const isRunning = task.status === "running";
 
@@ -117,9 +125,9 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
 
       <ConfirmDialog
         open={showDeleteConfirm}
-        title="删除任务"
-        message="确定删除此任务？所有相关数据将被清除。"
-        confirmLabel="删除"
+        title={isRemote ? "取消订阅" : "删除任务"}
+        message={isRemote ? "确定取消订阅此共享任务？本地数据将被清除。" : "确定删除此任务？所有相关数据将被清除。"}
+        confirmLabel={isRemote ? "取消订阅" : "删除"}
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}

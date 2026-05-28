@@ -218,4 +218,26 @@ describe("Share Integration", () => {
       ).rejects.toThrow();
     });
   });
+
+  describe("ShareStore revokeByRunId", () => {
+    it("should remove all shares for a given runId", async () => {
+      const run = await createRun();
+      await methodHandlers["share.create"]({ runId: run.id, label: "share 1" });
+      await methodHandlers["share.create"]({ runId: run.id, label: "share 2" });
+      const run2 = await createRun();
+      await methodHandlers["share.create"]({ runId: run2.id, label: "other share" });
+
+      const before = await methodHandlers["share.list"]({ runId: run.id }) as unknown[];
+      expect(before).toHaveLength(2);
+
+      const result = await methodHandlers["run.delete"]({ runId: run.id }) as Record<string, unknown>;
+      expect(result.deleted).toBe(true);
+
+      const after = await methodHandlers["share.list"]({ runId: run.id }) as unknown[];
+      expect(after).toHaveLength(0);
+
+      const otherShares = await methodHandlers["share.list"]({ runId: run2.id }) as unknown[];
+      expect(otherShares).toHaveLength(1);
+    });
+  });
 });

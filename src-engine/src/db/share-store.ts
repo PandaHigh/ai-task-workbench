@@ -104,6 +104,14 @@ export class ShareStore {
     return true;
   }
 
+  revokeByRunId(runId: string): number {
+    const shares = this.readAll();
+    const remaining = shares.filter((s) => s.runId !== runId);
+    const removed = shares.length - remaining.length;
+    if (removed > 0) this.writeAll(remaining);
+    return removed;
+  }
+
   cleanup(): number {
     const shares = this.readAll();
     const now = Date.now();

@@ -332,6 +332,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       executor.stop();
       activeExecutors.delete(runId);
     }
+    shareStore.revokeByRunId(runId);
+    subscriptionStore.unsubscribe(runId);
     queueManager.clear(runId);
     store.deleteRun(runId);
     return { deleted: true };
