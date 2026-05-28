@@ -20,7 +20,7 @@ export function useNotifications() {
           if (status === "completed") updates.completedAt = Date.now();
           updateTask(runId, updates);
           if (status === "running") setRunning(true);
-          if (status === "completed" || status === "failed") setRunning(false);
+          if (status === "completed" || status === "failed" || status === "paused" || status === "budget_exceeded") setRunning(false);
           break;
         }
         case "task.status": {

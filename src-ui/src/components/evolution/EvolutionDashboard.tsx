@@ -117,7 +117,10 @@ export function EvolutionDashboard() {
           if (cancelled) return;
           useTaskStore.setState({ tasks: allRuns });
           const found = allRuns.find((r) => r.id === runId);
-          if (found) setFetchedRun(found);
+          if (found) {
+            setFetchedRun(found);
+            setRunning(found.status === "running");
+          }
           else { if (!cancelled) navigate("/"); return; }
         } catch (err) {
           console.warn("Failed to load run:", err instanceof Error ? err.message : err);
@@ -188,6 +191,7 @@ export function EvolutionDashboard() {
         if (freshRun) {
           setFetchedRun(freshRun);
           useTaskStore.getState().updateTask(runId, freshRun);
+          setRunning(freshRun.status === "running");
         }
       } catch { /* ignore */ }
     }, 5000);
@@ -380,8 +384,8 @@ export function EvolutionDashboard() {
               ) : queue.length === 0 ? (
                 <EmptyState
                   title="队列为空"
-                  description={!isRunning && run?.status !== "completed" ? "点击开始执行任务" : undefined}
-                  action={!isRunning && run?.status !== "completed" ? { label: "开始执行", onClick: handleStart } : undefined}
+                  description={!isRunning ? "点击开始执行任务" : undefined}
+                  action={!isRunning ? { label: run?.status === "completed" ? "继续运行" : "开始执行", onClick: handleStart } : undefined}
                   variant="queue"
                 />
               ) : (
@@ -657,7 +661,7 @@ export function EvolutionDashboard() {
           {/* Start / Pause */}
           <div className="flex gap-2">
             {!isRunning ? (
-              <button onClick={handleStart} disabled={run?.status === "completed"} className="flex-1 px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#0d1117" }}>▶ 开始</button>
+              <button onClick={handleStart} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#0d1117" }}>{run?.status === "completed" ? "▶ 继续运行" : "▶ 开始"}</button>
             ) : (
               <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#0d1117" }}>⏸ 暂停</button>
             )}

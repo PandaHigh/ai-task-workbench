@@ -319,6 +319,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (run) {
       run.status = "paused";
       store.saveRun(run);
+      notify("run.status", { runId, status: "paused" });
       sessionManager.recordActivity({ userId: "system", runId, action: "run.stopped" });
     }
     return { status: "stopped" };
@@ -366,6 +367,19 @@ export const methodHandlers: Record<string, MethodHandler> = {
     store.saveTask(runId, task);
     sessionManager.recordActivity({ userId: "system", runId, action: "task.created", details: { taskId: task.id, content: content.substring(0, 80) } });
     notify("queue.updated", { runId, queue: queueManager.list(runId) });
+
+    // Auto-restart executor when adding tasks to a completed/failed run
+    const currentRun = store.getRun(runId);
+    if (currentRun && (currentRun.status === "completed" || currentRun.status === "failed") && !activeExecutors.has(runId)) {
+      currentRun.status = "running";
+      currentRun.completedAt = undefined;
+      currentRun.finalReport = undefined;
+      store.saveRun(currentRun);
+      const executor = new Executor(queueManager, notify, runId);
+      activeExecutors.set(runId, executor);
+      setImmediate(() => executor.start(currentRun).finally(() => { activeExecutors.delete(runId); }));
+    }
+
     return task;
   },
 
@@ -376,7 +390,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!run) throw new RpcValidationError(`Run ${runId} not found`);
 
     if (run.status === "completed" || run.status === "failed") {
-      throw new RpcValidationError(`Run ${runId} is already ${run.status} and cannot be restarted`);
+      // Allow restarting completed/failed runs — reset completion state
+      run.completedAt = undefined;
+      run.finalReport = undefined;
     }
 
     if (activeExecutors.has(runId)) {
@@ -391,7 +407,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
 
     run.status = "running";
-    run.startedAt = Date.now();
+    run.startedAt = run.startedAt || Date.now();
     store.saveRun(run);
 
     const executor = new Executor(queueManager, notify, runId);
@@ -416,6 +432,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (run) {
       run.status = "paused";
       store.saveRun(run);
+      notify("run.status", { runId, status: "paused" });
     }
     return { status: "paused" };
   },
