@@ -583,6 +583,13 @@ export class Executor {
   private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
     const parts: string[] = [];
 
+    const injected = this.injectedInstructions.splice(0);
+    if (injected.length > 0) {
+      parts.push("[USER INJECTED INSTRUCTIONS — high priority]");
+      for (const inst of injected) parts.push(`  - ${inst}`);
+      parts.push("");
+    }
+
     const goalPrompt = this.buildGoalContinuationPrompt();
     if (goalPrompt) {
       parts.push(goalPrompt);

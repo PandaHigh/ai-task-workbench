@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { engineClient } from "../../lib/engine-client";
+import { useToast } from "../common/Toast";
 
 interface InjectButtonProps {
   runId: string;
@@ -10,6 +11,8 @@ export function InjectButton({ runId, disabled }: InjectButtonProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const toast = useToast();
 
   const handleInject = async () => {
     if (!text.trim()) return;
@@ -20,9 +23,11 @@ export function InjectButton({ runId, disabled }: InjectButtonProps) {
         instructions: text.trim(),
       });
       setText("");
-      setOpen(false);
+      setSent(true);
+      setTimeout(() => setSent(false), 2000);
+      toast.success("指令已注入，将在下一个任务中生效");
     } catch (err) {
-      console.error("Failed to inject instructions:", err);
+      toast.error(`注入失败: ${err instanceof Error ? err.message : err}`);
     } finally {
       setLoading(false);
     }
@@ -37,7 +42,11 @@ export function InjectButton({ runId, disabled }: InjectButtonProps) {
       >
         注入指令
       </button>
-      {open && (
+      {sent ? (
+        <div className="mt-1 px-2 py-1 text-xs font-mono rounded" style={{ color: "var(--green)" }}>
+          指令已注入
+        </div>
+      ) : open && (
         <div className="mt-1 space-y-1">
           <textarea
             value={text}

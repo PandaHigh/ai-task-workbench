@@ -1,4 +1,5 @@
 import { useEngine } from "../../hooks/useEngine";
+import { useTaskStore } from "../../stores/task-store";
 import type { ExecutionMode } from "@ai-workbench/shared";
 
 interface ExecutionModeSelectorProps {
@@ -14,9 +15,11 @@ export function ExecutionModeSelector({ runId, currentMode, maxConcurrent, disab
   const concurrent = maxConcurrent ?? 2;
 
   const handleModeChange = async (newMode: ExecutionMode) => {
+    useTaskStore.getState().updateTask(runId, { executionMode: newMode });
     try {
       await call("run.setExecutionMode", { runId, mode: newMode });
     } catch (err) {
+      useTaskStore.getState().updateTask(runId, { executionMode: mode });
       console.warn("Failed to set execution mode:", err);
     }
   };

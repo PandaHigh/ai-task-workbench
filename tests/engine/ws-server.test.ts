@@ -34,6 +34,74 @@ vi.mock("http", () => ({
   createServer: vi.fn(() => mockHttpServer),
 }));
 
+const mockStore = {
+  saveRun: vi.fn(),
+  getRun: vi.fn(),
+  listRuns: vi.fn(() => []),
+  deleteRun: vi.fn(),
+  saveTask: vi.fn(),
+  listTasks: vi.fn(() => []),
+  getTask: vi.fn(),
+  updateTask: vi.fn(),
+  appendLog: vi.fn(),
+  getLogs: vi.fn(() => []),
+  appendScore: vi.fn(),
+  appendCommit: vi.fn(),
+  appendLesson: vi.fn(),
+  getLessons: vi.fn(() => []),
+  getCommits: vi.fn(() => []),
+  saveReport: vi.fn(),
+  getReport: vi.fn(() => null),
+  getConfig: vi.fn(() => undefined),
+  setConfig: vi.fn(),
+};
+
+const mockShareStore = {
+  createShare: vi.fn(),
+  getShare: vi.fn(),
+  listShares: vi.fn(() => []),
+  revokeShare: vi.fn(),
+};
+
+const mockQueueManager = {
+  enqueue: vi.fn(),
+  dequeue: vi.fn(),
+  list: vi.fn(() => []),
+  peekNext: vi.fn(() => []),
+  remove: vi.fn(),
+  restore: vi.fn(),
+  clear: vi.fn(),
+  reorder: vi.fn(),
+};
+
+vi.mock("../../src-engine/src/db/store.js", () => ({
+  Store: vi.fn(() => ({
+    saveRun: vi.fn(), getRun: vi.fn(), listRuns: vi.fn(() => []),
+    deleteRun: vi.fn(), saveTask: vi.fn(), listTasks: vi.fn(() => []),
+    getTask: vi.fn(), updateTask: vi.fn(), appendLog: vi.fn(),
+    getLogs: vi.fn(() => []), appendScore: vi.fn(), appendCommit: vi.fn(),
+    appendLesson: vi.fn(), getLessons: vi.fn(() => []),
+    getCommits: vi.fn(() => []), saveReport: vi.fn(), getReport: vi.fn(() => null),
+    getConfig: vi.fn(() => undefined), setConfig: vi.fn(),
+  })),
+}));
+
+vi.mock("../../src-engine/src/db/share-store.js", () => ({
+  ShareStore: vi.fn(() => ({
+    createShare: vi.fn(), getShare: vi.fn(), listShares: vi.fn(() => []),
+    list: vi.fn(() => []), revokeShare: vi.fn(), revoke: vi.fn(),
+    cleanup: vi.fn(),
+  })),
+}));
+
+vi.mock("../../src-engine/src/engine/queue-manager.js", () => ({
+  QueueManager: vi.fn(() => ({
+    enqueue: vi.fn(), dequeue: vi.fn(), list: vi.fn(() => []),
+    peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
+    clear: vi.fn(), reorder: vi.fn(),
+  })),
+}));
+
 import { WsServer } from "../../src-engine/src/ws-server.js";
 
 function createMockWs(): MockWs {
@@ -57,7 +125,14 @@ function findHandler(calls: unknown[][], event: string): Function | undefined {
 describe("WsServer", () => {
   let server: WsServer;
 
-  beforeEach(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let store: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let shareStore: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let queueManager: any;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockClients.clear();
     mockWss.on.mockReset();
@@ -65,7 +140,13 @@ describe("WsServer", () => {
     mockHttpServer.on.mockReset();
     mockHttpServer.listen.mockReset();
     mockHttpServer.close.mockImplementation((cb?: () => void) => { if (cb) cb(); });
-    server = new WsServer();
+    const { Store } = await import("../../src-engine/src/db/store.js");
+    const { ShareStore } = await import("../../src-engine/src/db/share-store.js");
+    const { QueueManager } = await import("../../src-engine/src/engine/queue-manager.js");
+    store = new Store();
+    shareStore = new ShareStore();
+    queueManager = new QueueManager();
+    server = new WsServer({ store, shareStore, queueManager });
   });
 
   describe("start", () => {

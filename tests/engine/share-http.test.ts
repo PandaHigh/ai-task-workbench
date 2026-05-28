@@ -45,9 +45,33 @@ describe("Share HTTP API Integration", () => {
       };
     });
 
+    vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
+      CCClient: vi.fn(() => ({
+        executeTask: vi.fn(async () => ({
+          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+        })),
+      })),
+    }));
+
+    vi.doMock("../../src-engine/src/git/git-manager.js", () => ({
+      GitManager: vi.fn(() => ({
+        ensureInit: vi.fn(async () => {}),
+        autoCommit: vi.fn(async () => "abc1234"),
+        revert: vi.fn(async () => {}),
+        checkoutClean: vi.fn(async () => {}),
+        getLastNCommits: vi.fn(async () => []),
+        getDiffStats: vi.fn(async () => ({ filesChanged: 0, linesChanged: 0, hasCriticalFiles: false })),
+      })),
+    }));
+
     const mod = await import("../../src-engine/src/json-rpc/methods.js");
     methodHandlers = mod.methodHandlers;
     mod.setNotifyFn(() => {});
+
+    const { Store } = await import("../../src-engine/src/db/store.js");
+    const { ShareStore } = await import("../../src-engine/src/db/share-store.js");
+    const { QueueManager } = await import("../../src-engine/src/engine/queue-manager.js");
 
     // Get a random available port
     serverPort = await new Promise<number>((resolve) => {
@@ -61,9 +85,12 @@ describe("Share HTTP API Integration", () => {
 
     // Set env so WsServer uses our port
     process.env.ENGINE_HOST = "127.0.0.1";
-    // We need to import WsServer after mocks are set up
     const wsMod = await import("../../src-engine/src/ws-server.js");
-    server = new wsMod.WsServer();
+    server = new wsMod.WsServer({
+      store: new Store(),
+      shareStore: new ShareStore(),
+      queueManager: new QueueManager(),
+    });
 
     // Manually start on our port by accessing the httpServer
     const httpServer = server.httpServer as import("http").Server;

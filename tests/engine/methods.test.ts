@@ -41,6 +41,26 @@ describe("RPC Methods", () => {
       };
     });
 
+    vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
+      CCClient: vi.fn(() => ({
+        executeTask: vi.fn(async () => ({
+          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+        })),
+      })),
+    }));
+
+    vi.doMock("../../src-engine/src/git/git-manager.js", () => ({
+      GitManager: vi.fn(() => ({
+        ensureInit: vi.fn(async () => {}),
+        autoCommit: vi.fn(async () => "abc1234"),
+        revert: vi.fn(async () => {}),
+        checkoutClean: vi.fn(async () => {}),
+        getLastNCommits: vi.fn(async () => []),
+        getDiffStats: vi.fn(async () => ({ filesChanged: 0, linesChanged: 0, hasCriticalFiles: false })),
+      })),
+    }));
+
     const mod = await import("../../src-engine/src/json-rpc/methods.js");
     methodHandlers = mod.methodHandlers;
     mod.setNotifyFn(() => {});
@@ -594,5 +614,74 @@ describe("RPC Methods", () => {
           .rejects.toThrow("invalid path characters");
       });
     }
+  });
+
+  // ─── Execution Mode ────────────────────────────────────────────────
+
+  describe("run.setExecutionMode", () => {
+    it("should set execution mode to sequential", async () => {
+      const run = await createRun();
+      const result = await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "sequential" }) as Record<string, unknown>;
+      expect(result.executionMode).toBe("sequential");
+
+      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
+      expect((report.run as ExecutionRun).executionMode).toBe("sequential");
+    });
+
+    it("should set execution mode to parallel", async () => {
+      const run = await createRun();
+      const result = await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "parallel" }) as Record<string, unknown>;
+      expect(result.executionMode).toBe("parallel");
+      expect(result.runId).toBe(run.id);
+
+      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
+      expect((report.run as ExecutionRun).executionMode).toBe("parallel");
+    });
+
+    it("should reject invalid mode", async () => {
+      const run = await createRun();
+      await expect(methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "invalid" }))
+        .rejects.toThrow("sequential or parallel");
+    });
+
+    it("should reject nonexistent run", async () => {
+      await expect(methodHandlers["run.setExecutionMode"]({ runId: "nonexistent", mode: "sequential" }))
+        .rejects.toThrow("Run not found");
+    });
+
+    it("should switch between modes", async () => {
+      const run = await createRun();
+      await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "parallel" });
+      await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "sequential" });
+
+      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
+      expect((report.run as ExecutionRun).executionMode).toBe("sequential");
+    });
+  });
+
+  // ─── Inject Instructions ───────────────────────────────────────────
+
+  describe("approval.inject", () => {
+    it("should reject when no active executor", async () => {
+      const run = await createRun();
+      await expect(methodHandlers["approval.inject"]({ runId: run.id, instructions: "test" }))
+        .rejects.toThrow("No active executor");
+    });
+
+    it("should reject missing runId", async () => {
+      await expect(methodHandlers["approval.inject"]({ instructions: "test" }))
+        .rejects.toThrow();
+    });
+
+    it("should reject path traversal in runId", async () => {
+      await expect(methodHandlers["approval.inject"]({ runId: "../etc", instructions: "test" }))
+        .rejects.toThrow("invalid path characters");
+    });
+
+    it("should reject missing instructions", async () => {
+      const run = await createRun();
+      await expect(methodHandlers["approval.inject"]({ runId: run.id }))
+        .rejects.toThrow();
+    });
   });
 });
