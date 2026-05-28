@@ -97,12 +97,17 @@ export function EvolutionDashboard() {
     }
   };
 
-  // Load data on mount — wait for engine connection
+  // Load data on mount — only reset when runId changes
+  const prevRunIdRef = useRef(runId);
   useEffect(() => {
     if (!runId || !connected) return;
     let cancelled = false;
-    reset();
-    setLoading(true);
+    const runIdChanged = prevRunIdRef.current !== runId;
+    prevRunIdRef.current = runId;
+    if (runIdChanged) {
+      reset();
+      setLoading(true);
+    }
 
     const load = async () => {
       // Load run itself (needed when page is refreshed directly — taskStore is empty)

@@ -108,8 +108,10 @@ interface StreamingOutputProps {
   taskId: string;
 }
 
+const EMPTY_MESSAGES: unknown[] = [];
+
 export function StreamingOutput({ taskId }: StreamingOutputProps) {
-  const messages = useApprovalStore((s) => s.streamMessages.get(taskId) ?? []);
+  const messages = useApprovalStore((s) => s.streamMessages.get(taskId) || EMPTY_MESSAGES);
 
   if (messages.length === 0) {
     return (
