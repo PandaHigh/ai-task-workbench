@@ -1,6 +1,6 @@
 import { useWizardStore } from "../../stores/wizard-store";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
 import type { ExecutionRun } from "@ai-workbench/shared";
@@ -8,6 +8,7 @@ import { useToast } from "../common/Toast";
 import { Spinner } from "../common/Spinner";
 import { pageEnterStyle } from "../../hooks/useAnimations";
 import { open } from "@tauri-apps/plugin-dialog";
+import { marked } from "marked";
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
@@ -31,9 +32,13 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
     return () => clearInterval(timer);
   }, [text, speed]);
 
+  const html = useMemo(() => {
+    try { return marked.parse(displayed, { async: false }) as string; } catch { return displayed; }
+  }, [displayed]);
+
   return (
     <span>
-      {displayed}
+      <span className="markdown-body text-xs" dangerouslySetInnerHTML={{ __html: html }} />
       {isTyping && <span className="typewriter-cursor" />}
     </span>
   );
@@ -177,7 +182,7 @@ export function TaskWizard() {
       const res = (await call("wizard.chat", {
         sessionId,
         message: userMsg,
-      })) as { response: string; shouldExtractParams: boolean };
+      }, 180_000)) as { response: string; shouldExtractParams: boolean };
 
       addMessage({ role: "assistant", content: res.response, timestamp: Date.now() });
 
@@ -200,7 +205,7 @@ export function TaskWizard() {
             const retryRes = (await call("wizard.chat", {
               sessionId,
               message: errorMsg,
-            })) as { response: string; shouldExtractParams: boolean };
+            }, 180_000)) as { response: string; shouldExtractParams: boolean };
             addMessage({ role: "assistant", content: retryRes.response, timestamp: Date.now() });
           } catch (retryErr) {
             console.warn("Wizard validation retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
@@ -366,25 +371,31 @@ export function TaskWizard() {
                 <p className="text-xs" style={{ color: "var(--text-secondary)" }}>AI 助手将通过对话帮你定义任务的目标和终止条件。</p>
               </div>
             )}
-            {messages.map((msg, i) => (
-              <div
-                key={getMessageId(msg, i)}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                style={{
-                  animation: "slideUp 0.3s ease-out",
-                }}
-              >
-                <div className={`max-w-[80%] px-3 py-2 rounded-lg text-xs terminal-line whitespace-pre-wrap ${msg.role === "assistant" ? "glass-card-sm" : ""}`} style={{
-                  background: msg.role === "user" ? "var(--blue)" : undefined,
-                  color: msg.role === "user" ? "#0d1117" : "var(--text-primary)",
-                }}>
-                  {msg.role === "assistant" && i === lastAssistantIdx && !isLoading
-                    ? <TypewriterText text={msg.content} />
-                    : msg.content
-                  }
+            {messages.map((msg, i) => {
+              const isAssistant = msg.role === "assistant";
+              const isTypingTarget = isAssistant && i === lastAssistantIdx && !isLoading;
+              const mdHtml = isAssistant && !isTypingTarget
+                ? (marked.parse(msg.content, { async: false }) as string)
+                : "";
+              return (
+                <div
+                  key={getMessageId(msg, i)}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  style={{ animation: "slideUp 0.3s ease-out" }}
+                >
+                  <div className={`max-w-[80%] px-3 py-2 rounded-lg text-xs ${isAssistant ? "glass-card-sm" : ""}`} style={{
+                    background: msg.role === "user" ? "var(--blue)" : undefined,
+                    color: msg.role === "user" ? "#0d1117" : "var(--text-primary)",
+                  }}>
+                    {msg.role === "user" && <span className="whitespace-pre-wrap">{msg.content}</span>}
+                    {isTypingTarget && <TypewriterText text={msg.content} />}
+                    {isAssistant && !isTypingTarget && (
+                      <span className="markdown-body text-xs" dangerouslySetInnerHTML={{ __html: mdHtml }} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {isLoading && (
               <div className="flex justify-start" style={{ animation: "slideUp 0.25s ease-out" }}>
                 <div className="glass-card-sm px-3 py-2 rounded-lg text-xs flex items-center gap-2">

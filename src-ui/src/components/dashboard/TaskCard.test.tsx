@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TaskCard } from "./TaskCard";
@@ -51,17 +51,22 @@ function renderCard(task: ExecutionRun, onDelete?: () => void) {
 describe("TaskCard", () => {
   const mockDeleteTask = vi.fn();
 
+  const storeObj = {
+    tasks: [],
+    activeRunId: null,
+    loading: false,
+    loadTasks: vi.fn(),
+    addTask: vi.fn(),
+    updateTask: vi.fn(),
+    deleteTask: mockDeleteTask,
+    setActiveRun: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useTaskStore).mockReturnValue({
-      tasks: [],
-      activeRunId: null,
-      loading: false,
-      loadTasks: vi.fn(),
-      addTask: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: mockDeleteTask,
-      setActiveRun: vi.fn(),
+    // Support selector usage: useTaskStore(s => s.deleteTask)
+    vi.mocked(useTaskStore).mockImplementation((selector?: (s: typeof storeObj) => unknown) => {
+      return selector ? selector(storeObj) : storeObj;
     });
   });
 
@@ -95,10 +100,9 @@ describe("TaskCard", () => {
     expect(screen.getByText("失败")).toBeInTheDocument();
   });
 
-  it("显示终止条件（截断到2个）", () => {
-    renderCard(makeRun({ terminationConditions: ["A", "B", "C", "D"] }));
-    expect(screen.getByText(/A; B/)).toBeInTheDocument();
-    expect(screen.getByText(/\+2/)).toBeInTheDocument();
+  it("显示目标数量", () => {
+    renderCard(makeRun({ goals: ["目标A", "目标B", "目标C"] }));
+    expect(screen.getByText(/目标: 3/)).toBeInTheDocument();
   });
 
   it("显示工作目录名", () => {
@@ -137,8 +141,14 @@ describe("TaskCard", () => {
     mockDeleteTask.mockResolvedValue(undefined);
     renderCard(makeRun({ id: "run-del" }), onDelete);
     await user.click(screen.getByLabelText("删除任务"));
-    await user.click(screen.getByText("删除"));
-    expect(mockDeleteTask).toHaveBeenCalledWith("run-del");
+    // Wait for ConfirmDialog to mount
+    const dialog = await screen.findByRole("dialog");
+    // Use fireEvent for the confirm click to avoid async timing issues
+    const confirmBtn = within(dialog).getByRole("button", { name: "删除" });
+    fireEvent.click(confirmBtn);
+    await vi.waitFor(() => {
+      expect(mockDeleteTask).toHaveBeenCalledWith("run-del");
+    });
     await vi.waitFor(() => {
       expect(onDelete).toHaveBeenCalled();
     });
@@ -148,8 +158,18 @@ describe("TaskCard", () => {
     const user = userEvent.setup();
     renderCard(makeRun());
     await user.click(screen.getByLabelText("删除任务"));
-    await user.click(screen.getByText("取消"));
-    expect(screen.queryByText("确定删除此任务？所有相关数据将被清除。")).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(screen.getByText("确定删除此任务？所有相关数据将被清除。")).toBeInTheDocument();
+    });
+    // Click the cancel button inside the dialog
+    const cancelBtn = screen.getByRole("button", { name: "取消" });
+    await user.click(cancelBtn);
+    // ConfirmDialog uses transitionEnd to unmount, fire it to complete the close
+    const dialog = screen.getByRole("dialog");
+    fireEvent.transitionEnd(dialog);
+    await vi.waitFor(() => {
+      expect(screen.queryByText("确定删除此任务？所有相关数据将被清除。")).not.toBeInTheDocument();
+    });
   });
 
   it("未开始的任务显示'未开始'", () => {
@@ -160,7 +180,7 @@ describe("TaskCard", () => {
   it("running 状态下启动计时器更新", () => {
     vi.useFakeTimers();
     renderCard(makeRun({ status: "running", startedAt: Date.now() - 5000 }));
-    const el = screen.getByText(/1s/);
+    const el = screen.getByText(/5s/);
     expect(el).toBeInTheDocument();
     vi.advanceTimersByTime(1000);
     vi.useRealTimers();

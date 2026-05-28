@@ -33,7 +33,7 @@ describe("Wizard Handler", () => {
     // No messages → returns defaults, not null
     expect(params).toBeDefined();
     expect(params!.content).toBe("未命名任务");
-    expect(params!.goals).toContain("完成用户描述的任务");
+    expect(params!.goals).toContain("完成未命名任务");
   });
 
   it("should validate params correctly", async () => {

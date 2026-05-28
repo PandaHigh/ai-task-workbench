@@ -20,6 +20,7 @@ interface EvolutionStore {
   setQueue: (queue: TaskDefinition[]) => void;
   setActiveTask: (id: string | null) => void;
   addLog: (log: LogEntry) => void;
+  setLogs: (logs: LogEntry[]) => void;
   setCommits: (commits: GitCommit[]) => void;
   setLessons: (lessons: LessonLearned[]) => void;
   setRunning: (running: boolean) => void;
@@ -38,6 +39,7 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
   setActiveTask: (id) => set({ activeTaskId: id }),
   addLog: (log) =>
     set((state) => ({ logs: [...state.logs, log].slice(-500) })),
+  setLogs: (logs) => set({ logs: logs.slice(-500) }),
   setCommits: (commits) => set({ commits }),
   setLessons: (lessons) => set({ lessons }),
   setRunning: (running) => set({ isRunning: running }),

@@ -66,7 +66,17 @@ export type EngineMethod =
   | "share.subscriptions"
   | "run.pauseGoal"
   | "run.resumeGoal"
-  | "run.clearGoal";
+  | "run.clearGoal"
+  | "approval.respond"
+  | "approval.inject"
+  | "run.setExecutionMode"
+  | "role.list"
+  | "role.create"
+  | "session.identify"
+  | "session.list"
+  | "activity.list"
+  | "comment.create"
+  | "comment.list";
 
 export type EngineNotification =
   | "task.progress"
@@ -76,4 +86,13 @@ export type EngineNotification =
   | "run.status"
   | "log.entry"
   | "git.commit"
-  | "goal.updated";
+  | "goal.updated"
+  | "approval.requested"
+  | "approval.resolved"
+  | "task.stream"
+  | "features.generated"
+  | "features.updated"
+  | "presence.joined"
+  | "presence.left"
+  | "activity.created"
+  | "comment.created";

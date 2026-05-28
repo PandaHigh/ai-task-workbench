@@ -25,6 +25,8 @@ const mockStore = {
   getConfig: vi.fn(() => undefined),
   setConfig: vi.fn(),
   getScores: vi.fn(() => []),
+  getPendingApprovals: vi.fn(() => []),
+  updateApprovalRequest: vi.fn(),
 };
 
 vi.mock("../../src-engine/src/db/store.js", () => ({

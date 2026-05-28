@@ -93,6 +93,7 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
       timeoutMinutes: 3,
       maxTurns: 1,
       systemPrompt: "",
+      disallowedTools: ["AskUserQuestion", "Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch"],
     });
 
     const response = result.result || "抱歉，我无法理解。请再描述一下你的需求。";
@@ -103,6 +104,7 @@ export async function chat(sessionId: string, userMessage: string): Promise<{
 
     return { response, shouldExtractParams: shouldExtract };
   } catch (err) {
+    console.warn("[wizard] CC client error:", err instanceof Error ? err.message : err);
     const fallback = generateFallbackResponse(userMessage, session.messages);
     session.messages.push({ role: "assistant", content: fallback });
     const shouldExtract = session.messages.filter((m) => m.role === "user").length >= 3;

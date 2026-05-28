@@ -51,6 +51,7 @@ export interface CCExecutionOptions {
   timeoutMinutes: number;
   maxTurns?: number;
   allowedTools?: string[];
+  disallowedTools?: string[];
   systemPrompt?: string;
   jsonSchema?: Record<string, unknown>;
   abortSignal?: AbortSignal;
@@ -61,6 +62,12 @@ export interface CCMessage {
   subtype?: string;
   content?: unknown;
   timestamp?: number;
+  result?: string;
+  error?: string;
+  session_id?: string;
+  total_cost_usd?: number;
+  duration_ms?: number;
+  num_turns?: number;
 }
 
 export interface CCTaskResult {
@@ -364,6 +371,10 @@ export class CCClient {
 
     if (options.allowedTools && options.allowedTools.length > 0) {
       args.push("--allowedTools", options.allowedTools.join(","));
+    }
+
+    if (options.disallowedTools && options.disallowedTools.length > 0) {
+      args.push("--disallowedTools", options.disallowedTools.join(","));
     }
 
     if (options.systemPrompt) {

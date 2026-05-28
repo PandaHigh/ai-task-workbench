@@ -8,6 +8,7 @@ import type {
   GitCommit,
   LessonLearned,
   ScoreDetails,
+  ApprovalRequest,
 } from "@ai-workbench/shared";
 
 function getDataDir(): string {
@@ -263,6 +264,36 @@ export class Store {
     writeJsonFile(file, config);
   }
 
+  // ---- Activities ----
+
+  appendActivity(runId: string, event: import("@ai-workbench/shared").ActivityEvent): void {
+    const file = path.join(this.runDir(runId), "activities.json");
+    const activities = readJsonFile<import("@ai-workbench/shared").ActivityEvent[]>(file, []);
+    activities.push(event);
+    const trimmed = activities.length > MAX_HISTORY_ENTRIES ? activities.slice(-MAX_HISTORY_ENTRIES) : activities;
+    writeJsonFile(file, trimmed);
+  }
+
+  getActivities(runId: string, limit?: number): import("@ai-workbench/shared").ActivityEvent[] {
+    const file = path.join(this.runDir(runId), "activities.json");
+    const activities = readJsonFile<import("@ai-workbench/shared").ActivityEvent[]>(file, []);
+    return limit ? activities.slice(-limit) : activities;
+  }
+
+  // ---- Comments ----
+
+  appendComment(runId: string, comment: import("@ai-workbench/shared").TaskComment): void {
+    const file = path.join(this.runDir(runId), "comments.json");
+    const comments = readJsonFile<import("@ai-workbench/shared").TaskComment[]>(file, []);
+    comments.push(comment);
+    writeJsonFile(file, comments);
+  }
+
+  getComments(runId: string): import("@ai-workbench/shared").TaskComment[] {
+    const file = path.join(this.runDir(runId), "comments.json");
+    return readJsonFile(file, []);
+  }
+
   // ---- Final Report ----
 
   saveReport(runId: string, report: string): void {
@@ -275,5 +306,51 @@ export class Store {
   getReport(runId: string): { report: string; generatedAt: number } | null {
     const file = path.join(this.runDir(runId), "report.json");
     return readJsonFile(file, null);
+  }
+
+  // ---- Approval Requests ----
+
+  saveApprovalRequest(runId: string, request: ApprovalRequest): void {
+    const file = path.join(this.runDir(runId), "approvals.json");
+    const approvals = readJsonFile<ApprovalRequest[]>(file, []);
+    const idx = approvals.findIndex((a) => a.id === request.id);
+    if (idx >= 0) {
+      approvals[idx] = request;
+    } else {
+      approvals.push(request);
+    }
+    writeJsonFile(file, approvals);
+  }
+
+  getPendingApprovals(runId: string): ApprovalRequest[] {
+    const file = path.join(this.runDir(runId), "approvals.json");
+    const approvals = readJsonFile<ApprovalRequest[]>(file, []);
+    return approvals.filter((a) => a.status === "pending");
+  }
+
+  updateApprovalRequest(runId: string, approvalId: string, updates: Partial<ApprovalRequest>): void {
+    // If runId not provided, search across all runs
+    if (!runId) {
+      const runs = this.listRuns();
+      for (const run of runs) {
+        const file = path.join(this.runDir(run.id), "approvals.json");
+        const approvals = readJsonFile<ApprovalRequest[]>(file, []);
+        const idx = approvals.findIndex((a) => a.id === approvalId);
+        if (idx >= 0) {
+          Object.assign(approvals[idx], updates);
+          writeJsonFile(file, approvals);
+          return;
+        }
+      }
+      return;
+    }
+
+    const file = path.join(this.runDir(runId), "approvals.json");
+    const approvals = readJsonFile<ApprovalRequest[]>(file, []);
+    const idx = approvals.findIndex((a) => a.id === approvalId);
+    if (idx >= 0) {
+      Object.assign(approvals[idx], updates);
+      writeJsonFile(file, approvals);
+    }
   }
 }

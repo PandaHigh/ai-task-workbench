@@ -136,7 +136,7 @@ describe("EvolutionDashboard", () => {
 
   it("渲染自进化看板标题", async () => {
     renderEvolution();
-    expect(screen.getByText("自进化看板")).toBeInTheDocument();
+    expect(screen.getByText("任务看板")).toBeInTheDocument();
   });
 
   it("加载时调用 queue.list、run.commits、run.lessons", async () => {
@@ -150,7 +150,9 @@ describe("EvolutionDashboard", () => {
 
   it("渲染任务队列空状态", async () => {
     renderEvolution();
-    expect(screen.getByText(/队列为空/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/队列为空/)).toBeInTheDocument();
+    });
   });
 
   it("渲染任务队列项", async () => {
@@ -160,8 +162,10 @@ describe("EvolutionDashboard", () => {
       queue,
     });
     renderEvolution();
-    expect(screen.getByText("用户任务内容")).toBeInTheDocument();
-    expect(screen.getByText("第二个任务")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("用户任务内容")).toBeInTheDocument();
+      expect(screen.getByText("第二个任务")).toBeInTheDocument();
+    });
   });
 
   it("显示日志、提交、教训标签", () => {
@@ -244,10 +248,13 @@ describe("EvolutionDashboard", () => {
       return null;
     });
     renderEvolution();
-    const input = screen.getByLabelText("新任务内容");
-    await user.type(input, "新测试任务");
-    const addBtn = screen.getByLabelText("添加任务");
-    await user.click(addBtn);
+    // Click the add task button to open modal
+    await user.click(screen.getByText("+ 新增任务"));
+    // Find the textarea by placeholder and type into it
+    const textarea = screen.getByPlaceholderText("描述你的任务...");
+    await user.type(textarea, "新测试任务");
+    // Click the confirm button
+    await user.click(screen.getByText("确认添加"));
     await waitFor(() => {
       expect(mockCall).toHaveBeenCalledWith("task.create", expect.objectContaining({ content: "新测试任务" }));
     });
@@ -259,7 +266,8 @@ describe("EvolutionDashboard", () => {
       ...defaultEvolutionStore,
     });
     renderEvolution("run-001", run);
-    expect(screen.getByText(/\$25\.00/)).toBeInTheDocument();
+    const budgetEls = screen.getAllByText(/\$25\.00/);
+    expect(budgetEls.length).toBeGreaterThanOrEqual(1);
   });
 
   it("显示目标列表", () => {
@@ -314,9 +322,14 @@ describe("EvolutionDashboard", () => {
     });
   });
 
-  it("显示最终报告", () => {
+  it("显示最终报告", async () => {
+    const user = userEvent.setup();
     const run = makeRun({ finalReport: "这是最终报告内容" });
     renderEvolution("run-001", run);
-    expect(screen.getByText("这是最终报告内容")).toBeInTheDocument();
+    // Click the report tab to show the report content
+    await user.click(screen.getByText("最终报告"));
+    await waitFor(() => {
+      expect(screen.getByText("这是最终报告内容")).toBeInTheDocument();
+    });
   });
 });

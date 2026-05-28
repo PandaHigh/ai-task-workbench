@@ -1,8 +1,12 @@
-import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus } from "@ai-workbench/shared";
+import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus, CheckpointType } from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
 import type { QueueManager } from "./queue-manager.js";
+import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
+import { BUILTIN_ROLES } from "./agent-roles.js";
+import { WorkerAgent } from "./worker-agent.js";
+import { WorktreeManager } from "../git/worktree-manager.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
@@ -40,6 +44,10 @@ export class Executor {
   private evaluationCycles = 0;
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
+  private approvalGate: ApprovalGate | null = null;
+  private injectedInstructions: string[] = [];
+  private activeWorkers: Map<string, WorkerAgent> = new Map();
+  private worktreeManager: WorktreeManager = new WorktreeManager();
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -101,32 +109,66 @@ export class Executor {
     }
 
     try {
+      // Generate feature list on first run
+      if (!run.featuresGeneratedAt && run.goals.length > 0) {
+        await this.generateFeatures(run);
+      }
+
       while (this.running) {
-        const task = this.queueManager.dequeue(run.id);
+        if (run.executionMode === "parallel") {
+          // Parallel mode: dispatch tasks to workers
+          const maxConcurrent = run.maxConcurrentAgents ?? 2;
+          const availableSlots = maxConcurrent - this.activeWorkers.size;
 
-        if (!task) {
-          const shouldContinue = await this.handleEmptyQueue(run);
-          if (!shouldContinue) break;
-          continue;
-        }
+          for (let i = 0; i < availableSlots; i++) {
+            const task = this.queueManager.dequeue(run.id);
+            if (!task) break;
 
-        this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
-        this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+            this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
+            this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
+            this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
 
-        await this.executeSingleTask(task, run);
+            // Fire-and-forget, tracked in activeWorkers
+            this.executeInWorker(task, run).catch((err) => {
+              this.log(run.id, "engine", "error", `Worker failed: ${this.errorToMessage(err)}`, task.id);
+            });
+          }
 
-        run.totalTasksCompleted++;
-        this.store.saveRun(run);
+          if (this.activeWorkers.size === 0) {
+            const shouldContinue = await this.handleEmptyQueue(run);
+            if (!shouldContinue) break;
+          }
 
-        // Post-task budget guard
-        const taskCost = this.recalculateCost(run.id);
-        if (taskCost > this.config.maxBudgetUsd) {
-          this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
-          this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
-          this.stop();
-          await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
-          break;
+          // Wait a bit for workers to progress
+          try { await this.sleep(1000); } catch { /* interrupted */ }
+        } else {
+          // Sequential mode (default)
+          const task = this.queueManager.dequeue(run.id);
+
+          if (!task) {
+            const shouldContinue = await this.handleEmptyQueue(run);
+            if (!shouldContinue) break;
+            continue;
+          }
+
+          this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
+          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
+          this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+
+          await this.executeSingleTask(task, run);
+
+          run.totalTasksCompleted++;
+          this.store.saveRun(run);
+
+          // Post-task budget guard
+          const taskCost = this.recalculateCost(run.id);
+          if (taskCost > this.config.maxBudgetUsd) {
+            this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
+            this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
+            this.stop();
+            await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
+            break;
+          }
         }
       }
     } catch (err) {
@@ -185,9 +227,32 @@ export class Executor {
       }
     }
     if (this.isStagnant()) {
-      this.log(run.id, "engine", "warn", `Progress stalled at ${(evaluation.overallProgress * 100).toFixed(0)}% for ${this.config.stagnationWindow} cycles. Stopping.`);
-      await this.finalize(run, `Progress stalled at ${(evaluation.overallProgress * 100).toFixed(0)}%.`);
-      return false;
+      // ─── Checkpoint: goal_stagnation ──────────────────────
+      this.log(run.id, "engine", "warn", "Progress stalled — requesting human guidance");
+      const lessons = this.store.getLessons(run.id, "failure").slice(-5);
+      const decision = await this.checkApproval(
+        "goal_stagnation", run, null,
+        "Progress stalled at " + (evaluation.overallProgress * 100).toFixed(0) + "%. Continue, stop, or redirect?",
+        { progressHistory: this.progressHistory.slice(-10), evaluation, lessons },
+      );
+      if (!decision || decision.action === "reject") {
+        await this.finalize(run, "Progress stalled. Human decided to stop.");
+        return false;
+      }
+      if (decision.action === "modify" && decision.instructions) {
+        this.log(run.id, "engine", "info", "Human redirection: " + decision.instructions);
+        // Inject as a high-priority user task
+        const redirectTask = this.queueManager.enqueue(run.id, {
+          content: decision.instructions,
+          type: "user_defined",
+          priority: 1,
+        });
+        this.store.saveTask(run.id, redirectTask);
+        this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+      }
+      // Reset stagnation tracking after human intervention
+      this.progressHistory = [];
+      this.evaluationCycles = 0;
     }
 
     if (evaluation.isComplete) {
@@ -293,7 +358,16 @@ export class Executor {
 
       this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}...`);
 
-      const result = await this.ccClient.executeTask(task.content, {
+      // Stream CC output in real-time
+      let result: import("../cc-integration/cc-client.js").CCTaskResult | null = null;
+      let streamResult: string | null = null;
+      let streamSessionId = "";
+      let streamCost = 0;
+      let streamDuration = 0;
+      let streamTurns = 0;
+      const streamMessages: import("../cc-integration/cc-client.js").CCMessage[] = [];
+
+      const stream = this.ccClient.executeTaskStream(task.content, {
         workingDir: run.workingDir,
         sessionId: task.sessionId,
         timeoutMinutes: task.timeoutMinutes,
@@ -302,6 +376,44 @@ export class Executor {
         abortSignal: abortController.signal,
         allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
       });
+
+      for await (const message of stream) {
+        streamMessages.push(message);
+        this.broadcast("task.stream", { taskId: task.id, runId: run.id, message });
+
+        if (message.type === "result" && message.subtype === "success") {
+          streamResult = message.result || "";
+          streamSessionId = message.session_id || "";
+          streamCost = message.total_cost_usd || 0;
+          streamDuration = message.duration_ms || 0;
+          streamTurns = message.num_turns || 0;
+        }
+      }
+
+      if (streamResult !== null) {
+        result = {
+          result: streamResult,
+          sessionId: streamSessionId,
+          totalCostUsd: streamCost,
+          durationMs: streamDuration,
+          numTurns: streamTurns,
+          messages: streamMessages,
+        };
+      } else {
+        // Fallback: assemble from assistant messages
+        const assistantTexts = streamMessages
+          .filter((m) => m.type === "assistant")
+          .map((m) => typeof m.content === "string" ? m.content : (Array.isArray(m.content) ? (m.content as Array<{text: string}>).map(c => c.text).join("") : ""))
+          .filter(Boolean);
+        const fallbackResult = assistantTexts.length > 0 ? assistantTexts[assistantTexts.length - 1] : "";
+        if (fallbackResult) {
+          result = { result: fallbackResult, sessionId: streamSessionId, totalCostUsd: streamCost, durationMs: streamDuration, numTurns: streamTurns, messages: streamMessages };
+        }
+      }
+
+      if (!result || !result.result) {
+        throw new Error("CC stream completed without producing a result");
+      }
 
       this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
@@ -332,6 +444,48 @@ export class Executor {
       this.log(run.id, "scorer", score.passed ? "info" : "warn",
         `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`, task.id);
 
+      // ─── Checkpoint: borderline_score ─────────────────────
+      const scoreDiff = Math.abs(score.overall - this.config.qualityThreshold);
+      if (scoreDiff < 0.15) {
+        this.log(run.id, "engine", "info", "Borderline score — requesting human decision", task.id);
+        const diffStats = await this.getDiffStats(gitManager);
+        const decision = await this.checkApproval(
+          "borderline_score", run, task,
+          "Score near threshold. Commit or revert?",
+          { score, diffStats, taskContent: task.content },
+        );
+        if (decision?.action === "reject") {
+          score.passed = false;
+        } else if (decision?.action === "approve" && !score.passed) {
+          score.passed = true;
+        }
+        if (decision?.instructions) {
+          this.log(run.id, "engine", "info", "Human instruction: " + decision.instructions, task.id);
+        }
+      }
+
+      // ─── Checkpoint: risky_commit ─────────────────────────
+      if (score.passed) {
+        const diffStats = await this.getDiffStats(gitManager);
+        const isRisky = diffStats.filesChanged > 10
+          || diffStats.linesChanged > 200
+          || diffStats.hasCriticalFiles;
+        if (isRisky) {
+          this.log(run.id, "engine", "info", "Risky commit — requesting human review", task.id);
+          const decision = await this.checkApproval(
+            "risky_commit", run, task,
+            "Large change: " + diffStats.filesChanged + " files, " + diffStats.linesChanged + " lines. Review?",
+            { diffStats, taskContent: task.content },
+          );
+          if (decision?.action === "reject") {
+            score.passed = false;
+          }
+          if (decision?.instructions) {
+            this.log(run.id, "engine", "info", "Human instruction: " + decision.instructions, task.id);
+          }
+        }
+      }
+
       if (score.passed) {
         const commitHash = await gitManager.autoCommit(task.id, task.content);
         this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
@@ -342,6 +496,11 @@ export class Executor {
         this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
         this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
+
+        // Verify features after successful commit
+        if (run.features && run.features.length > 0) {
+          await this.verifyFeatures(run);
+        }
       } else {
         let revertSucceeded = true;
         try {
@@ -657,10 +816,309 @@ IMPORTANT: After completing this task, you should verify your work contributes t
     }
     this.running = false;
     this.stopController?.abort();
+    this.approvalGate?.abort();
+    this.approvalGate = null;
     for (const [id, controller] of this.abortControllers) {
       controller.abort();
       this.store.updateTask(this.runId, id, { status: "cancelled", completedAt: Date.now() });
     }
     this.abortControllers.clear();
+
+    // Stop all active workers
+    for (const [taskId, worker] of this.activeWorkers) {
+      worker.abort();
+      this.store.updateTask(this.runId, taskId, { status: "cancelled", completedAt: Date.now() });
+    }
+    this.activeWorkers.clear();
+
+    // Cleanup worktrees
+    if (this.currentRun?.workingDir) {
+      this.worktreeManager.cleanupAll(this.currentRun.workingDir).catch(() => {});
+    }
+  }
+
+  // ─── Approval integration ──────────────────────────────────────────────
+
+  private async checkApproval(
+    checkpointType: CheckpointType,
+    run: ExecutionRun,
+    task: TaskDefinition | null,
+    summary: string,
+    contextData: Record<string, unknown>,
+  ): Promise<ApprovalDecision | null> {
+    const timeoutMs = run.approvalTimeoutMs || 30 * 60 * 1000;
+
+    this.approvalGate = new ApprovalGate(this.store, (method, params) => this.broadcast(method, params));
+
+    try {
+      const decision = await this.approvalGate.waitForApproval(
+        run.id,
+        task?.id,
+        checkpointType,
+        summary,
+        contextData,
+        timeoutMs,
+      );
+
+      this.broadcast("approval.resolved", {
+        approvalId: this.approvalGate.pendingApprovalId,
+        runId: run.id,
+        status: decision.timedOut ? "timed_out" : decision.action === "approve" ? "approved" : decision.action === "reject" ? "rejected" : "modified",
+      });
+
+      return decision;
+    } catch (err) {
+      this.log(run.id, "engine", "warn", `Approval wait interrupted: ${this.errorToMessage(err)}`);
+      return null;
+    } finally {
+      this.approvalGate = null;
+    }
+  }
+
+  resolveApproval(approvalId: string, decision: ApprovalDecision): boolean {
+    if (!this.approvalGate) return false;
+    return this.approvalGate.resolve(approvalId, decision);
+  }
+
+  injectInstructions(text: string): void {
+    this.injectedInstructions.push(text);
+    this.log(this.runId, "engine", "info", `Instructions injected: ${text.substring(0, 80)}...`);
+  }
+
+  private resolveRole(roleId?: string): import("@ai-workbench/shared").AgentRole {
+    const allRoles = [...BUILTIN_ROLES, ...(this.currentRun?.agentRoles ?? [])];
+    return allRoles.find((r) => r.id === roleId) ?? BUILTIN_ROLES[0];
+  }
+
+  private async executeInWorker(task: TaskDefinition, run: ExecutionRun): Promise<void> {
+    const role = this.resolveRole(task.assignedRoleId);
+    const worker = new WorkerAgent(role, run.id, run.workingDir, this.worktreeManager, this.broadcast.bind(this));
+    this.activeWorkers.set(task.id, worker);
+
+    try {
+      const context: TaskContext = {
+        workingDir: run.workingDir,
+        goals: run.goals,
+        terminationConditions: run.terminationConditions,
+        lastTenCommits: this.store.getCommits(run.id).slice(-10).map((c) => ({
+          hash: c.hash, message: c.message, timestamp: c.timestamp, isAiCommit: c.isAiCommit,
+        })),
+        nextFiveTasks: this.queueManager.list(run.id).slice(0, 5),
+        lessonsLearned: this.store.getLessons(run.id, "failure").slice(-5),
+      };
+
+      const result = await worker.execute(task, context);
+
+      this.log(run.id, role.id, "info", `Worker ${role.id} completed: ${result.durationMs}ms, $${result.totalCostUsd.toFixed(4)}`, task.id);
+      run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
+
+      // Score the result in the main worktree context
+      let score: ScoreDetails;
+      try {
+        score = await this.scoreTask(task, result.result, run);
+      } catch (scoringErr) {
+        this.log(run.id, "scorer", "warn", `Scoring failed: ${this.errorToMessage(scoringErr)}`, task.id);
+        score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring failed: ${this.errorToMessage(scoringErr)}` };
+      }
+
+      this.store.appendScore(run.id, task.id, score);
+      this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score, result: result.result });
+      this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
+
+      if (score.passed) {
+        // Merge worker changes to main worktree
+        try {
+          await this.worktreeManager.mergeChanges(run.workingDir, `worker-${role.id}-${task.id.substring(0, 6)}`);
+          const gitManager = new GitManager({ workingDir: run.workingDir });
+          const commitHash = await gitManager.autoCommit(task.id, `[${role.id}] ${task.content}`);
+          this.log(run.id, "git", "info", `Committed (parallel): ${commitHash?.substring(0, 7) ?? "unknown"}`, task.id);
+          this.store.appendCommit(run.id, {
+            taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
+            isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
+          });
+          this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
+          this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
+          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
+
+          // Verify features after successful commit
+          if (run.features && run.features.length > 0) {
+            await this.verifyFeatures(run);
+          }
+        } catch (mergeErr) {
+          this.log(run.id, "engine", "warn", `Merge failed, discarding worker changes: ${this.errorToMessage(mergeErr)}`, task.id);
+          this.store.appendLesson(run.id, {
+            runId: run.id, taskId: task.id, category: "failure",
+            lesson: `Worker ${role.id} merge failed: ${this.errorToMessage(mergeErr)}`,
+            score: score.overall, createdAt: Date.now(),
+          });
+          this.store.updateTask(run.id, task.id, { status: "failed", completedAt: Date.now(), errorMessage: `Merge failed: ${this.errorToMessage(mergeErr)}` });
+          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed" });
+        }
+      } else {
+        // Discard worker changes
+        this.store.appendLesson(run.id, {
+          runId: run.id, taskId: task.id, category: "failure",
+          lesson: `Worker ${role.id} task scored ${(score.overall * 100).toFixed(0)}%: ${score.reasoning}`,
+          score: score.overall, createdAt: Date.now(),
+        });
+        this.store.updateTask(run.id, task.id, { status: "reverted", completedAt: Date.now(), errorMessage: `Score: ${(score.overall * 100).toFixed(0)}%` });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "reverted" });
+      }
+
+      run.totalTasksCompleted++;
+      this.store.saveRun(run);
+    } finally {
+      this.activeWorkers.delete(task.id);
+      await worker.cleanup();
+    }
+  }
+
+  private async getDiffStats(gitManager: GitManager): Promise<{
+    filesChanged: number;
+    linesChanged: number;
+    hasCriticalFiles: boolean;
+  }> {
+    return gitManager.getDiffStats();
+  }
+
+  private async generateFeatures(run: ExecutionRun): Promise<void> {
+    this.log(run.id, "engine", "info", "Generating feature list for goal tracking...");
+    try {
+      const schema: Record<string, unknown> = {
+        type: "object",
+        properties: {
+          features: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                category: { type: "string", enum: ["functional", "non_functional", "edge_case"] },
+                description: { type: "string" },
+                steps: { type: "array", items: { type: "string" } },
+                priority: { type: "number" },
+              },
+              required: ["id", "category", "description", "steps", "priority"],
+            },
+          },
+        },
+        required: ["features"],
+      };
+
+      const prompt = `Based on these goals and the project at ${run.workingDir}, generate a comprehensive feature checklist.
+Goals: ${run.goals.join("; ")}
+Termination conditions: ${run.terminationConditions.join("; ")}
+
+Generate 30-100 verifiable features covering:
+1. Functional requirements (core features, API endpoints, data flows)
+2. Non-functional requirements (performance, security, error handling)
+3. Edge cases (error states, boundary conditions, concurrent access)
+
+Each feature should have:
+- A unique id (e.g., "feat-001")
+- category: functional / non_functional / edge_case
+- description: what should work
+- steps: verification steps (array of strings)
+- priority: 1-5 (1=critical, 5=nice-to-have)
+
+Return ONLY the JSON object.`;
+
+      const result = await this.ccClient.executeTask(prompt, {
+        workingDir: run.workingDir,
+        timeoutMinutes: 5,
+        maxTurns: 3,
+        jsonSchema: schema,
+        abortSignal: this.stopController?.signal,
+      });
+
+      const parsed = JSON.parse(result.result) as { features: Array<{
+        id: string; category: "functional" | "non_functional" | "edge_case";
+        description: string; steps: string[]; priority: number;
+      }> };
+
+      const features: import("@ai-workbench/shared").FeatureItem[] = parsed.features.map((f) => ({
+        ...f,
+        passes: false,
+      }));
+
+      run.features = features;
+      run.featuresGeneratedAt = Date.now();
+      this.store.saveRun(run);
+      this.broadcast("features.generated", { runId: run.id, total: features.length });
+      this.log(run.id, "engine", "info", `Generated ${features.length} features for tracking`);
+    } catch (err) {
+      this.log(run.id, "engine", "warn", `Feature generation failed (non-fatal): ${this.errorToMessage(err)}`);
+    }
+  }
+
+  private async verifyFeatures(run: ExecutionRun): Promise<void> {
+    if (!run.features || run.features.length === 0) return;
+
+    const unverified = run.features.filter((f) => !f.passes);
+    if (unverified.length === 0) return;
+
+    // Sample up to 10 features per verification pass to control cost
+    const sample = unverified.slice(0, 10);
+
+    try {
+      const featureList = sample.map((f) =>
+        `[${f.id}] (${f.category}, P${f.priority}) ${f.description}\n  Verify: ${f.steps.join("; ")}`
+      ).join("\n");
+
+      const schema: Record<string, unknown> = {
+        type: "object",
+        properties: {
+          results: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                passes: { type: "boolean" },
+              },
+              required: ["id", "passes"],
+            },
+          },
+        },
+        required: ["results"],
+      };
+
+      const prompt = `Verify these features in the project at ${run.workingDir}:
+
+${featureList}
+
+For each feature, check if it currently passes by reading the relevant source files and tests.
+Return a JSON object with "results" array containing { id, passes } for each feature.`;
+
+      const result = await this.ccClient.executeTask(prompt, {
+        workingDir: run.workingDir,
+        timeoutMinutes: 5,
+        maxTurns: 5,
+        jsonSchema: schema,
+        abortSignal: this.stopController?.signal,
+      });
+
+      const parsed = JSON.parse(result.result) as { results: Array<{ id: string; passes: boolean }> };
+
+      let passed = 0;
+      for (const r of parsed.results) {
+        const feature = run.features.find((f) => f.id === r.id);
+        if (feature && r.passes && !feature.passes) {
+          feature.passes = true;
+          feature.verifiedAt = Date.now();
+          feature.verifiedBy = "auto";
+          passed++;
+        }
+      }
+
+      if (passed > 0) {
+        this.store.saveRun(run);
+        const totalPassed = run.features.filter((f) => f.passes).length;
+        this.broadcast("features.updated", { runId: run.id, passed: totalPassed, total: run.features.length });
+        this.log(run.id, "engine", "info", `Features verified: +${passed} passed (${totalPassed}/${run.features.length} total)`);
+      }
+    } catch (err) {
+      this.log(run.id, "engine", "warn", `Feature verification failed (non-fatal): ${this.errorToMessage(err)}`);
+    }
   }
 }

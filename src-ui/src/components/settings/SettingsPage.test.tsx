@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { SettingsPage } from "./SettingsPage";
@@ -86,14 +86,12 @@ describe("SettingsPage", () => {
   });
 
   it("修改质量阈值后按钮激活", async () => {
-    const user = userEvent.setup();
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
     const rangeInput = screen.getByRole("slider", { name: /质量阈值/ });
-    await user.clear(rangeInput);
-    await user.type(rangeInput, "80");
+    fireEvent.change(rangeInput, { target: { value: "80" } });
     await waitFor(() => {
       const btn = screen.getByText("保存设置");
       expect(btn).not.toBeDisabled();
@@ -127,28 +125,24 @@ describe("SettingsPage", () => {
   });
 
   it("验证质量阈值边界 - 低于最小值", async () => {
-    const user = userEvent.setup();
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
     const numberInput = screen.getByLabelText("质量阈值数值输入");
-    await user.clear(numberInput);
-    await user.type(numberInput, "-0.1");
+    fireEvent.change(numberInput, { target: { value: "-0.1" } });
     await waitFor(() => {
       expect(screen.getByText(/不能低于/)).toBeInTheDocument();
     });
   });
 
   it("验证质量阈值边界 - 超过最大值", async () => {
-    const user = userEvent.setup();
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
     const numberInput = screen.getByLabelText("质量阈值数值输入");
-    await user.clear(numberInput);
-    await user.type(numberInput, "1.5");
+    fireEvent.change(numberInput, { target: { value: "1.5" } });
     await waitFor(() => {
       expect(screen.getByText(/不能超过/)).toBeInTheDocument();
     });
@@ -183,7 +177,6 @@ describe("SettingsPage", () => {
   });
 
   it("config.get 失败时显示 toast 错误", async () => {
-    const toastErrorSpy = vi.fn();
     // We need to check the toast.error calls in the component
     mockCall.mockImplementation(async (method: string, params?: Record<string, unknown>) => {
       if (method === "config.get" && params?.key === "qualityThreshold") throw new Error("网络错误");

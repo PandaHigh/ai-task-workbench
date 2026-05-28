@@ -4,6 +4,7 @@ import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
+import { SessionManager } from "../engine/session-manager.js";
 import * as wizardHandler from "../wizard/wizard-handler.js";
 import * as remoteProxy from "../remote/remote-proxy.js";
 import { resolve, normalize } from "path";
@@ -15,7 +16,12 @@ const store = new Store();
 const shareStore = new ShareStore();
 const subscriptionStore = new SubscriptionStore();
 const queueManager = new QueueManager();
+
+export { store, shareStore, queueManager };
+const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
+
+export { sessionManager };
 
 // ─── Remote run detection ────────────────────────────────────────────────
 
@@ -144,9 +150,10 @@ function serializeGoalState(run: ExecutionRun): Record<string, unknown> {
   };
 }
 
-export function recoverStaleRuns(): { runsReset: number; tasksReset: number } {
+export function recoverStaleRuns(): { runsReset: number; tasksReset: number; approvalsReset: number } {
   let runsReset = 0;
   let tasksReset = 0;
+  let approvalsReset = 0;
   const transientStatuses = ["running", "scoring", "committing", "reverting"] as const;
 
   const runs = store.listRuns();
@@ -166,8 +173,17 @@ export function recoverStaleRuns(): { runsReset: number; tasksReset: number } {
         tasksReset++;
       }
     }
+    // Mark pending approvals as timed_out
+    const pendingApprovals = store.getPendingApprovals(run.id);
+    for (const approval of pendingApprovals) {
+      store.updateApprovalRequest(run.id, approval.id, {
+        status: "timed_out",
+        resolvedAt: Date.now(),
+      });
+      approvalsReset++;
+    }
   }
-  return { runsReset, tasksReset };
+  return { runsReset, tasksReset, approvalsReset };
 }
 
 type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
@@ -303,6 +319,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (run) {
       run.status = "paused";
       store.saveRun(run);
+      sessionManager.recordActivity({ userId: "system", runId, action: "run.stopped" });
     }
     return { status: "stopped" };
   },
@@ -345,6 +362,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       ...(promptJson !== undefined && { promptJson: String(promptJson) }),
     });
     store.saveTask(runId, task);
+    sessionManager.recordActivity({ userId: "system", runId, action: "task.created", details: { taskId: task.id, content: content.substring(0, 80) } });
+    notify("queue.updated", { runId, queue: queueManager.list(runId) });
     return task;
   },
 
@@ -450,9 +469,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
       throw new RpcValidationError(`Task ${taskId} status '${task.status}' — can only retry failed/reverted/cancelled`);
     }
     store.updateTask(runId, taskId, {
-      status: "pending", score: null, scoreDetails: null,
-      result: null, errorMessage: null, completedAt: null,
-      durationMs: null, costUsd: null,
+      status: "pending", score: undefined, scoreDetails: undefined,
+      result: undefined, errorMessage: undefined, completedAt: undefined,
+      durationMs: undefined, costUsd: undefined,
     });
     const restored = queueManager.enqueue(runId, {
       content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
@@ -683,5 +702,121 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const goalState = serializeGoalState(run);
     notify("goal.updated", { runId: run.id, goal: goalState });
     return { cleared: true };
+  },
+
+  // ─── Approval system ──────────────────────────────────────────────────────
+
+  "approval.respond": async (params) => {
+    const runId = requireString(params, "runId");
+    const approvalId = requireString(params, "approvalId");
+    const action = requireString(params, "action") as "approve" | "reject" | "modify";
+    if (!["approve", "reject", "modify"].includes(action)) {
+      throw new RpcValidationError("action must be approve, reject, or modify");
+    }
+    validateRunId(runId);
+    const executor = activeExecutors.get(runId);
+    if (!executor) {
+      throw new RpcValidationError(`No active executor for run ${runId}`);
+    }
+    const instructions = typeof params.instructions === "string" ? params.instructions : undefined;
+    const modifications = params.modifications as Record<string, unknown> | undefined;
+    const resolved = executor.resolveApproval(approvalId, { action, instructions, modifications });
+    if (!resolved) {
+      throw new RpcValidationError(`Approval ${approvalId} not found or already resolved`);
+    }
+    sessionManager.recordActivity({ userId: "system", runId, action: "approval.responded", details: { approvalId, action } });
+    return { approvalId, resolved: true };
+  },
+
+  "approval.inject": async (params) => {
+    const runId = requireString(params, "runId");
+    const instructions = requireString(params, "instructions");
+    validateRunId(runId);
+    const executor = activeExecutors.get(runId);
+    if (!executor) {
+      throw new RpcValidationError(`No active executor for run ${runId}`);
+    }
+    executor.injectInstructions(instructions);
+    return { injected: true };
+  },
+
+  // ─── Multi-agent ──────────────────────────────────────────────────────────
+
+  "run.setExecutionMode": async (params) => {
+    const runId = requireString(params, "runId");
+    const mode = requireString(params, "mode") as "sequential" | "parallel";
+    if (!["sequential", "parallel"].includes(mode)) {
+      throw new RpcValidationError("mode must be sequential or parallel");
+    }
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+    run.executionMode = mode;
+    store.saveRun(run);
+    return { runId, executionMode: mode };
+  },
+
+  "role.list": async () => {
+    const { BUILTIN_ROLES } = await import("../engine/agent-roles.js");
+    return { roles: BUILTIN_ROLES };
+  },
+
+  "role.create": async (_params) => {
+    return { created: true };
+  },
+
+  // ─── Session & Identity ─────────────────────────────────────────────────
+
+  "session.identify": async (params) => {
+    const session = sessionManager.identify({
+      userId: params.userId as string | undefined,
+      displayName: params.displayName as string | undefined,
+      role: params.role as "owner" | "collaborator" | "viewer" | undefined,
+      sessionId: params.sessionId as string | undefined,
+    });
+    return session;
+  },
+
+  "session.list": async () => {
+    return { sessions: sessionManager.listActive() };
+  },
+
+  // ─── Activity Timeline ──────────────────────────────────────────────────
+
+  "activity.list": async (params) => {
+    const runId = params.runId as string;
+    if (!runId) throw new RpcValidationError("Missing runId");
+    const limit = params.limit as number | undefined;
+    return { activities: sessionManager.getActivities(runId, limit) };
+  },
+
+  // ─── Comments ───────────────────────────────────────────────────────────
+
+  "comment.create": async (params) => {
+    const runId = params.runId as string;
+    const taskId = params.taskId as string;
+    const userId = (params.userId as string) || "anonymous";
+    const displayName = (params.displayName as string) || userId;
+    const content = params.content as string;
+
+    if (!runId || !taskId || !content) {
+      throw new RpcValidationError("Missing runId, taskId, or content");
+    }
+
+    const comment = sessionManager.addComment({ taskId, runId, userId, displayName, content });
+
+    const event = sessionManager.recordActivity({
+      userId, runId, action: "comment.created",
+      details: { taskId, commentId: comment.id },
+    });
+
+    return { comment, activity: event };
+  },
+
+  "comment.list": async (params) => {
+    const runId = params.runId as string;
+    if (!runId) throw new RpcValidationError("Missing runId");
+    const taskId = params.taskId as string | undefined;
+    return { comments: sessionManager.getComments(runId, taskId) };
   },
 };

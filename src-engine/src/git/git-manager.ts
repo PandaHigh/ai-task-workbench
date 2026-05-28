@@ -85,4 +85,31 @@ export class GitManager {
     return this.git.diff([hash]);
   }
 
+  async getDiffStats(): Promise<{
+    filesChanged: number;
+    linesChanged: number;
+    hasCriticalFiles: boolean;
+  }> {
+    try {
+      const summary = await this.git.diffSummary();
+      const files = summary.files ?? [];
+      let linesChanged = 0;
+      for (const f of files) {
+        const textFile = f as { insertions?: number; deletions?: number };
+        linesChanged += (textFile.insertions ?? 0) + (textFile.deletions ?? 0);
+      }
+      const criticalPatterns = [
+        "package.json", "tsconfig", "docker-compose", "Dockerfile",
+        ".env", "config/", "build/", "deploy/", "Makefile",
+      ];
+      const hasCriticalFiles = files.some((f) => {
+        const file = (f as { file?: string }).file ?? "";
+        return criticalPatterns.some((p) => file.includes(p));
+      });
+      return { filesChanged: files.length, linesChanged, hasCriticalFiles };
+    } catch {
+      return { filesChanged: 0, linesChanged: 0, hasCriticalFiles: false };
+    }
+  }
+
 }

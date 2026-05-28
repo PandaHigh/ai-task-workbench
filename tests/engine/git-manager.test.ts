@@ -30,7 +30,7 @@ describe("GitManager", () => {
   describe("autoCommit", () => {
     it("should commit with formatted message", async () => {
       const hash = await gm.autoCommit("abc123", "Add feature");
-      expect(mockGitInstance.add).toHaveBeenCalledWith("-u");
+      expect(mockGitInstance.add).toHaveBeenCalledWith("-A");
       expect(mockGitInstance.commit).toHaveBeenCalledWith("[abc123] Add feature #AI commit#");
       expect(hash).toBe("abc1234567890");
     });
@@ -68,10 +68,10 @@ describe("GitManager", () => {
     });
   });
 
-  describe("initIfNeeded", () => {
+  describe("ensureInit", () => {
     it("should init repo and set config when not a repo", async () => {
       mockGitInstance.checkIsRepo.mockResolvedValueOnce(false);
-      await gm.initIfNeeded();
+      await gm.ensureInit();
       expect(mockGitInstance.init).toHaveBeenCalled();
       expect(mockGitInstance.addConfig).toHaveBeenCalledWith("user.name", "AI Task Workbench");
       expect(mockGitInstance.addConfig).toHaveBeenCalledWith("user.email", "ai-workbench@local");
@@ -79,7 +79,7 @@ describe("GitManager", () => {
 
     it("should skip init when already a repo", async () => {
       mockGitInstance.checkIsRepo.mockResolvedValueOnce(true);
-      await gm.initIfNeeded();
+      await gm.ensureInit();
       expect(mockGitInstance.init).not.toHaveBeenCalled();
     });
   });

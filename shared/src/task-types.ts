@@ -4,6 +4,11 @@ import type {
   TaskType,
   LessonCategory,
   GoalStatus,
+  CheckpointType,
+  ApprovalStatus,
+  ExecutionMode,
+  AgentRoleType,
+  UserRole,
 } from "./enums.js";
 
 export interface TaskDefinition {
@@ -28,6 +33,7 @@ export interface TaskDefinition {
   errorMessage?: string;
   retryCount?: number;
   lastError?: string;
+  assignedRoleId?: string;
 }
 
 export interface ExecutionRun {
@@ -55,6 +61,18 @@ export interface ExecutionRun {
   goalEvaluationCycles?: number;
   goalLastEvalReason?: string;
   goalEvidence?: string[];
+
+  // Approval system
+  approvalTimeoutMs?: number;
+
+  // Multi-agent
+  executionMode?: ExecutionMode;
+  maxConcurrentAgents?: number;
+  agentRoles?: AgentRole[];
+
+  // Feature tracking
+  features?: FeatureItem[];
+  featuresGeneratedAt?: number;
 }
 
 export interface ShareToken {
@@ -182,4 +200,112 @@ export interface GoalEvaluationResult {
   evidence: string[];
   progress: number;
   nextSteps: string;
+}
+
+// ─── Approval system ─────────────────────────────────────────────────────
+
+export interface ApprovalRequest {
+  id: string;
+  runId: string;
+  taskId?: string;
+  checkpointType: CheckpointType;
+  status: ApprovalStatus;
+  createdAt: number;
+  resolvedAt?: number;
+  timeoutMs?: number;
+  autoAction: "approve" | "reject";
+  summary: string;
+  contextData: Record<string, unknown>;
+  decision?: {
+    action: "approve" | "reject" | "modify";
+    instructions?: string;
+    modifications?: Record<string, unknown>;
+  };
+}
+
+// ─── Multi-agent roles ───────────────────────────────────────────────────
+
+export interface AgentRole {
+  id: string;
+  type: AgentRoleType;
+  name: string;
+  systemPrompt: string;
+  allowedTools: string[];
+}
+
+// ─── Feature tracking ────────────────────────────────────────────────────
+
+export interface FeatureItem {
+  id: string;
+  category: "functional" | "non_functional" | "edge_case";
+  description: string;
+  steps: string[];
+  passes: boolean;
+  priority: number;
+  verifiedAt?: number;
+  verifiedBy?: string;
+}
+
+// ─── Multi-user collaboration ──────────────────────────────────────────
+
+export interface RunPermission {
+  userId: string;
+  role: UserRole;
+  canAddTask: boolean;
+  canApproveTask: boolean;
+  canEditQueue: boolean;
+  canStartStop: boolean;
+  canManageShare: boolean;
+}
+
+export interface ClientSession {
+  sessionId: string;
+  userId: string;
+  displayName: string;
+  role: UserRole;
+  connectedAt: number;
+  lastActiveAt: number;
+  currentPage?: string;
+}
+
+export interface ActivityEvent {
+  id: string;
+  timestamp: number;
+  userId: string;
+  action: string;
+  details: Record<string, unknown>;
+  runId: string;
+}
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  runId: string;
+  userId: string;
+  displayName: string;
+  content: string;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+export function hasPermission(perm: RunPermission | undefined, action: "addTask" | "approveTask" | "editQueue" | "startStop" | "manageShare"): boolean {
+  if (!perm) return false;
+  switch (action) {
+    case "addTask": return perm.canAddTask;
+    case "approveTask": return perm.canApproveTask;
+    case "editQueue": return perm.canEditQueue;
+    case "startStop": return perm.canStartStop;
+    case "manageShare": return perm.canManageShare;
+  }
+}
+
+export function roleToPermissions(role: UserRole): Omit<RunPermission, "userId"> {
+  switch (role) {
+    case "owner":
+      return { role: "owner", canAddTask: true, canApproveTask: true, canEditQueue: true, canStartStop: true, canManageShare: true };
+    case "collaborator":
+      return { role: "collaborator", canAddTask: true, canApproveTask: true, canEditQueue: true, canStartStop: false, canManageShare: false };
+    case "viewer":
+      return { role: "viewer", canAddTask: false, canApproveTask: false, canEditQueue: false, canStartStop: false, canManageShare: false };
+  }
 }

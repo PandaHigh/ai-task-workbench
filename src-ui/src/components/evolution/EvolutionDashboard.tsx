@@ -11,8 +11,16 @@ import { useToast } from "../common/Toast";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 import { marked } from "marked";
+import { ApprovalPanel } from "./ApprovalPanel";
+import { InjectButton } from "./InjectButton";
+import { StreamingOutput } from "./StreamingOutput";
+import { FeatureBoard } from "./FeatureBoard";
+import { ExecutionModeSelector } from "./ExecutionModeSelector";
+import { PresencePanel } from "./PresencePanel";
+import { ActivityTimeline } from "./ActivityTimeline";
+import { TaskComments } from "./TaskComments";
 
-type TabType = "logs" | "commits" | "lessons" | "report";
+type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "report";
 
 const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(59,130,246,0.15)" },
@@ -43,10 +51,20 @@ export function EvolutionDashboard() {
   const { tasks } = useTaskStore();
   const run = tasks.find((t) => t.id === runId);
 
-  const {
-    queue, logs, commits, lessons, isRunning, activeTaskId,
-    setQueue, addLog, setCommits, setLessons, setRunning, setActiveTask, reset,
-  } = useEvolutionStore();
+  const queue = useEvolutionStore((s) => s.queue);
+  const logs = useEvolutionStore((s) => s.logs);
+  const commits = useEvolutionStore((s) => s.commits);
+  const lessons = useEvolutionStore((s) => s.lessons);
+  const isRunning = useEvolutionStore((s) => s.isRunning);
+  const activeTaskId = useEvolutionStore((s) => s.activeTaskId);
+  const setQueue = useEvolutionStore((s) => s.setQueue);
+  const addLog = useEvolutionStore((s) => s.addLog);
+  const setLogs = useEvolutionStore((s) => s.setLogs);
+  const setCommits = useEvolutionStore((s) => s.setCommits);
+  const setLessons = useEvolutionStore((s) => s.setLessons);
+  const setRunning = useEvolutionStore((s) => s.setRunning);
+  const setActiveTask = useEvolutionStore((s) => s.setActiveTask);
+  const reset = useEvolutionStore((s) => s.reset);
 
   const [tab, setTab] = useState<TabType>("logs");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
@@ -108,7 +126,7 @@ export function EvolutionDashboard() {
 
       try {
         const historyLogs = (await call("run.logs", { runId })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
-        historyLogs.forEach((log) => addLog(log));
+        setLogs(historyLogs);
       } catch { /* ignore */ }
 
       try {
@@ -234,6 +252,8 @@ export function EvolutionDashboard() {
   const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
 
   return (
+    <>
+    <ApprovalPanel />
     <div className="flex-1 flex overflow-hidden" style={pageEnterStyle()}>
       <div className="flex-1 flex flex-col">
         {/* Header */}
@@ -367,6 +387,11 @@ export function EvolutionDashboard() {
                     {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
                   </div>
                 </div>
+                {runId && (
+                  <div className="mt-1.5 px-1">
+                    <TaskComments runId={runId} taskId={runningTask.id} />
+                  </div>
+                )}
               </div>
             )}
             {/* Completed tasks */}
@@ -425,12 +450,12 @@ export function EvolutionDashboard() {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
             <div className="px-4 py-2 border-b relative flex" style={{ borderColor: "var(--border)" }}>
-              {(["logs", "commits", "lessons", ...(run?.finalReport ? ["report" as const] : [])] as TabType[]).map((t) => (
+              {(["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
                   background: tab === t ? "var(--bg-tertiary)" : "transparent",
                 }}>
-                  {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : t === "lessons" ? `经验教训 (${lessons.length})` : "最终报告"}
+                  {t === "logs" ? `日志 (${logs.length})` : t === "commits" ? `Git 提交 (${commits.length})` : t === "lessons" ? `经验教训 (${lessons.length})` : t === "features" ? `Features (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "活动" : "最终报告"}
                 </button>
               ))}
             </div>
@@ -445,7 +470,7 @@ export function EvolutionDashboard() {
               ) : <>
               {/* Logs Tab */}
               {tab === "logs" && (
-                logs.length === 0 ? (
+                logs.length === 0 && !activeTaskId ? (
                   <EmptyState
                     title="等待任务执行"
                     description="启动后日志将实时显示在这里"
@@ -453,6 +478,15 @@ export function EvolutionDashboard() {
                   />
                 ) : (
                   <div className="space-y-0.5">
+                    {activeTaskId && (
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                          <span className="text-blue-400 font-mono text-xs font-bold">实时输出</span>
+                        </div>
+                        <StreamingOutput taskId={activeTaskId} />
+                      </div>
+                    )}
                     {logs.map((log) => (
                       <div key={log.id} className="terminal-line terminal-line-enter">
                         <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
@@ -518,6 +552,20 @@ export function EvolutionDashboard() {
                     ))}
                   </div>
                 )
+              )}
+
+              {/* Features Tab */}
+              {tab === "features" && (
+                run?.features ? (
+                  <FeatureBoard features={run.features} />
+                ) : (
+                  <EmptyState title="暂无 Feature 数据" description="执行开始后自动生成 feature 追踪列表" variant="logs" />
+                )
+              )}
+
+              {/* Activity Tab */}
+              {tab === "activity" && (
+                <ActivityTimeline runId={runId ?? ""} />
               )}
 
               {/* Report Tab — rendered as markdown */}
@@ -622,6 +670,27 @@ export function EvolutionDashboard() {
                     <span style={{ color: "var(--text-primary)" }}>{c}</span>
                   </p>
                 ))}
+              </div>
+
+              {/* Execution Mode */}
+              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
+                <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>执行模式</h4>
+                <ExecutionModeSelector
+                  runId={runId ?? ""}
+                  currentMode={run.executionMode}
+                  maxConcurrent={run.maxConcurrentAgents}
+                  disabled={isRunning}
+                />
+              </div>
+
+              {/* Inject Instructions */}
+              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
+                <InjectButton runId={runId ?? ""} disabled={!isRunning} />
+              </div>
+
+              {/* Online Users */}
+              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
+                <PresencePanel />
               </div>
 
               {/* Goal State Panel */}
@@ -822,6 +891,7 @@ export function EvolutionDashboard() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

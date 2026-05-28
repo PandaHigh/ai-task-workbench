@@ -44,8 +44,8 @@ export function useEngine() {
   }, []);
 
   const call = useCallback(
-    (method: string, params?: Record<string, unknown>) => {
-      return engineClient.call(method, params);
+    (method: string, params?: Record<string, unknown>, timeoutMs?: number) => {
+      return engineClient.call(method, params, timeoutMs);
     },
     [],
   );

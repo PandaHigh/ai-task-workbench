@@ -61,7 +61,7 @@ class EngineClient {
     });
   }
 
-  call(method: string, params?: Record<string, unknown>): Promise<unknown> {
+  call(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error("Engine not connected"));
@@ -84,7 +84,7 @@ class EngineClient {
           this.pending.delete(id);
           reject(new Error(`Timeout calling ${method}`));
         }
-      }, 30000);
+      }, timeoutMs ?? 30000);
     });
   }
 

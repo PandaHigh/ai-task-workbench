@@ -53,6 +53,26 @@ export class QueueManager {
     return queue.shift()!.task;
   }
 
+  dequeueForRole(runId: string, roleId: string): TaskDefinition | null {
+    const queue = this.queues.get(runId);
+    if (!queue || queue.length === 0) return null;
+
+    // Prefer tasks explicitly assigned to this role
+    const roleIdx = queue.findIndex((e) => e.task.assignedRoleId === roleId);
+    if (roleIdx !== -1) {
+      return queue.splice(roleIdx, 1)[0].task;
+    }
+
+    // Fall back to unassigned tasks
+    const unassignedIdx = queue.findIndex((e) => !e.task.assignedRoleId);
+    if (unassignedIdx !== -1) {
+      return queue.splice(unassignedIdx, 1)[0].task;
+    }
+
+    // Last resort: take any task
+    return queue.shift()!.task;
+  }
+
   peekNext(runId: string, count: number): TaskDefinition[] {
     const queue = this.queues.get(runId);
     if (!queue) return [];

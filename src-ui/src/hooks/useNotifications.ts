@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
-import type { ExecutionRun, TaskDefinition, GoalStatus } from "@ai-workbench/shared";
+import { useApprovalStore } from "../stores/approval-store";
+import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -104,6 +105,105 @@ export function useNotifications() {
             goalEvaluationCycles: goal.evaluationCycles,
             goalLastEvalReason: goal.lastEvaluationReason,
             goalEvidence: goal.evidence,
+          });
+          break;
+        }
+        case "approval.requested": {
+          const { approvalId, runId, taskId, checkpointType, summary, contextData } = params as {
+            approvalId: string;
+            runId: string;
+            taskId?: string;
+            checkpointType: CheckpointType;
+            summary: string;
+            contextData: Record<string, unknown>;
+            timeoutAt?: number;
+          };
+          const { addApproval } = useApprovalStore.getState();
+          addApproval({
+            id: approvalId,
+            runId,
+            taskId,
+            checkpointType,
+            summary,
+            contextData,
+            status: "pending",
+            createdAt: Date.now(),
+            autoAction: "approve",
+          } as ApprovalRequest);
+          addLog({
+            id: Date.now(),
+            timestamp: Date.now(),
+            level: "warn",
+            source: "engine",
+            message: `Approval needed: ${summary}`,
+          });
+          break;
+        }
+        case "approval.resolved": {
+          const { approvalId, status } = params as { approvalId: string; status: ApprovalStatus };
+          const { removeApproval } = useApprovalStore.getState();
+          removeApproval(approvalId);
+          addLog({
+            id: Date.now(),
+            timestamp: Date.now(),
+            level: "info",
+            source: "engine",
+            message: `Approval ${approvalId.substring(0, 6)} resolved: ${status}`,
+          });
+          break;
+        }
+        case "task.stream": {
+          const { taskId, message } = params as { taskId: string; message: { type: string; subtype?: string; content?: unknown } };
+          const { appendStreamMessage } = useApprovalStore.getState();
+          appendStreamMessage(taskId, message);
+          break;
+        }
+        case "features.generated": {
+          addLog({
+            id: Date.now(),
+            timestamp: Date.now(),
+            level: "info",
+            source: "engine",
+            message: "Feature list generated",
+          });
+          break;
+        }
+        case "features.updated": {
+          const { passed, total } = params as { passed: number; total: number };
+          addLog({
+            id: Date.now(),
+            timestamp: Date.now(),
+            level: "info",
+            source: "engine",
+            message: `Features: ${passed}/${total} passed`,
+          });
+          break;
+        }
+        case "presence.joined": {
+          const { displayName } = params as { displayName: string };
+          addLog({
+            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            message: `${displayName} 已连接`,
+          });
+          break;
+        }
+        case "presence.left": {
+          const { displayName } = params as { displayName: string };
+          addLog({
+            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            message: `${displayName} 已断开`,
+          });
+          break;
+        }
+        case "activity.created": {
+          // Activity events are loaded on-demand via RPC
+          break;
+        }
+        case "comment.created": {
+          const { userId, taskId } = params as { userId: string; taskId: string };
+          addLog({
+            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            message: `${userId} 评论了任务 ${taskId.substring(0, 6)}`,
           });
           break;
         }
