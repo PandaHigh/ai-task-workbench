@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 type Theme = "light" | "dark";
 
-const STORAGE_KEY = "forge-theme";
+const STORAGE_KEY = "pandaai-theme";
 
 function getInitial(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);

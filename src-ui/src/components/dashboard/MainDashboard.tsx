@@ -87,7 +87,7 @@ export function MainDashboard() {
 
       {!loading && tasks.length === 0 && (
         <EmptyState
-          title="欢迎使用 Forge"
+          title="欢迎使用 PandaAI"
           description="点击下方按钮，告诉我你想做什么"
           action={{ label: "开始第一个任务", onClick: () => navigate("/wizard") }}
           variant="default"

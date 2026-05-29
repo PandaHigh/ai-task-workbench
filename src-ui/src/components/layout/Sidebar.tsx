@@ -107,8 +107,8 @@ export function Sidebar() {
               </div>
               <div>
                 <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
-                  <span className="max-md:hidden">Forge</span>
-                  <span className="hidden max-md:inline">Forge</span>
+                  <span className="max-md:hidden">PandaAI</span>
+                  <span className="hidden max-md:inline">PandaAI</span>
                 </h1>
               </div>
             </div>
