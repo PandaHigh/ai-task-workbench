@@ -4,9 +4,7 @@ import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
 import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
-import { BUILTIN_ROLES } from "./agent-roles.js";
-import { WorkerAgent } from "./worker-agent.js";
-import { WorktreeManager } from "../git/worktree-manager.js";
+import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
@@ -45,8 +43,6 @@ export class Executor {
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
-private activeWorkers: Map<string, WorkerAgent> = new Map();
-  private worktreeManager: WorktreeManager = new WorktreeManager();
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -114,60 +110,32 @@ private activeWorkers: Map<string, WorkerAgent> = new Map();
       }
 
       while (this.running) {
-        if (run.executionMode === "parallel") {
-          // Parallel mode: dispatch tasks to workers
-          const maxConcurrent = run.maxConcurrentAgents ?? 2;
-          const availableSlots = maxConcurrent - this.activeWorkers.size;
+        // Sequential mode (default)
+        const task = this.queueManager.dequeue(run.id);
 
-          for (let i = 0; i < availableSlots; i++) {
-            const task = this.queueManager.dequeue(run.id);
-            if (!task) break;
+        if (!task) {
+          const shouldContinue = await this.handleEmptyQueue(run);
+          if (!shouldContinue) break;
+          continue;
+        }
 
-            this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
-            this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
-            this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+        this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
+        this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
 
-            // Fire-and-forget, tracked in activeWorkers
-            this.executeInWorker(task, run).catch((err) => {
-              this.log(run.id, "engine", "error", `Worker failed: ${this.errorToMessage(err)}`, task.id);
-            });
-          }
+        await this.executeSingleTask(task, run);
 
-          if (this.activeWorkers.size === 0) {
-            const shouldContinue = await this.handleEmptyQueue(run);
-            if (!shouldContinue) break;
-          }
+        run.totalTasksCompleted++;
+        this.store.saveRun(run);
 
-          // Wait a bit for workers to progress
-          try { await this.sleep(1000); } catch { /* interrupted */ }
-        } else {
-          // Sequential mode (default)
-          const task = this.queueManager.dequeue(run.id);
-
-          if (!task) {
-            const shouldContinue = await this.handleEmptyQueue(run);
-            if (!shouldContinue) break;
-            continue;
-          }
-
-          this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
-          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
-          this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
-
-          await this.executeSingleTask(task, run);
-
-          run.totalTasksCompleted++;
-          this.store.saveRun(run);
-
-          // Post-task budget guard
-          const taskCost = this.recalculateCost(run.id);
-          if (taskCost > this.config.maxBudgetUsd) {
-            this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
-            this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
-            this.stop();
-            await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
-            break;
-          }
+        // Post-task budget guard
+        const taskCost = this.recalculateCost(run.id);
+        if (taskCost > this.config.maxBudgetUsd) {
+          this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
+          this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
+          this.stop();
+          await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
+          break;
         }
       }
     } catch (err) {
@@ -353,87 +321,49 @@ private activeWorkers: Map<string, WorkerAgent> = new Map();
     try {
       await gitManager.ensureInit();
       const context = await this.buildContext(task, run, gitManager);
-      const systemPrompt = this.buildSystemPrompt(task, context);
 
-      this.log(run.id, "cc", "info", `Executing: ${task.content.substring(0, 80)}...`);
+      this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
 
-      // Stream CC output in real-time
-      let result: import("../cc-integration/cc-client.js").CCTaskResult | null = null;
-      let streamResult: string | null = null;
-      let streamSessionId = "";
-      let streamCost = 0;
-      let streamDuration = 0;
-      let streamTurns = 0;
-      const streamMessages: import("../cc-integration/cc-client.js").CCMessage[] = [];
+      // Use TaskPipeline for structured execution
+      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), run.workingDir);
+      const pipelineResult: PipelineResult = await pipeline.run(task, context, abortController.signal);
 
-      const stream = this.ccClient.executeTaskStream(task.content, {
-        workingDir: run.workingDir,
-        sessionId: task.sessionId,
-        timeoutMinutes: task.timeoutMinutes,
-        maxTurns: this.config.maxTurns,
-        systemPrompt,
-        abortSignal: abortController.signal,
-        allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-      });
-
-      for await (const message of stream) {
-        streamMessages.push(message);
-        this.broadcast("task.stream", { taskId: task.id, runId: run.id, message });
-
-        if (message.type === "result" && message.subtype === "success") {
-          streamResult = message.result || "";
-          streamSessionId = message.session_id || "";
-          streamCost = message.total_cost_usd || 0;
-          streamDuration = message.duration_ms || 0;
-          streamTurns = message.num_turns || 0;
-        }
-      }
-
-      if (streamResult !== null) {
-        result = {
-          result: streamResult,
-          sessionId: streamSessionId,
-          totalCostUsd: streamCost,
-          durationMs: streamDuration,
-          numTurns: streamTurns,
-          messages: streamMessages,
-        };
-      } else {
-        // Fallback: assemble from assistant messages
-        const assistantTexts = streamMessages
-          .filter((m) => m.type === "assistant")
-          .map((m) => typeof m.content === "string" ? m.content : (Array.isArray(m.content) ? (m.content as Array<{text: string}>).map(c => c.text).join("") : ""))
-          .filter(Boolean);
-        const fallbackResult = assistantTexts.length > 0 ? assistantTexts[assistantTexts.length - 1] : "";
-        if (fallbackResult) {
-          result = { result: fallbackResult, sessionId: streamSessionId, totalCostUsd: streamCost, durationMs: streamDuration, numTurns: streamTurns, messages: streamMessages };
-        }
-      }
-
-      if (!result || !result.result) {
-        throw new Error("CC stream completed without producing a result");
-      }
-
-      this.log(run.id, "cc", "info", `CC completed in ${result.durationMs}ms, cost $${result.totalCostUsd.toFixed(4)}`, task.id);
-      run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
+      this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
+      run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
 
       this.store.updateTask(run.id, task.id, {
         status: "scoring",
-        result: result.result,
-        sessionId: result.sessionId,
-        costUsd: result.totalCostUsd,
-        durationMs: result.durationMs,
+        result: pipelineResult.finalOutput,
+        sessionId: pipelineResult.sessionId,
+        costUsd: pipelineResult.totalCostUsd,
+        durationMs: pipelineResult.durationMs,
+        pipelinePhases: pipelineResult.phases,
+        pipelineIterations: pipelineResult.iterations,
       });
       this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "scoring" });
 
-      // Quality scoring (with error recovery)
+      // Quality scoring: prefer reviewer score from pipeline, fallback to scoreTask()
       let score: ScoreDetails;
-      try {
-        score = await this.scoreTask(task, result.result, run);
-      } catch (scoringErr) {
-        const scoringMsg = this.errorToMessage(scoringErr);
-        this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`, task.id);
-        score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
+      if (pipelineResult.reviewResult) {
+        const review = pipelineResult.reviewResult;
+        const overall = Math.min(review.score / 100, 1); // reviewResult.score is 0-100, normalize to 0-1
+        score = {
+          overall,
+          goalAlignment: overall * 0.3,
+          correctness: overall * 0.3,
+          completeness: overall * 0.2,
+          quality: overall * 0.2,
+          passed: overall >= this.config.qualityThreshold,
+          reasoning: review.summary || `Pipeline review score: ${review.score}/100`,
+        };
+      } else {
+        try {
+          score = await this.scoreTask(task, pipelineResult.finalOutput, run);
+        } catch (scoringErr) {
+          const scoringMsg = this.errorToMessage(scoringErr);
+          this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`, task.id);
+          score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
+        }
       }
 
       this.store.appendScore(run.id, task.id, score);
@@ -577,30 +507,6 @@ private activeWorkers: Map<string, WorkerAgent> = new Map();
       nextFiveTasks,
       lessonsLearned: lessons,
     };
-  }
-
-  private buildSystemPrompt(_task: TaskDefinition, context: TaskContext): string {
-    const parts: string[] = [];
-
-    const goalPrompt = this.buildGoalContinuationPrompt();
-    if (goalPrompt) {
-      parts.push(goalPrompt);
-      parts.push("");
-    }
-
-    if (context.lastTenCommits.length > 0) {
-      parts.push("Recent git commits:");
-      for (const c of context.lastTenCommits) parts.push(`  ${c.hash.substring(0, 7)} ${c.message}`);
-    }
-    if (context.nextFiveTasks.length > 0) {
-      parts.push("\nUpcoming tasks:");
-      for (const t of context.nextFiveTasks) parts.push(`  [${t.type}] ${t.content}`);
-    }
-    if (context.lessonsLearned.length > 0) {
-      parts.push("\nLessons from previous tasks:");
-      for (const l of context.lessonsLearned.slice(-10)) parts.push(`  [${l.category}] ${l.lesson}`);
-    }
-    return parts.join("\n");
   }
 
   private async evaluateGoal(run: ExecutionRun): Promise<GoalEvaluation> {
@@ -774,22 +680,6 @@ Respond ONLY with valid JSON:
     this.notify(method, params);
   }
 
-  private buildGoalContinuationPrompt(): string {
-    const run = this.currentRun;
-    if (!run || run.goalStatus !== "pursuing" || !run.goalEvidence) return "";
-
-    const objective = run.goals.join("\n");
-    const evidence = run.goalEvidence;
-    return `[GOAL CONTEXT — This task is part of an ongoing goal pursuit]
-OBJECTIVE: ${objective}
-EVALUATION CYCLE: ${run.goalEvaluationCycles ?? 0}
-LAST EVALUATION: ${run.goalLastEvalReason || "(first cycle)"}
-COLLECTED EVIDENCE SO FAR:
-${evidence.length > 0 ? evidence.map((e, i) => `${i + 1}. ${e}`).join("\n") : "(none yet)"}
-
-IMPORTANT: After completing this task, you should verify your work contributes to the objective above. Focus on producing concrete, verifiable results.`;
-  }
-
   private serializeGoalState(run: ExecutionRun): Record<string, unknown> {
     return {
       status: run.goalStatus ?? "unmet",
@@ -822,18 +712,6 @@ IMPORTANT: After completing this task, you should verify your work contributes t
       this.store.updateTask(this.runId, id, { status: "cancelled", completedAt: Date.now() });
     }
     this.abortControllers.clear();
-
-    // Stop all active workers
-    for (const [taskId, worker] of this.activeWorkers) {
-      worker.abort();
-      this.store.updateTask(this.runId, taskId, { status: "cancelled", completedAt: Date.now() });
-    }
-    this.activeWorkers.clear();
-
-    // Cleanup worktrees
-    if (this.currentRun?.workingDir) {
-      this.worktreeManager.cleanupAll(this.currentRun.workingDir).catch(() => {});
-    }
   }
 
   // ─── Approval integration ──────────────────────────────────────────────
@@ -877,94 +755,6 @@ IMPORTANT: After completing this task, you should verify your work contributes t
   resolveApproval(approvalId: string, decision: ApprovalDecision): boolean {
     if (!this.approvalGate) return false;
     return this.approvalGate.resolve(approvalId, decision);
-  }
-
-  private resolveRole(roleId?: string): import("@ai-workbench/shared").AgentRole {
-    const allRoles = [...BUILTIN_ROLES, ...(this.currentRun?.agentRoles ?? [])];
-    return allRoles.find((r) => r.id === roleId) ?? BUILTIN_ROLES[0];
-  }
-
-  private async executeInWorker(task: TaskDefinition, run: ExecutionRun): Promise<void> {
-    const role = this.resolveRole(task.assignedRoleId);
-    const worker = new WorkerAgent(role, run.id, run.workingDir, this.worktreeManager, this.broadcast.bind(this));
-    this.activeWorkers.set(task.id, worker);
-
-    try {
-      const context: TaskContext = {
-        workingDir: run.workingDir,
-        goals: run.goals,
-        terminationConditions: run.terminationConditions,
-        lastTenCommits: this.store.getCommits(run.id).slice(-10).map((c) => ({
-          hash: c.hash, message: c.message, timestamp: c.timestamp, isAiCommit: c.isAiCommit,
-        })),
-        nextFiveTasks: this.queueManager.list(run.id).slice(0, 5),
-        lessonsLearned: this.store.getLessons(run.id, "failure").slice(-5),
-      };
-
-      const result = await worker.execute(task, context);
-
-      this.log(run.id, role.id, "info", `Worker ${role.id} completed: ${result.durationMs}ms, $${result.totalCostUsd.toFixed(4)}`, task.id);
-      run.totalCostUsd = this.recalculateCost(run.id) + result.totalCostUsd;
-
-      // Score the result in the main worktree context
-      let score: ScoreDetails;
-      try {
-        score = await this.scoreTask(task, result.result, run);
-      } catch (scoringErr) {
-        this.log(run.id, "scorer", "warn", `Scoring failed: ${this.errorToMessage(scoringErr)}`, task.id);
-        score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring failed: ${this.errorToMessage(scoringErr)}` };
-      }
-
-      this.store.appendScore(run.id, task.id, score);
-      this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score, result: result.result });
-      this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
-
-      if (score.passed) {
-        // Merge worker changes to main worktree
-        try {
-          await this.worktreeManager.mergeChanges(run.workingDir, `worker-${role.id}-${task.id.substring(0, 6)}`);
-          const gitManager = new GitManager({ workingDir: run.workingDir });
-          const commitHash = await gitManager.autoCommit(task.id, `[${role.id}] ${task.content}`);
-          this.log(run.id, "git", "info", `Committed (parallel): ${commitHash?.substring(0, 7) ?? "unknown"}`, task.id);
-          this.store.appendCommit(run.id, {
-            taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
-            isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
-          });
-          this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
-          this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
-          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
-
-          // Verify features after successful commit
-          if (run.features && run.features.length > 0) {
-            await this.verifyFeatures(run);
-          }
-        } catch (mergeErr) {
-          this.log(run.id, "engine", "warn", `Merge failed, discarding worker changes: ${this.errorToMessage(mergeErr)}`, task.id);
-          this.store.appendLesson(run.id, {
-            runId: run.id, taskId: task.id, category: "failure",
-            lesson: `Worker ${role.id} merge failed: ${this.errorToMessage(mergeErr)}`,
-            score: score.overall, createdAt: Date.now(),
-          });
-          this.store.updateTask(run.id, task.id, { status: "failed", completedAt: Date.now(), errorMessage: `Merge failed: ${this.errorToMessage(mergeErr)}` });
-          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed" });
-        }
-      } else {
-        // Discard worker changes
-        this.store.appendLesson(run.id, {
-          runId: run.id, taskId: task.id, category: "failure",
-          lesson: `Worker ${role.id} task scored ${(score.overall * 100).toFixed(0)}%: ${score.reasoning}`,
-          score: score.overall, createdAt: Date.now(),
-        });
-        this.store.updateTask(run.id, task.id, { status: "reverted", completedAt: Date.now(), errorMessage: `Score: ${(score.overall * 100).toFixed(0)}%` });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "reverted" });
-      }
-
-      run.totalTasksCompleted++;
-      this.store.saveRun(run);
-    } finally {
-      this.activeWorkers.delete(task.id);
-      await worker.cleanup();
-    }
   }
 
   private async getDiffStats(gitManager: GitManager): Promise<{

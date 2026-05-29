@@ -81,6 +81,10 @@ export class GitManager {
     return this.git.status().then((s) => String(s));
   }
 
+  async getDiff(): Promise<string> {
+    return this.git.diff();
+  }
+
   async getDiffSince(hash: string): Promise<string> {
     return this.git.diff([hash]);
   }
