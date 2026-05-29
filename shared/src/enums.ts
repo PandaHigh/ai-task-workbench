@@ -37,11 +37,9 @@ export type CheckpointType =
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "modified" | "timed_out";
 
-// ─── Multi-agent ─────────────────────────────────────────────────────────
+// ─── Pipeline phases ──────────────────────────────────────────────────
 
-export type ExecutionMode = "sequential" | "parallel";
-
-export type AgentRoleType = "developer" | "tester" | "reviewer" | "custom";
+export type TaskPhase = "planner" | "developer" | "tester" | "reviewer";
 
 // ─── Multi-user collaboration ──────────────────────────────────────────
 
