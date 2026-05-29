@@ -24,51 +24,49 @@ export function RobotMascot({ mood, size = 56 }: RobotMascotProps) {
         height: size,
       }}
     >
-      <svg viewBox="0 0 48 48" width={size} height={size} role="img" aria-label={`Robot mascot, ${mood} mood`}>
-        {/* Body */}
-        <rect
-          x="12" y="18" width="24" height="20" rx="4"
-          fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1"
-        />
+      <svg viewBox="0 0 48 48" width={size} height={size} role="img" aria-label={`Panda mascot, ${mood} mood`}>
+        {/* Ears */}
+        <rect x="6" y="2" width="10" height="10" rx="2" fill="#2d2d2d" />
+        <rect x="32" y="2" width="10" height="10" rx="2" fill="#2d2d2d" />
         {/* Head */}
-        <rect
-          x="14" y="8" width="20" height="16" rx="6"
-          fill="var(--bg-secondary)" stroke="var(--border)" strokeWidth="1"
-        />
-        {/* Antenna */}
-        <line
-          x1="24" y1="8" x2="24" y2="3"
-          stroke="var(--text-secondary)" strokeWidth="1" strokeLinecap="round"
-        />
-        <circle
-          cx="24" cy="3" r="2"
-          fill={style.eyeColor}
-        />
+        <rect x="8" y="6" width="32" height="22" rx="6" fill="#f0f0f0" stroke="#2d2d2d" strokeWidth="1" />
+        {/* Eye patches */}
+        <rect x="11" y="12" width="9" height="7" rx="2.5" fill="#2d2d2d" />
+        <rect x="28" y="12" width="9" height="7" rx="2.5" fill="#2d2d2d" />
         {/* Eyes */}
-        <circle cx="19" cy="15" r="2.5" fill={style.eyeColor}>
+        <circle cx="15.5" cy="15" r="2" fill={style.eyeColor}>
           {mood === "thinking" && (
             <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
           )}
         </circle>
-        <circle cx="29" cy="15" r="2.5" fill={style.eyeColor}>
+        <circle cx="32.5" cy="15" r="2" fill={style.eyeColor}>
           {mood === "thinking" && (
             <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" begin="0.5s" />
           )}
         </circle>
+        {/* Nose */}
+        <ellipse cx="24" cy="22" rx="2.5" ry="1.8" fill="#2d2d2d" />
         {/* Mouth */}
         {mood === "celebrating" ? (
-          <path d="M 20 21 Q 24 25 28 21" fill="none" stroke={style.eyeColor} strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M 20 25 Q 24 28 28 25" fill="none" stroke={style.eyeColor} strokeWidth="1.2" strokeLinecap="round" />
         ) : mood === "error" ? (
-          <path d="M 20 22 Q 24 19 28 22" fill="none" stroke={style.eyeColor} strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M 20 26 Q 24 24 28 26" fill="none" stroke={style.eyeColor} strokeWidth="1.2" strokeLinecap="round" />
         ) : (
-          <line x1="20" y1="21" x2="28" y2="21" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="20" y1="25" x2="28" y2="25" stroke="#555" strokeWidth="1.2" strokeLinecap="round" />
         )}
-        {/* Arms */}
-        <rect x="8" y="22" width="4" height="10" rx="2" fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1" />
-        <rect x="36" y="22" width="4" height="10" rx="2" fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1" />
-        {/* Legs */}
-        <rect x="16" y="38" width="5" height="6" rx="2" fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1" />
-        <rect x="27" y="38" width="5" height="6" rx="2" fill="var(--bg-tertiary)" stroke="var(--border)" strokeWidth="1" />
+        {/* Body */}
+        <rect x="12" y="28" width="24" height="12" rx="3" fill="#f0f0f0" stroke="#2d2d2d" strokeWidth="1" />
+        {/* Belly */}
+        <ellipse cx="24" cy="34" rx="8" ry="5" fill="#e8e8e8" />
+        {/* Arms reaching toward Enter key */}
+        <rect x="6" y="30" width="6" height="5" rx="2" fill="#2d2d2d" />
+        <rect x="36" y="30" width="6" height="5" rx="2" fill="#2d2d2d" />
+        {/* Big Enter Key - high-blue style */}
+        <rect x="8" y="40" width="32" height="7" rx="2" fill="#4a7fff" stroke="#3a6ae0" strokeWidth="0.8" />
+        <rect x="9" y="41" width="30" height="1.5" rx="0.5" fill="white" opacity="0.2" />
+        <text x="24" y="46.2" textAnchor="middle" fill="white" fontFamily="monospace" fontSize="4.5" fontWeight="bold">
+          ENTER ⏎
+        </text>
       </svg>
     </div>
   );
