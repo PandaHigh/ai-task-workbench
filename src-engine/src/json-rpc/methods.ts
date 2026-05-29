@@ -108,6 +108,7 @@ const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> =
   maxTurns: { min: 1, max: 500 },
   maxAutoRetries: { min: 0, max: 10 },
   maxConcurrentTasks: { min: 1, max: 10 },
+  defaultTimeout: { min: 5, max: 180 },
 };
 
 const ALLOWED_CONFIG_KEYS = new Set([
@@ -120,6 +121,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "maxConcurrentTasks",
   "defaultModel",
   "publicUrl",
+  "defaultTimeout",
+  "claudePath",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
