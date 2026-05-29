@@ -6,8 +6,7 @@ import type {
   GoalStatus,
   CheckpointType,
   ApprovalStatus,
-  ExecutionMode,
-  AgentRoleType,
+  TaskPhase,
   UserRole,
 } from "./enums.js";
 
@@ -34,6 +33,8 @@ export interface TaskDefinition {
   retryCount?: number;
   lastError?: string;
   assignedRoleId?: string;
+  pipelinePhases?: PhaseRecord[];
+  pipelineIterations?: number;
 }
 
 export interface ExecutionRun {
@@ -64,11 +65,6 @@ export interface ExecutionRun {
 
   // Approval system
   approvalTimeoutMs?: number;
-
-  // Multi-agent
-  executionMode?: ExecutionMode;
-  maxConcurrentAgents?: number;
-  agentRoles?: AgentRole[];
 
   // Feature tracking
   features?: FeatureItem[];
@@ -223,14 +219,44 @@ export interface ApprovalRequest {
   };
 }
 
-// ─── Multi-agent roles ───────────────────────────────────────────────────
+// ─── Pipeline types ─────────────────────────────────────────────────────
 
-export interface AgentRole {
-  id: string;
-  type: AgentRoleType;
-  name: string;
-  systemPrompt: string;
-  allowedTools: string[];
+export interface ExecutionPlan {
+  understanding: string;
+  steps: string[];
+  targetFiles: string[];
+  risks: string[];
+  testStrategy: string;
+}
+
+export interface TestResult {
+  testsWritten: string[];
+  allPassed: boolean;
+  failures: string[];
+  coverage: string;
+}
+
+export interface ReviewIssue {
+  severity: "critical" | "major" | "minor";
+  file: string;
+  line?: number;
+  description: string;
+  suggestion: string;
+}
+
+export interface ReviewResult {
+  approved: boolean;
+  score: number;
+  issues: ReviewIssue[];
+  summary: string;
+}
+
+export interface PhaseRecord {
+  phase: TaskPhase;
+  durationMs: number;
+  costUsd: number;
+  turns: number;
+  iteration: number;
 }
 
 // ─── Feature tracking ────────────────────────────────────────────────────
