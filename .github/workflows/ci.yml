@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: ''
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -32,7 +32,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build shared (required by engine + UI)
         run: cd shared && npx tsc --build
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: ''
       - run: npm ci
       - run: npm run build
       - name: Install Playwright
