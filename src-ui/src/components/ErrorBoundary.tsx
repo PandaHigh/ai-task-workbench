@@ -8,13 +8,14 @@ interface State {
   hasError: boolean;
   error: Error | null;
   expanded: boolean;
+  retryKey: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null, expanded: false };
+  state: State = { hasError: false, error: null, expanded: false, retryKey: 0 };
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, expanded: false };
+    return { hasError: true, error, expanded: false, retryKey: 0 };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -22,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleRetry = () => {
-    this.setState({ hasError: false, error: null, expanded: false });
+    this.setState((s) => ({ hasError: false, error: null, expanded: false, retryKey: s.retryKey + 1 }));
   };
 
   render() {
@@ -69,6 +70,6 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return this.props.children;
+    return <div key={this.state.retryKey} className="flex-1 flex flex-col min-h-0">{this.props.children}</div>;
   }
 }

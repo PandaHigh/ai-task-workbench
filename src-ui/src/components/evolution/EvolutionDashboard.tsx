@@ -354,11 +354,11 @@ export function EvolutionDashboard() {
         <div className="flex-1 flex overflow-hidden">
           {/* Task Queue - desktop: always visible sidebar, mobile: drawer */}
           <div
-            className={`w-72 border-r flex flex-col max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`}
+            className={`w-72 border-r flex flex-col min-h-0 overflow-hidden max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`}
             style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
           >
-            <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-              <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>待办 ({queue.length})</h3>
+            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+              <h3 className="text-sm font-bold" style={{ color: "var(--text-secondary)" }}>待办 ({queue.length})</h3>
               {queue.length > 0 && (
                 <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}></span>
               )}
@@ -440,7 +440,7 @@ export function EvolutionDashboard() {
                   </div>
                 ))
               )}
-            </div>
+
             {/* Running task indicator */}
             {runningTask && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
@@ -465,7 +465,7 @@ export function EvolutionDashboard() {
             {/* Completed tasks */}
             {completedTasks.length > 0 && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
-                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</h4>
+                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</h4>
                 <div className="space-y-1">
                   {completedTasks.map((t) => (
                     <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.15)" }}>
@@ -485,7 +485,7 @@ export function EvolutionDashboard() {
             {/* Failed tasks with retry */}
             {failedTasks.length > 0 && (
               <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
-                <h4 className="text-[10px] font-bold mb-1" style={{ color: "var(--red)" }}>出错了 ({failedTasks.length})</h4>
+                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--red)" }}>出错了 ({failedTasks.length})</h4>
                 <div className="space-y-1">
                   {failedTasks.map((t) => (
                     <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
@@ -502,14 +502,16 @@ export function EvolutionDashboard() {
                 </div>
               </div>
             )}
-            {/* Add task button — fixed at bottom of queue panel */}
-            <div className="px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
+            </div>
+            {/* Add task button — always pinned at bottom */}
+            <div className="shrink-0 px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
               <button
                 onClick={() => { setNewTaskText(""); setNewTaskPriority(5); setShowAddModal(true); }}
-                className="w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
                 style={{
                   background: "var(--green)",
                   color: "#fff",
+                  height: "29px",
                   boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
                   transition: "transform 0.15s, box-shadow 0.15s",
                 }}
@@ -526,18 +528,21 @@ export function EvolutionDashboard() {
                 ? (["activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
                 : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
               ).map((t) => (
-                <button key={t} onClick={() => handleTabChange(t)} className="text-xs px-3 py-1.5 rounded transition-colors" style={{
+                <button key={t} onClick={() => handleTabChange(t)} className="text-sm px-4 py-2 rounded-md transition-all" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
                   background: tab === t ? "var(--bg-tertiary)" : "transparent",
-                }}>
+                  border: tab === t ? "1px solid var(--border)" : "1px solid transparent",
+                  fontWeight: tab === t ? 600 : 400,
+                  cursor: "pointer",
+                }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
                   {t === "logs" ? `记录 (${logs.length})` : t === "commits" ? `保存 (${commits.length})` : t === "lessons" ? `经验 (${lessons.length})` : t === "features" ? `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "动态" : "报告"}
                 </button>
               ))}
               </div>
               <button
                 onClick={() => { const next = !simpleMode; setSimpleMode(next); localStorage.setItem("ui-mode", next ? "simple" : "detailed"); }}
-                className="text-[10px] px-2 py-1 rounded shrink-0"
-                style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
+                className="text-xs px-3 py-1.5 rounded-md shrink-0 font-medium"
+                style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)", cursor: "pointer" }}
               >
                 {simpleMode ? "详细" : "简单"}
               </button>
