@@ -11,3 +11,8 @@ coverage/
 .vite/
 .superpowers/
 *.tsbuildinfo
+.playwright-mcp/
+test-results/
+src-ui/test-results/
+*.png
+!src-tauri/icons/*.png
