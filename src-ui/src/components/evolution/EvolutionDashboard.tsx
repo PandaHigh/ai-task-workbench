@@ -14,7 +14,6 @@ import { marked } from "marked";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { StreamingOutput } from "./StreamingOutput";
 import { FeatureBoard } from "./FeatureBoard";
-import { ExecutionModeSelector } from "./ExecutionModeSelector";
 import { PresencePanel } from "./PresencePanel";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { TaskComments } from "./TaskComments";
@@ -759,20 +758,6 @@ export function EvolutionDashboard() {
                   </p>
                 ))}
               </div>
-
-
-              {/* Execution Mode - advanced only */}
-              {!simpleMode && (
-              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
-                <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>运行方式</h4>
-                <ExecutionModeSelector
-                  runId={runId ?? ""}
-                  currentMode={run.executionMode}
-                  maxConcurrent={run.maxConcurrentAgents}
-                  disabled={isRunning}
-                />
-              </div>
-              )}
 
               {/* Online Users - advanced only */}
               {!simpleMode && (
