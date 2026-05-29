@@ -10,3 +10,4 @@ target/
 coverage/
 .vite/
 .superpowers/
+*.tsbuildinfo
