@@ -293,33 +293,28 @@ export class TaskPipeline {
       }
     }
 
-    if (streamResult) {
+    // Collect assistant message texts for richer content extraction
+    const assistantTexts = collectedMessages
+      .filter((m) => m.type === "assistant")
+      .map((m) => typeof m.content === "string"
+        ? m.content
+        : (Array.isArray(m.content) ? (m.content as Array<{text: string}>).map((c) => c.text).join("") : ""))
+      .filter(Boolean);
+
+    // Prefer the last assistant message (richest content) over the result summary
+    const bestResult = assistantTexts.length > 0
+      ? assistantTexts[assistantTexts.length - 1]
+      : streamResult;
+
+    if (bestResult) {
       result = {
-        result: streamResult,
+        result: bestResult,
         sessionId: streamSessionId,
         totalCostUsd: streamCost,
         durationMs: streamDuration,
         numTurns: streamTurns,
         messages: collectedMessages,
       };
-    } else {
-      const assistantTexts = collectedMessages
-        .filter((m) => m.type === "assistant")
-        .map((m) => typeof m.content === "string"
-          ? m.content
-          : (Array.isArray(m.content) ? (m.content as Array<{text: string}>).map((c) => c.text).join("") : ""))
-        .filter(Boolean);
-      const fallback = assistantTexts.length > 0 ? assistantTexts[assistantTexts.length - 1] : "";
-      if (fallback) {
-        result = {
-          result: fallback,
-          sessionId: streamSessionId,
-          totalCostUsd: streamCost,
-          durationMs: streamDuration,
-          numTurns: streamTurns,
-          messages: collectedMessages,
-        };
-      }
     }
 
     if (!result || !result.result) {
@@ -330,7 +325,21 @@ export class TaskPipeline {
   }
 
   private parseJsonResult<T>(text: string): T {
+    // Handle case where text is already an object stringified incorrectly
+    if (typeof text !== "string") {
+      throw new Error(`parseJsonResult expected string, got ${typeof text}: ${String(text).substring(0, 100)}`);
+    }
+
     let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+
+    // Strip common non-JSON prefixes that Claude adds (e.g. "Here is the plan:\n")
+    const jsonStart = Math.min(
+      cleaned.indexOf("{") === -1 ? Infinity : cleaned.indexOf("{"),
+      cleaned.indexOf("[") === -1 ? Infinity : cleaned.indexOf("["),
+    );
+    if (jsonStart > 0 && jsonStart !== Infinity) {
+      cleaned = cleaned.substring(jsonStart);
+    }
 
     try {
       return JSON.parse(cleaned) as T;

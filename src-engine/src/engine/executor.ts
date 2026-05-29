@@ -346,7 +346,7 @@ export class Executor {
       let score: ScoreDetails;
       if (pipelineResult.reviewResult) {
         const review = pipelineResult.reviewResult;
-        const overall = Math.min(review.score / 100, 1); // reviewResult.score is 0-100, normalize to 0-1
+        const overall = Math.min(review.score, 1); // reviewResult.score is already 0-1
         score = {
           overall,
           goalAlignment: overall * 0.3,
@@ -354,7 +354,7 @@ export class Executor {
           completeness: overall * 0.2,
           quality: overall * 0.2,
           passed: overall >= this.config.qualityThreshold,
-          reasoning: review.summary || `Pipeline review score: ${review.score}/100`,
+          reasoning: review.summary || `Pipeline review score: ${review.score}`,
         };
       } else {
         try {
