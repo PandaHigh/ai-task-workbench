@@ -100,7 +100,7 @@ const defaultEvolutionStore = {
 
 function renderEvolution(runId = "run-001", run?: ExecutionRun) {
   const tasks = run ? [run] : [makeRun()];
-  vi.mocked(useTaskStore).mockReturnValue({
+  const taskStoreState = {
     tasks,
     activeRunId: runId,
     loading: false,
@@ -109,7 +109,9 @@ function renderEvolution(runId = "run-001", run?: ExecutionRun) {
     updateTask: vi.fn(),
     deleteTask: vi.fn(),
     setActiveRun: vi.fn(),
-  });
+  };
+  vi.mocked(useTaskStore).mockImplementation(((selector?: Function) =>
+    selector ? selector(taskStoreState) : taskStoreState) as any);
 
   return render(
     <MemoryRouter initialEntries={[`/evolution/${runId}`]}>
@@ -121,10 +123,15 @@ function renderEvolution(runId = "run-001", run?: ExecutionRun) {
   );
 }
 
+function setupEvolutionStore(overrides: Partial<typeof defaultEvolutionStore> = {}) {
+  vi.mocked(useEvolutionStore).mockImplementation(((selector?: Function) =>
+    selector ? selector({ ...defaultEvolutionStore, ...overrides }) : { ...defaultEvolutionStore, ...overrides }) as any);
+}
+
 describe("EvolutionDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useEvolutionStore).mockReturnValue({ ...defaultEvolutionStore });
+    setupEvolutionStore();
     mockCall.mockImplementation(async (method: string) => {
       if (method === "queue.list") return { queue: [] };
       if (method === "run.commits") return [];
@@ -136,7 +143,7 @@ describe("EvolutionDashboard", () => {
 
   it("渲染自进化看板标题", async () => {
     renderEvolution();
-    expect(screen.getByText("任务看板")).toBeInTheDocument();
+    expect(screen.getByText("任务详情")).toBeInTheDocument();
   });
 
   it("加载时调用 queue.list、run.commits、run.lessons", async () => {
@@ -151,16 +158,13 @@ describe("EvolutionDashboard", () => {
   it("渲染任务队列空状态", async () => {
     renderEvolution();
     await waitFor(() => {
-      expect(screen.getByText(/队列为空/)).toBeInTheDocument();
+      expect(screen.getByText(/没有待办任务/)).toBeInTheDocument();
     });
   });
 
   it("渲染任务队列项", async () => {
     const queue = [makeTaskDef(), makeTaskDef({ id: "task-002", content: "第二个任务", priority: 2 })];
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-      queue,
-    });
+    setupEvolutionStore({ queue });
     renderEvolution();
     await waitFor(() => {
       expect(screen.getByText("用户任务内容")).toBeInTheDocument();
@@ -168,22 +172,26 @@ describe("EvolutionDashboard", () => {
     });
   });
 
-  it("显示日志、提交、教训标签", () => {
+  it("显示日志、提交、教训标签", async () => {
+    const user = userEvent.setup();
     renderEvolution();
-    expect(screen.getByText(/日志/)).toBeInTheDocument();
-    expect(screen.getByText(/Git 提交/)).toBeInTheDocument();
-    expect(screen.getByText(/经验教训/)).toBeInTheDocument();
+    // Default is simple mode — click "详细" to show all tabs
+    await user.click(screen.getByText("详细"));
+    expect(screen.getAllByText(/^记录/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^保存/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^经验/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("切换到提交标签显示提交内容", async () => {
     const user = userEvent.setup();
     const commits = [makeCommit()];
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-      commits,
-    });
+    setupEvolutionStore({ commits });
     renderEvolution();
-    await user.click(screen.getByText(/Git 提交/));
+    // Ensure detailed mode to show the commits tab
+    const modeBtn = screen.queryByText("详细");
+    if (modeBtn) await user.click(modeBtn);
+    const saveTabs = screen.getAllByText(/^保存/);
+    await user.click(saveTabs[0]);
     expect(screen.getByText("feat: 添加新功能")).toBeInTheDocument();
     expect(screen.getByText("#AI")).toBeInTheDocument();
   });
@@ -191,21 +199,20 @@ describe("EvolutionDashboard", () => {
   it("切换到教训标签显示教训内容", async () => {
     const user = userEvent.setup();
     const lessons = [makeLesson()];
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-      lessons,
-    });
+    setupEvolutionStore({ lessons });
     renderEvolution();
-    await user.click(screen.getByText(/经验教训/));
+    // Ensure detailed mode to show the lessons tab
+    const modeBtn = screen.queryByText("详细");
+    if (modeBtn) await user.click(modeBtn);
+    const lessonTabs = screen.getAllByText(/^经验/);
+    await user.click(lessonTabs[0]);
     expect(screen.getByText("教训内容")).toBeInTheDocument();
     expect(screen.getByText("failure")).toBeInTheDocument();
   });
 
   it("点击开始执行调用 task.start", async () => {
     const user = userEvent.setup();
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-    });
+    setupEvolutionStore();
     renderEvolution();
     const startBtn = screen.getByText("▶ 开始");
     await user.click(startBtn);
@@ -215,10 +222,7 @@ describe("EvolutionDashboard", () => {
   });
 
   it("运行中显示暂停按钮", async () => {
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-      isRunning: true,
-    });
+    setupEvolutionStore({ isRunning: true });
     renderEvolution();
     expect(screen.getByText("⏸ 暂停")).toBeInTheDocument();
   });
@@ -234,11 +238,7 @@ describe("EvolutionDashboard", () => {
   it("添加新任务到队列", async () => {
     const user = userEvent.setup();
     const setQueue = vi.fn();
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-      queue: [],
-      setQueue,
-    });
+    setupEvolutionStore({ queue: [], setQueue });
     mockCall.mockImplementation(async (method: string) => {
       if (method === "queue.list") return { queue: [makeTaskDef()] };
       if (method === "task.create") return {};
@@ -249,7 +249,7 @@ describe("EvolutionDashboard", () => {
     });
     renderEvolution();
     // Click the add task button to open modal
-    await user.click(screen.getByText("+ 新增任务"));
+    await user.click(screen.getByText("+ 添加任务"));
     // Find the textarea by placeholder and type into it
     const textarea = screen.getByPlaceholderText("描述你的任务...");
     await user.type(textarea, "新测试任务");
@@ -262,9 +262,7 @@ describe("EvolutionDashboard", () => {
 
   it("显示预算消耗进度条", () => {
     const run = makeRun({ totalCostUsd: 25 });
-    vi.mocked(useEvolutionStore).mockReturnValue({
-      ...defaultEvolutionStore,
-    });
+    setupEvolutionStore();
     renderEvolution("run-001", run);
     const budgetEls = screen.getAllByText(/\$25\.00/);
     expect(budgetEls.length).toBeGreaterThanOrEqual(1);
@@ -298,7 +296,7 @@ describe("EvolutionDashboard", () => {
     renderEvolution();
     await waitFor(() => {
       expect(screen.getByText("失败的任务")).toBeInTheDocument();
-      expect(screen.getByText("重试")).toBeInTheDocument();
+      expect(screen.getByText("再试一次")).toBeInTheDocument();
     });
   });
 
@@ -314,9 +312,9 @@ describe("EvolutionDashboard", () => {
     });
     renderEvolution();
     await waitFor(() => {
-      expect(screen.getByText("重试")).toBeInTheDocument();
+      expect(screen.getByText("再试一次")).toBeInTheDocument();
     });
-    await user.click(screen.getByText("重试"));
+    await user.click(screen.getByText("再试一次"));
     await waitFor(() => {
       expect(mockCall).toHaveBeenCalledWith("task.retry", { runId: "run-001", taskId: "fail-001" });
     });
@@ -327,7 +325,7 @@ describe("EvolutionDashboard", () => {
     const run = makeRun({ finalReport: "这是最终报告内容" });
     renderEvolution("run-001", run);
     // Click the report tab to show the report content
-    await user.click(screen.getByText("最终报告"));
+    await user.click(screen.getByText("报告"));
     await waitFor(() => {
       expect(screen.getByText("这是最终报告内容")).toBeInTheDocument();
     });

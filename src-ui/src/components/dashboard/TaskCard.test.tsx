@@ -82,12 +82,12 @@ describe("TaskCard", () => {
 
   it("显示正确的状态标签 - idle", () => {
     renderCard(makeRun({ status: "idle" }));
-    expect(screen.getByText("空闲")).toBeInTheDocument();
+    expect(screen.getByText("准备中")).toBeInTheDocument();
   });
 
   it("显示正确的状态标签 - running", () => {
     renderCard(makeRun({ status: "running" }));
-    expect(screen.getByText("运行中")).toBeInTheDocument();
+    expect(screen.getByText("工作中")).toBeInTheDocument();
   });
 
   it("显示正确的状态标签 - completed", () => {
@@ -97,12 +97,12 @@ describe("TaskCard", () => {
 
   it("显示正确的状态标签 - failed", () => {
     renderCard(makeRun({ status: "failed", completedAt: Date.now() }));
-    expect(screen.getByText("失败")).toBeInTheDocument();
+    expect(screen.getByText("出错了")).toBeInTheDocument();
   });
 
   it("显示目标数量", () => {
     renderCard(makeRun({ goals: ["目标A", "目标B", "目标C"] }));
-    expect(screen.getByText(/目标: 3/)).toBeInTheDocument();
+    expect(screen.getByText(/已完成 3\/3 项/)).toBeInTheDocument();
   });
 
   it("显示工作目录名", () => {
@@ -112,7 +112,7 @@ describe("TaskCard", () => {
 
   it("显示费用", () => {
     renderCard(makeRun({ totalCostUsd: 1.2345 }));
-    expect(screen.getByText("$1.2345")).toBeInTheDocument();
+    expect(screen.getByText("$1.23")).toBeInTheDocument();
   });
 
   it("费用为0时不显示", () => {

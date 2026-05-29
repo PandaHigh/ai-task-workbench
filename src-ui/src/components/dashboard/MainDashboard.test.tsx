@@ -77,7 +77,7 @@ describe("MainDashboard", () => {
       call: vi.fn(),
     });
     renderDashboard();
-    expect(screen.getByText("引擎未连接")).toBeInTheDocument();
+    expect(screen.getByText("AI 未连接")).toBeInTheDocument();
   });
 
   it("显示已连接状态和任务数量", () => {
@@ -92,7 +92,7 @@ describe("MainDashboard", () => {
       setActiveRun: vi.fn(),
     });
     renderDashboard();
-    expect(screen.getByText(/已连接引擎 · 1 个任务/)).toBeInTheDocument();
+    expect(screen.getByText(/AI 已就绪 · 共 1 个任务/)).toBeInTheDocument();
   });
 
   it("加载中显示骨架屏", () => {
@@ -113,14 +113,14 @@ describe("MainDashboard", () => {
 
   it("空任务列表显示空状态和新建按钮", () => {
     renderDashboard();
-    expect(screen.getByText("还没有任务")).toBeInTheDocument();
-    expect(screen.getByText("+ 新建任务")).toBeInTheDocument();
+    expect(screen.getByText("欢迎使用 PandaAI")).toBeInTheDocument();
+    expect(screen.getByText("开始第一个任务")).toBeInTheDocument();
   });
 
   it("点击新建任务按钮导航到 wizard", async () => {
     const user = userEvent.setup();
     renderDashboard();
-    await user.click(screen.getByText("+ 新建任务"));
+    await user.click(screen.getByText("开始第一个任务"));
     expect(mockNavigate).toHaveBeenCalledWith("/wizard");
   });
 

@@ -59,7 +59,7 @@ describe("SettingsPage", () => {
   it("显示已连接状态", async () => {
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText("已连接 (ws://localhost:9731)")).toBeInTheDocument();
+      expect(screen.getByText("已连接")).toBeInTheDocument();
     });
   });
 
@@ -73,7 +73,7 @@ describe("SettingsPage", () => {
   it("显示超时设置", async () => {
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText(/每个任务的默认执行超时: 60 分钟/)).toBeInTheDocument();
+      expect(screen.getByText(/每个任务最多运行 60 分钟/)).toBeInTheDocument();
     });
   });
 
@@ -90,7 +90,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
-    const rangeInput = screen.getByRole("slider", { name: /质量阈值/ });
+    const rangeInput = screen.getByRole("slider", { name: /质量要求/ });
     fireEvent.change(rangeInput, { target: { value: "80" } });
     await waitFor(() => {
       const btn = screen.getByText("保存设置");
@@ -111,7 +111,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("未修改")).toBeInTheDocument();
     });
-    const numberInput = screen.getByLabelText("质量阈值数值输入");
+    const numberInput = screen.getByLabelText("质量要求数值输入");
     await user.clear(numberInput);
     await user.type(numberInput, "0.8");
     await waitFor(() => {
@@ -129,7 +129,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
-    const numberInput = screen.getByLabelText("质量阈值数值输入");
+    const numberInput = screen.getByLabelText("质量要求数值输入");
     fireEvent.change(numberInput, { target: { value: "-0.1" } });
     await waitFor(() => {
       expect(screen.getByText(/不能低于/)).toBeInTheDocument();
@@ -141,7 +141,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
-    const numberInput = screen.getByLabelText("质量阈值数值输入");
+    const numberInput = screen.getByLabelText("质量要求数值输入");
     fireEvent.change(numberInput, { target: { value: "1.5" } });
     await waitFor(() => {
       expect(screen.getByText(/不能超过/)).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
-    const numberInput = screen.getByLabelText("超时时间数值输入");
+    const numberInput = screen.getByLabelText("最长用时数值输入");
     await user.clear(numberInput);
     await user.type(numberInput, "200");
     await waitFor(() => {
@@ -168,11 +168,13 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("设置")).toBeInTheDocument();
     });
+    // Open advanced settings to reveal the Claude path input
+    await user.click(screen.getByText("高级设置"));
     const textInput = screen.getByDisplayValue("claude");
     await user.clear(textInput);
     await user.tab();
     await waitFor(() => {
-      expect(screen.getByText(/不能为空/)).toBeInTheDocument();
+      expect(screen.getByText(/请填写 AI 程序位置/)).toBeInTheDocument();
     });
   });
 
