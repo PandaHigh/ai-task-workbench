@@ -74,7 +74,9 @@ export type EngineMethod =
   | "session.list"
   | "activity.list"
   | "comment.create"
-  | "comment.list";
+  | "comment.list"
+  | "skill.list"
+  | "skill.delete";
 
 export type EngineNotification =
   | "task.progress"
@@ -93,4 +95,6 @@ export type EngineNotification =
   | "presence.joined"
   | "presence.left"
   | "activity.created"
-  | "comment.created";
+  | "comment.created"
+  | "skill.added"
+  | "skill.removed";

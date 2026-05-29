@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
 import { pageEnterStyle } from "../../hooks/useAnimations";
+import { SkillsManager } from "./SkillsManager";
 
 interface OrigValues {
   qualityThreshold: number;
@@ -197,6 +198,12 @@ export function SettingsPage() {
           style={{ background: "var(--blue)", color: "#fff" }}>
           {saved ? "已保存" : isDirty ? "保存设置" : "未修改"}
         </button>
+
+        {/* Skills Management */}
+        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>Skills 管理</h3>
+          <SkillsManager />
+        </div>
 
         {/* Advanced settings */}
         <div className="mt-4">

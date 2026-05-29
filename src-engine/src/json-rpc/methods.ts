@@ -2,6 +2,8 @@ import type { CreateRunParams, ExecutionRun } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
+import { SkillStore } from "../db/skill-store.js";
+import { SkillManager } from "../skills/skill-manager.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
 import { SessionManager } from "../engine/session-manager.js";
@@ -15,9 +17,11 @@ const PORT = 9731;
 const store = new Store();
 const shareStore = new ShareStore();
 const subscriptionStore = new SubscriptionStore();
+const skillStore = new SkillStore();
 const queueManager = new QueueManager();
+let skillManager: SkillManager;
 
-export { store, shareStore, queueManager };
+export { store, shareStore, queueManager, skillStore, skillManager };
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
 
@@ -142,6 +146,7 @@ let notify: NotifyFn = () => {};
 
 export function setNotifyFn(fn: NotifyFn): void {
   notify = fn;
+  skillManager = new SkillManager(skillStore, notify);
 }
 
 export function shutdown(): void {
@@ -824,5 +829,24 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!runId) throw new RpcValidationError("Missing runId");
     const taskId = params.taskId as string | undefined;
     return { comments: sessionManager.getComments(runId, taskId) };
+  },
+
+  // ─── Skills ────────────────────────────────────────────────────────────
+
+  "skill.list": async (params) => {
+    const type = params.type as "builtin" | "custom" | undefined;
+    return skillStore.list(type ? { type } : undefined);
+  },
+
+  "skill.delete": async (params) => {
+    const name = requireString(params, "name");
+    const skill = skillStore.findByName(name);
+    if (!skill) throw new RpcValidationError(`Skill not found: ${name}`);
+    if (skill.type === "builtin") throw new RpcValidationError("Cannot delete builtin skills");
+    const removed = skillStore.remove(name);
+    if (removed) {
+      notify("skill.removed", { name });
+    }
+    return { ok: removed };
   },
 };

@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket, type Data } from "ws";
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "http";
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
 import { RPC_ERRORS } from "@ai-workbench/shared";
-import { methodHandlers, RpcValidationError } from "./json-rpc/methods.js";
+import { methodHandlers, RpcValidationError, skillManager } from "./json-rpc/methods.js";
 import type { ShareStore } from "./db/share-store.js";
 import type { Store } from "./db/store.js";
 import type { QueueManager } from "./engine/queue-manager.js";
@@ -161,6 +161,13 @@ export class WsServer {
     if (url.startsWith("/api/share/")) {
       this.setCorsHeaders(req, res);
       this.handleShareApi(req, res, url, method);
+      return;
+    }
+
+    // Skill upload API
+    if (url === "/api/skills/upload" && method === "POST") {
+      this.setCorsHeaders(req, res);
+      skillManager.handleUpload(req, res);
       return;
     }
 

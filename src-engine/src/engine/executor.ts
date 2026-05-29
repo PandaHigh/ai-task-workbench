@@ -2,6 +2,9 @@ import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDe
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
+import { SkillStore } from "../db/skill-store.js";
+import { SkillManager } from "../skills/skill-manager.js";
+import { generateClaudeMd } from "../skills/claude-md-generator.js";
 import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
 import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
@@ -36,6 +39,7 @@ type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 export class Executor {
   private ccClient: CCClient;
   private store: Store;
+  private skillManager: SkillManager;
   private abortControllers: Map<string, AbortController> = new Map();
   private running = false;
   private currentRun: ExecutionRun | null = null;
@@ -59,6 +63,7 @@ export class Executor {
   ) {
     this.ccClient = new CCClient();
     this.store = new Store();
+    this.skillManager = new SkillManager(new SkillStore(), () => {});
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
       maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,
@@ -320,7 +325,11 @@ export class Executor {
 
     try {
       await gitManager.ensureInit();
+
+      // Inject skills and generate CLAUDE.md
+      this.skillManager.prepareWorkingDir(run.workingDir);
       const context = await this.buildContext(task, run, gitManager);
+      generateClaudeMd(run.workingDir, context);
 
       this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
 

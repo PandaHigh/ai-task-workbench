@@ -1,5 +1,5 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 
 let isShuttingDown = false;
@@ -10,6 +10,8 @@ async function main() {
   setNotifyFn((method: string, params: Record<string, unknown>) => {
     wsServer.broadcast(method, params);
   });
+
+  skillManager.initBuiltinSkills();
 
   wsServer.start();
 
