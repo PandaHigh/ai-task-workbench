@@ -99,11 +99,7 @@ export function Sidebar() {
                 className="w-7 h-7 rounded-md flex items-center justify-center"
                 style={{ background: "var(--blue)", color: "#fff" }}
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" />
-                  <line x1="7" y1="1" x2="7" y2="13" />
-                  <line x1="1" y1="4.5" x2="13" y2="4.5" />
-                </svg>
+                <span style={{ fontSize: 15, lineHeight: 1 }}>🐼</span>
               </div>
               <div>
                 <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
