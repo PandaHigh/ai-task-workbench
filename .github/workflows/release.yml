@@ -18,7 +18,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - run: cd shared && npx tsc --build
+      - run: cd src-engine && npx tsc --noEmit
+      - run: cd src-ui && npx tsc --noEmit
+      - run: npm run build --workspace=src-engine
+      - run: npm run build --workspace=src-ui
       - run: cd src-engine && npx vitest run
       - run: cd src-ui && npx vitest run src/components
 
@@ -30,16 +34,12 @@ jobs:
         include:
           - platform: macos-latest
             target: aarch64-apple-darwin
-            bundles: app,dmg
           - platform: macos-latest
             target: x86_64-apple-darwin
-            bundles: app,dmg
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            bundles: deb,appimage
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            bundles: msi,nsis
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -78,18 +78,14 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'AI Task Workbench ${{ github.ref_name }}'
           releaseBody: |
-            ## 更新内容
+            请根据操作系统下载对应安装包：
 
-            请根据你的操作系统下载对应的安装包：
+            - macOS (Apple Silicon): `.dmg`
+            - macOS (Intel): `.dmg`
+            - Windows: `.msi` 或 `.exe`
+            - Linux: `.deb` 或 `.AppImage`
 
-            | 系统 | 文件 |
-            |------|------|
-            | macOS (Apple Silicon) | `.dmg` |
-            | macOS (Intel) | `.dmg` |
-            | Windows | `.msi` 或 `.exe` (NSIS) |
-            | Linux | `.deb` 或 `.AppImage` |
-
-            **首次启动需要联网下载 WebView2 运行时（Windows）。**
+            Windows 首次启动需要联网下载 WebView2 运行时。
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          args: --target ${{ matrix.target }}
