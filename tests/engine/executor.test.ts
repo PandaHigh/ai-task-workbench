@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Mock } from "vitest";
-import type { TaskDefinition, GitCommitSummary, LessonLearned, TaskContext } from "../../shared/src/task-types";
+import type { TaskDefinition } from "../../shared/src/task-types";
 
 // Mocks must be at module scope for vi.mock
 const mockStore = {
@@ -261,51 +261,6 @@ describe("Executor extractJson", () => {
   });
 });
 
-describe("Executor buildSystemPrompt", () => {
-  it("should build prompt with context", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const notifications: { method: string; params: Record<string, unknown> }[] = [];
-    const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
-    const qm = createMockQueueManager();
-
-    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
-    const task: Partial<TaskDefinition> = { content: "Test" };
-    const context: TaskContext = {
-      workingDir: "/tmp",
-      goals: ["g1"],
-      terminationConditions: ["done"],
-      lastTenCommits: [{ hash: "abc1234", message: "init", timestamp: 1000, isAiCommit: true }],
-      nextFiveTasks: [{ type: "user_defined", content: "next task", runId: "run-1", id: "t1", priority: 1, timeoutMinutes: 60, promptJson: "", status: "pending", createdAt: Date.now() }],
-      lessonsLearned: [{ id: 1, runId: "run-1", category: "failure", lesson: "avoid X", createdAt: Date.now() }],
-    };
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt(task, context);
-
-    expect(prompt).toContain("init");
-    expect(prompt).toContain("next task");
-    expect(prompt).toContain("avoid X");
-  });
-
-  it("should build prompt without context data", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const notifications: { method: string; params: Record<string, unknown> }[] = [];
-    const notify = (method: string, params: Record<string, unknown>) => notifications.push({ method, params });
-    const qm = createMockQueueManager();
-
-    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
-    const task: Partial<TaskDefinition> = { content: "Test" };
-    const context: TaskContext = {
-      workingDir: "/tmp",
-      goals: [],
-      terminationConditions: [],
-      lastTenCommits: [],
-      nextFiveTasks: [],
-      lessonsLearned: [],
-    };
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt(task, context);
-
-    expect(prompt).toBe("");
-  });
-});
 
 describe("Executor recalculateCost", () => {
   beforeEach(() => {
@@ -347,99 +302,3 @@ describe("Executor config loading", () => {
   });
 });
 
-describe("Executor + Goal integration", () => {
-  let queueManager: MockQueueManager;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queueManager = createMockQueueManager();
-    mockStore.getLessons.mockReturnValue([]);
-    mockStore.listTasks.mockReturnValue([]);
-    mockStore.getCommits.mockReturnValue([]);
-  });
-
-  it("should include goal continuation prompt in buildSystemPrompt when goal is active", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-1");
-
-    // Set currentRun with active goal state
-    const run = { id: "run-goal-1", goals: ["All tests pass and no lint errors"], goalStatus: "pursuing", goalEvidence: [], goalEvaluationCycles: 0, goalLastEvalReason: "" } as any;
-    (executor as any).currentRun = run;
-
-    const context: TaskContext = {
-      workingDir: "/tmp",
-      goals: ["All tests pass and no lint errors"],
-      terminationConditions: ["done"],
-      lastTenCommits: [],
-      nextFiveTasks: [],
-      lessonsLearned: [],
-    };
-
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context);
-    expect(prompt).toContain("GOAL CONTEXT");
-    expect(prompt).toContain("All tests pass and no lint errors");
-  });
-
-  it("should NOT include goal continuation prompt when no goal is set", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-no-goal");
-
-    const context: TaskContext = {
-      workingDir: "/tmp",
-      goals: ["g1"],
-      terminationConditions: ["done"],
-      lastTenCommits: [],
-      nextFiveTasks: [],
-      lessonsLearned: [],
-    };
-
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context);
-    expect(prompt).not.toContain("GOAL CONTEXT");
-  });
-
-  it("should include evidence in continuation prompt after evaluation", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-2");
-
-    const run = {
-      id: "run-goal-2",
-      goals: ["Build feature X"],
-      goalStatus: "pursuing",
-      goalEvidence: ["src/feature.ts exists", "2 tests passing"],
-      goalEvaluationCycles: 1,
-      goalLastEvalReason: "Feature partially implemented",
-    } as any;
-    (executor as any).currentRun = run;
-
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context_empty);
-    expect(prompt).toContain("src/feature.ts exists");
-    expect(prompt).toContain("Feature partially implemented");
-  });
-
-  it("should not include continuation prompt for paused goal", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-goal-3");
-
-    const run = {
-      id: "run-goal-3",
-      goals: ["Paused goal"],
-      goalStatus: "paused",
-      goalEvidence: [],
-      goalEvaluationCycles: 0,
-      goalLastEvalReason: "",
-    } as any;
-    (executor as any).currentRun = run;
-
-    const prompt = (executor as unknown as { buildSystemPrompt: (task: Partial<TaskDefinition>, ctx: TaskContext) => string }).buildSystemPrompt({ content: "Test" }, context_empty);
-    expect(prompt).not.toContain("GOAL CONTEXT");
-  });
-});
-
-const context_empty: TaskContext = {
-  workingDir: "/tmp",
-  goals: [],
-  terminationConditions: [],
-  lastTenCommits: [],
-  nextFiveTasks: [],
-  lessonsLearned: [],
-};

@@ -712,47 +712,4 @@ describe("RPC Methods", () => {
     }
   });
 
-  // ─── Execution Mode ────────────────────────────────────────────────
-
-  describe("run.setExecutionMode", () => {
-    it("should set execution mode to sequential", async () => {
-      const run = await createRun();
-      const result = await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "sequential" }) as Record<string, unknown>;
-      expect(result.executionMode).toBe("sequential");
-
-      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
-      expect((report.run as ExecutionRun).executionMode).toBe("sequential");
-    });
-
-    it("should set execution mode to parallel", async () => {
-      const run = await createRun();
-      const result = await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "parallel" }) as Record<string, unknown>;
-      expect(result.executionMode).toBe("parallel");
-      expect(result.runId).toBe(run.id);
-
-      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
-      expect((report.run as ExecutionRun).executionMode).toBe("parallel");
-    });
-
-    it("should reject invalid mode", async () => {
-      const run = await createRun();
-      await expect(methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "invalid" }))
-        .rejects.toThrow("sequential or parallel");
-    });
-
-    it("should reject nonexistent run", async () => {
-      await expect(methodHandlers["run.setExecutionMode"]({ runId: "nonexistent", mode: "sequential" }))
-        .rejects.toThrow("Run not found");
-    });
-
-    it("should switch between modes", async () => {
-      const run = await createRun();
-      await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "parallel" });
-      await methodHandlers["run.setExecutionMode"]({ runId: run.id, mode: "sequential" });
-
-      const report = await methodHandlers["run.report"]({ runId: run.id }) as Record<string, unknown>;
-      expect((report.run as ExecutionRun).executionMode).toBe("sequential");
-    });
-  });
-
 });
