@@ -16,13 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: ''
       - run: npm install
-      - run: cd shared && npx tsc --build
-      - run: cd src-engine && npx tsc --noEmit
-      - run: cd src-ui && npx tsc --noEmit
-      - run: npm run build --workspace=src-engine
-      - run: npm run build --workspace=src-ui
+      - run: npm run build
       - run: cd src-engine && npx vitest run
       - run: cd src-ui && npx vitest run src/components
 
@@ -49,7 +44,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: ''
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: ''
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,14 +33,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build shared (required by engine + UI)
-        run: cd shared && npx tsc --build
-
-      - name: Type check - engine
-        run: cd src-engine && npx tsc --noEmit
-
-      - name: Type check - UI
-        run: cd src-ui && npx tsc --noEmit
+      - name: Build all (includes type checks via tsc)
+        run: npm run build
 
       - name: Check Rust code
         working-directory: src-tauri
@@ -53,9 +46,6 @@ jobs:
       - name: Run UI component tests
         run: cd src-ui && npx vitest run src/components
 
-      - name: Build engine + UI
-        run: npm run build --workspace=src-engine && npm run build --workspace=src-ui
-
   e2e:
     needs: test
     runs-on: macos-latest
@@ -64,8 +54,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: ''
-      - run: npm ci
+      - run: npm install
       - run: npm run build
       - name: Install Playwright
         run: cd src-ui && npx playwright install --with-deps chromium
