@@ -7,7 +7,7 @@
     "frontendDist": "../src-ui/dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev --workspace=src-ui",
-    "beforeBuildCommand": "npm run build --workspace=src-ui"
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
@@ -38,9 +38,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../src-engine/dist/": "src-engine/dist/",
-      "../src-engine/node_modules/": "src-engine/node_modules/",
-      "../shared/dist/": "shared/dist/"
+      "../src-engine/dist/engine.js": "src-engine/dist/engine.js"
     },
     "macOS": {
       "minimumSystemVersion": "10.15"

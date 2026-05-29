@@ -10,11 +10,10 @@ pub struct EngineState {
 /// Try to locate the engine source directory.
 /// Priority: Tauri resource dir (production) > relative paths (development).
 fn find_engine_dir(app: &App) -> std::path::PathBuf {
-    // Production: engine files bundled via tauri.conf.json bundle.resources
-    // Only use if the dist directory has the actual compiled output
+    // Production: bundled engine (esbuild single file)
     if let Ok(res_dir) = app.path().resource_dir() {
         let bundled = res_dir.join("src-engine");
-        if bundled.join("dist/index.js").exists() {
+        if bundled.join("dist/engine.js").exists() {
             println!("[sidecar] Found bundled engine at {:?}", bundled);
             return bundled;
         }
@@ -41,7 +40,7 @@ fn find_engine_dir(app: &App) -> std::path::PathBuf {
 fn find_engine_dir_handle(app: &AppHandle) -> std::path::PathBuf {
     if let Ok(res_dir) = app.path().resource_dir() {
         let bundled = res_dir.join("src-engine");
-        if bundled.join("dist/index.js").exists() {
+        if bundled.join("dist/engine.js").exists() {
             return bundled;
         }
     }
@@ -142,7 +141,7 @@ pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     println!("[sidecar] Engine dir: {:?}", engine_dir);
 
     let has_src = engine_dir.join("src/index.ts").exists();
-    let has_dist = engine_dir.join("dist/index.js").exists();
+    let has_dist = engine_dir.join("dist/engine.js").exists();
 
     if !has_src && !has_dist {
         eprintln!("[sidecar] Engine dir invalid: {:?} — frontend can use restart_engine RPC", engine_dir);
@@ -207,10 +206,10 @@ fn spawn_npx_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Opt
 }
 
 fn spawn_node_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
-    println!("[sidecar] Starting engine: node dist/index.js in {:?}", engine_dir);
+    println!("[sidecar] Starting engine: node dist/engine.js in {:?}", engine_dir);
     let (_rx, child) = app.shell()
         .command("node")
-        .args(["dist/index.js"])
+        .args(["dist/engine.js"])
         .current_dir(engine_dir)
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .spawn()?;
@@ -242,7 +241,7 @@ pub fn restart_engine(app: AppHandle) -> Result<String, String> {
     } else {
         let (_rx, child) = app.shell()
             .command("node")
-            .args(["dist/index.js"])
+            .args(["dist/engine.js"])
             .current_dir(&engine_dir)
             .env("PATH", std::env::var("PATH").unwrap_or_default())
             .spawn()
