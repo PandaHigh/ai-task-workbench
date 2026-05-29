@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ExecutionRun, TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition, GitCommit, LessonLearned, GoalStatus, RunStatus } from "@ai-workbench/shared";
 import { ShareClient } from "../lib/share-client";
 
-const POLL_INTERVAL = 5000;
-const FULL_REFRESH_INTERVAL = 30_000;
+const SAFETY_POLL_INTERVAL = 30_000;
 
 export function useShareView(token: string) {
   const client = useRef(new ShareClient());
@@ -16,8 +15,7 @@ export function useShareView(token: string) {
   const [queue, setQueue] = useState<TaskDefinition[]>([]);
   const [report, setReport] = useState<{ report: string; generatedAt: number } | null>(null);
   const [logs, setLogs] = useState<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>>([]);
-  const prevStatusRef = useRef<string | null>(null);
-  const lastFullRefreshRef = useRef(0);
+  const wsConnectedRef = useRef(false);
 
   const fullRefresh = useCallback(async () => {
     const c = client.current;
@@ -31,48 +29,19 @@ export function useShareView(token: string) {
         c.getReport(token),
         c.getLogs(token),
       ]);
-
-      if (runData.status === "fulfilled") {
-        setRun(runData.value);
-        const prevStatus = prevStatusRef.current;
-        prevStatusRef.current = runData.value.status;
-        if (prevStatus && prevStatus !== runData.value.status) {
-          lastFullRefreshRef.current = 0;
-        }
-      }
+      if (runData.status === "fulfilled") setRun(runData.value);
       if (taskData.status === "fulfilled") setTasks(taskData.value);
       if (commitData.status === "fulfilled") setCommits(commitData.value);
       if (lessonData.status === "fulfilled") setLessons(lessonData.value);
       if (queueData.status === "fulfilled") setQueue(queueData.value);
       if (reportData.status === "fulfilled") setReport(reportData.value);
       if (logsData.status === "fulfilled") setLogs(logsData.value);
-      lastFullRefreshRef.current = Date.now();
     } catch (err) {
       console.warn("Share full refresh failed:", err);
     }
   }, [token]);
 
-  const lightRefresh = useCallback(async () => {
-    const c = client.current;
-    try {
-      const runData = await c.getRun(token);
-      setRun(runData);
-      const prevStatus = prevStatusRef.current;
-      prevStatusRef.current = runData.status;
-      if (prevStatus && prevStatus !== runData.status) {
-        await fullRefresh();
-        return;
-      }
-      const now = Date.now();
-      if (now - lastFullRefreshRef.current >= FULL_REFRESH_INTERVAL) {
-        await fullRefresh();
-      }
-    } catch (err) {
-      console.warn("Share light refresh failed:", err);
-    }
-  }, [token, fullRefresh]);
-
-  // Reset all state and reload when token changes
+  // Connect WebSocket + load initial data, fallback to HTTP polling
   useEffect(() => {
     setError("");
     setRun(null);
@@ -82,35 +51,105 @@ export function useShareView(token: string) {
     setQueue([]);
     setReport(null);
     setLogs([]);
-    prevStatusRef.current = null;
-    lastFullRefreshRef.current = 0;
+    wsConnectedRef.current = false;
 
     let cancelled = false;
+    const c = client.current;
+
     const load = async () => {
       setLoading(true);
       try {
-        const runData = await client.current.getRun(token);
+        // Try WebSocket first
+        const initial = await c.connectWebSocket(token);
         if (cancelled) return;
-        setRun(runData);
-        prevStatusRef.current = runData.status;
-        await fullRefresh();
-        if (!cancelled) setLoading(false);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load share");
-          setLoading(false);
+        wsConnectedRef.current = true;
+        setRun(initial.run);
+        setTasks(initial.tasks || []);
+        setQueue(initial.queue || []);
+
+        // Fetch remaining data via HTTP
+        const [commitData, lessonData, reportData, logsData] = await Promise.allSettled([
+          c.getCommits(token),
+          c.getLessons(token),
+          c.getReport(token),
+          c.getLogs(token),
+        ]);
+        if (cancelled) return;
+        if (commitData.status === "fulfilled") setCommits(commitData.value);
+        if (lessonData.status === "fulfilled") setLessons(lessonData.value);
+        if (reportData.status === "fulfilled") setReport(reportData.value);
+        if (logsData.status === "fulfilled") setLogs(logsData.value);
+
+        setLoading(false);
+      } catch (wsErr) {
+        // Fallback to HTTP polling
+        console.warn("WebSocket connect failed, falling back to polling:", wsErr);
+        try {
+          const runData = await c.getRun(token);
+          if (cancelled) return;
+          setRun(runData);
+          await fullRefresh();
+          if (!cancelled) setLoading(false);
+        } catch (httpErr) {
+          if (!cancelled) {
+            setError(httpErr instanceof Error ? httpErr.message : "Failed to load share");
+            setLoading(false);
+          }
         }
       }
     };
+
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      c.disconnectWebSocket();
+    };
   }, [token, fullRefresh]);
 
+  // Register notification handler for real-time updates
+  useEffect(() => {
+    const c = client.current;
+    c.onNotification((method, params) => {
+      switch (method) {
+        case "run.status":
+          setRun(prev => prev ? { ...prev, status: params.status as RunStatus, ...(params.finalReport ? { finalReport: params.finalReport as string } : {}) } : prev);
+          if (["completed", "failed", "paused", "budget_exceeded"].includes(params.status as string)) {
+            c.getRun(token).then(r => setRun(r)).catch(() => {});
+          }
+          break;
+        case "queue.updated":
+          setQueue((params.queue as TaskDefinition[]) || []);
+          break;
+        case "task.status":
+        case "task.scored":
+          c.getTasks(token).then(setTasks).catch(() => {});
+          break;
+        case "log.entry":
+          setLogs(prev => [...prev, { id: Date.now(), timestamp: Date.now(), ...(params as Record<string, unknown>) } as (typeof prev)[number]]);
+          break;
+        case "git.commit":
+          c.getCommits(token).then(setCommits).catch(() => {});
+          break;
+        case "goal.updated":
+          setRun(prev => prev ? { ...prev, goalStatus: (params as Record<string, unknown>).status as GoalStatus } : prev);
+          break;
+        case "task.phase":
+        case "task.stream":
+          // Streaming output — refresh tasks to get latest progress
+          c.getTasks(token).then(setTasks).catch(() => {});
+          break;
+      }
+    });
+    return () => { c.onNotification(() => {}); };
+  }, [token]);
+
+  // Safety net polling (30s) — only when not using WebSocket
   useEffect(() => {
     if (loading || error) return;
-    const interval = setInterval(lightRefresh, POLL_INTERVAL);
+    if (wsConnectedRef.current) return;
+    const interval = setInterval(fullRefresh, SAFETY_POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [loading, error, lightRefresh]);
+  }, [loading, error, fullRefresh]);
 
   const call = useCallback(async (method: string, params?: Record<string, unknown>) => {
     const c = client.current;

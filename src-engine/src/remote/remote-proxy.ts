@@ -4,8 +4,82 @@ import type {
   GitCommit,
   LessonLearned,
 } from "@ai-workbench/shared";
+import WebSocket from "ws";
 
 const TIMEOUT_MS = 15_000;
+
+// ─── Remote WebSocket Sync ──────────────────────────────────────────────
+
+const activeRemoteWS = new Map<string, { ws: WebSocket; timer: ReturnType<typeof setTimeout> | null }>();
+
+export function connectRemoteWS(
+  localRunId: string,
+  remoteUrl: string,
+  remoteToken: string,
+  onNotification: (method: string, params: Record<string, unknown>) => void,
+): void {
+  // Already connected
+  if (activeRemoteWS.has(localRunId)) return;
+
+  const wsUrl = remoteUrl.replace(/^http/, "ws");
+  const ws = new WebSocket(wsUrl);
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectDelay = 1000;
+
+  const connect = () => {
+    ws.on("open", () => {
+      reconnectDelay = 1000;
+      ws.send(JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "share.authenticate",
+        params: { token: remoteToken },
+      }));
+    });
+
+    ws.on("message", (data: Buffer) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.id === 1 && msg.error) {
+          console.error(`[remote-ws] Auth failed for ${localRunId}:`, msg.error.message);
+          ws.close();
+          return;
+        }
+        if (msg.method) {
+          const remappedParams = { ...msg.params };
+          if (remappedParams.runId) {
+            remappedParams.runId = localRunId;
+          }
+          onNotification(msg.method, remappedParams);
+        }
+      } catch { /* ignore parse errors */ }
+    });
+
+    ws.on("close", () => {
+      activeRemoteWS.delete(localRunId);
+      // Reconnect with exponential backoff (max 30s)
+      reconnectTimer = setTimeout(() => {
+        reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+        connectRemoteWS(localRunId, remoteUrl, remoteToken, onNotification);
+      }, reconnectDelay);
+    });
+
+    ws.on("error", (err) => {
+      console.error(`[remote-ws] Error for ${localRunId}:`, err.message);
+    });
+  };
+
+  activeRemoteWS.set(localRunId, { ws, timer: reconnectTimer });
+  connect();
+}
+
+export function disconnectRemoteWS(runId: string): void {
+  const entry = activeRemoteWS.get(runId);
+  if (entry) {
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.ws.removeAllListeners("close");
+    entry.ws.close();
+    activeRemoteWS.delete(runId);
+  }
+}
 
 async function remoteFetch(baseUrl: string, path: string): Promise<Response> {
   const url = `${baseUrl}${path}`;

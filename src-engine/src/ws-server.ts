@@ -18,6 +18,7 @@ export class WsServer {
   private clients: Set<WebSocket> = new Set();
   private clientAlive: WeakMap<WebSocket, boolean> = new WeakMap();
   private wsSessions: WeakMap<WebSocket, string> = new WeakMap();
+  private shareClients: Map<WebSocket, { token: string; runId: string }> = new Map();
   private sessionManager: SessionManager;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatIntervalMs: number;
@@ -79,6 +80,7 @@ export class WsServer {
           this.sessionManager.removeSession(sessionId);
         }
         this.clients.delete(ws);
+        this.shareClients.delete(ws);
       });
 
       ws.on("error", (err) => {
@@ -141,6 +143,21 @@ export class WsServer {
       }
     }
     for (const s of stale) this.clients.delete(s);
+
+    // Share clients: only send if runId matches
+    const runId = params.runId as string | undefined;
+    const staleShare: WebSocket[] = [];
+    for (const [client, info] of this.shareClients) {
+      if (runId && info.runId !== runId) continue;
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(data);
+        } catch {
+          staleShare.push(client);
+        }
+      }
+    }
+    for (const s of staleShare) this.shareClients.delete(s);
   }
 
   // ─── HTTP Request Handler ──────────────────────────────────────────────
@@ -378,6 +395,35 @@ export class WsServer {
     }
 
     const req = message as RpcRequest;
+
+    // Share token authentication — handled before methodHandlers
+    if (req.method === "share.authenticate") {
+      const token = req.params?.token as string;
+      if (!token) {
+        this.send(ws, { jsonrpc: "2.0", id: req.id, error: { code: -32602, message: "Missing token" } });
+        return;
+      }
+      const share = this.shareStore.getByToken(token);
+      if (!share) {
+        this.send(ws, { jsonrpc: "2.0", id: req.id, error: { code: -32602, message: "Invalid or expired share token" } });
+        return;
+      }
+      this.shareClients.set(ws, { token, runId: share.runId });
+      const run = this.store.getRun(share.runId);
+      const { workingDir: _, ...safeRun } = run || {};
+      this.send(ws, {
+        jsonrpc: "2.0",
+        id: req.id,
+        result: {
+          authenticated: true,
+          run: safeRun,
+          tasks: this.store.listTasks(share.runId),
+          queue: this.queueManager.list(share.runId),
+        },
+      });
+      return;
+    }
+
     const handler = methodHandlers[req.method];
 
     if (!handler) {
@@ -434,6 +480,10 @@ export class WsServer {
       client.close();
     }
     this.clients.clear();
+    for (const client of this.shareClients.keys()) {
+      client.close();
+    }
+    this.shareClients.clear();
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
     this.httpServer.close();
   }

@@ -21,7 +21,7 @@ const skillStore = new SkillStore();
 const queueManager = new QueueManager();
 let skillManager: SkillManager;
 
-export { store, shareStore, queueManager, skillStore, skillManager };
+export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager };
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
 
@@ -683,6 +683,14 @@ export const methodHandlers: Record<string, MethodHandler> = {
       label: remoteRun.goals[0] || "Remote dashboard",
     });
 
+    // Establish real-time WebSocket connection to remote engine
+    try {
+      const { connectRemoteWS } = await import("../remote/remote-proxy.js");
+      connectRemoteWS(localRunId, remoteUrl, remoteToken, notify);
+    } catch (wsErr) {
+      console.warn("[share.subscribe] WebSocket connection to remote failed, will retry:", wsErr instanceof Error ? wsErr.message : wsErr);
+    }
+
     return {
       runId: sub.runId,
       remoteRun: {
@@ -698,6 +706,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "share.unsubscribe": async (params) => {
     const runId = requireString(params, "runId");
+    const { disconnectRemoteWS } = await import("../remote/remote-proxy.js");
+    disconnectRemoteWS(runId);
     const removed = subscriptionStore.unsubscribe(runId);
     if (!removed) throw new RpcValidationError(`Subscription not found for runId: ${runId}`);
     return { unsubscribed: true };

@@ -1,10 +1,20 @@
 import type { ExecutionRun, TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
+import { ENGINE_HTTP_URL, ENGINE_WS_URL } from "./platform";
+
+export interface ShareInitialData {
+  authenticated: boolean;
+  run: ExecutionRun;
+  tasks: TaskDefinition[];
+  queue: TaskDefinition[];
+}
 
 export class ShareClient {
   private baseUrl: string;
+  private ws: WebSocket | null = null;
+  private notificationHandler: ((method: string, params: Record<string, unknown>) => void) | null = null;
 
   constructor() {
-    this.baseUrl = `${window.location.origin}/api/share`;
+    this.baseUrl = `${ENGINE_HTTP_URL}/api/share`;
   }
 
   private tokenUrl(token: string, resource: string): string {
@@ -116,5 +126,76 @@ export class ShareClient {
     } catch {
       return `HTTP ${res.status}`;
     }
+  }
+
+  // ─── WebSocket ──────────────────────────────────────────────────────────
+
+  connectWebSocket(token: string): Promise<ShareInitialData> {
+    return new Promise((resolve, reject) => {
+      const wsUrl = ENGINE_WS_URL;
+      const ws = new WebSocket(wsUrl);
+      this.ws = ws;
+
+      const timeout = setTimeout(() => {
+        ws.close();
+        if (this.ws === ws) this.ws = null;
+        reject(new Error("WebSocket connection timeout"));
+      }, 10000);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          jsonrpc: "2.0", id: 1, method: "share.authenticate",
+          params: { token },
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.id === 1) {
+            clearTimeout(timeout);
+            if (msg.error) {
+              ws.close();
+              if (this.ws === ws) this.ws = null;
+              reject(new Error(msg.error.message || "Authentication failed"));
+              return;
+            }
+            resolve(msg.result as ShareInitialData);
+            return;
+          }
+          if (msg.method && this.notificationHandler) {
+            this.notificationHandler(msg.method, msg.params || {});
+          }
+        } catch { /* ignore parse errors */ }
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timeout);
+        if (this.ws === ws) this.ws = null;
+        reject(new Error("WebSocket connection failed"));
+      };
+
+      ws.onclose = () => {
+        clearTimeout(timeout);
+        if (this.ws === ws) this.ws = null;
+      };
+    });
+  }
+
+  onNotification(handler: (method: string, params: Record<string, unknown>) => void): void {
+    this.notificationHandler = handler;
+  }
+
+  disconnectWebSocket(): void {
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    this.notificationHandler = null;
+  }
+
+  get wsConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 }
