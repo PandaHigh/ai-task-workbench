@@ -21,51 +21,53 @@ jobs:
       - run: cd src-engine && npx vitest run
       - run: cd src-ui && npx vitest run src/components
 
-  build:
+  publish-tauri:
     needs: test
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: macos-latest
-            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
           - platform: macos-latest
-            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
           - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+            args: ''
           - platform: windows-latest
-            target: x86_64-pc-windows-msvc
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Cache Rust artifacts
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies (Linux)
+      - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - run: npm install
-      - run: npm run build
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - name: build frontend
+        run: npm run build
+
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -76,10 +78,10 @@ jobs:
 
             - macOS (Apple Silicon): `.dmg`
             - macOS (Intel): `.dmg`
-            - Windows: `.msi` 或 `.exe`
+            - Windows: `.msi` 或 NSIS `.exe`
             - Linux: `.deb` 或 `.AppImage`
 
             Windows 首次启动需要联网下载 WebView2 运行时。
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: ${{ matrix.args }}
