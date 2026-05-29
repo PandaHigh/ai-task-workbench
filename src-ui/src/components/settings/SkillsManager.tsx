@@ -1,6 +1,7 @@
 import { useEngine } from "../../hooks/useEngine";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "../common/Toast";
+import { ENGINE_HTTP_URL } from "../../lib/platform";
 
 interface SkillMeta {
   name: string;
@@ -53,7 +54,7 @@ export function SkillsManager() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:9731/api/skills/upload", {
+      const response = await fetch(`${ENGINE_HTTP_URL}/api/skills/upload`, {
         method: "POST",
         body: formData,
       });

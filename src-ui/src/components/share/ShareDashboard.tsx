@@ -34,16 +34,6 @@ export function ShareDashboard() {
     : "未开始";
   const budgetUsed = run?.totalCostUsd ?? 0;
 
-  const handleStart = async () => {
-    if (!token) return;
-    toast.info("分享页面无法直接控制执行，请在本地引擎操作");
-  };
-
-  const handleStop = async () => {
-    if (!token) return;
-    toast.info("分享页面无法直接控制执行，请在本地引擎操作");
-  };
-
   const handleRetry = async (taskId: string) => {
     if (!token) return;
     try { await call("task.retry", { taskId }); refresh(); } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : "未知错误"}`); }

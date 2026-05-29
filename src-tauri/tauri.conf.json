@@ -18,7 +18,9 @@
         "minWidth": 960,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {
@@ -35,14 +37,23 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../src-engine/dist/": "src-engine/dist/",
+      "../src-engine/node_modules/": "src-engine/node_modules/",
+      "../shared/dist/": "shared/dist/"
+    },
     "macOS": {
       "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     }
   },
   "plugins": {
     "shell": {
       "open": true
-    },
-    "window-state": {}
+    }
   }
 }

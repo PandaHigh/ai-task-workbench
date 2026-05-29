@@ -13,6 +13,7 @@
     "dialog:allow-save",
     "dialog:allow-message",
     "process:allow-restart",
-    "process:allow-exit"
+    "process:allow-exit",
+    "window-state:default"
   ]
 }

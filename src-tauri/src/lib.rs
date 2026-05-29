@@ -9,15 +9,19 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .manage(Mutex::new(sidecar::EngineState { child: None }))
         .invoke_handler(tauri::generate_handler![
             sidecar::restart_engine,
             sidecar::engine_status,
         ])
         .setup(|app| {
-            // Best-effort engine start — don't crash the app if it fails
             if let Err(e) = sidecar::start_engine(app) {
                 eprintln!("[setup] Engine start failed: {} — frontend can restart via RPC", e);
+            }
+            // Show window after state is restored by window-state plugin
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
             }
             Ok(())
         })

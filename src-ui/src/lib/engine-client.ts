@@ -1,6 +1,5 @@
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
-
-const ENGINE_URL = "ws://localhost:9731";
+import { ENGINE_WS_URL } from "./platform";
 
 type NotificationHandler = (method: string, params: Record<string, unknown>) => void;
 
@@ -22,7 +21,7 @@ class EngineClient {
         return;
       }
 
-      this.ws = new WebSocket(ENGINE_URL);
+      this.ws = new WebSocket(ENGINE_WS_URL);
 
       this.ws.onopen = () => {
         this.connected = true;

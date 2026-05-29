@@ -149,6 +149,13 @@ export class WsServer {
     const url = req.url || "/";
     const method = req.method || "GET";
 
+    // Health check
+    if (url === "/api/health" && method === "GET") {
+      this.setCorsHeaders(req, res);
+      this.sendJson(res, 200, { status: "ok", uptime: process.uptime() });
+      return;
+    }
+
     // CORS preflight
     if (method === "OPTIONS") {
       this.setCorsHeaders(req, res);

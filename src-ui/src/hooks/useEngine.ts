@@ -38,7 +38,7 @@ export function useEngine() {
       setConnected((prev) => {
         if (prev && !isConnected && !disconnectToastShown) {
           disconnectToastShown = true;
-          import("../components/common/Toast").then(({ useToast }) => {
+          import("../components/common/Toast").then((_toast) => {
             // Can't call hook outside component; use dynamic toast dispatch
           });
           // Use a custom event so any ToastProvider can pick it up

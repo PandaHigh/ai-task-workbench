@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useEngine } from "../../hooks/useEngine";
 import { useTheme } from "../../hooks/useTheme";
+import { useDesktopEngine } from "../../hooks/useDesktopEngine";
 
 const navItems = [
   {
@@ -41,6 +42,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { connected } = useEngine();
   const { theme, toggle } = useTheme();
+  const { isDesktop, restarting, restartEngine } = useDesktopEngine();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleNav = useCallback((path: string) => {
@@ -160,6 +162,18 @@ export function Sidebar() {
                 {connected ? "AI 已就绪" : "AI 未连接"}
               </span>
             </div>
+            <div className="flex items-center gap-1">
+              {isDesktop && !connected && (
+                <button
+                  onClick={() => restartEngine()}
+                  disabled={restarting}
+                  className="text-[10px] px-2 py-0.5 rounded disabled:opacity-50"
+                  style={{ background: "var(--blue)", color: "#fff", cursor: "pointer" }}
+                  title="重启引擎进程"
+                >
+                  {restarting ? "重启中..." : "重启"}
+                </button>
+              )}
             <button
               onClick={toggle}
               className="w-7 h-7 rounded-md flex items-center justify-center"
@@ -185,6 +199,7 @@ export function Sidebar() {
                 </svg>
               )}
             </button>
+            </div>
           </div>
         </div>
       </aside>

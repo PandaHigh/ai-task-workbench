@@ -8,7 +8,7 @@ export function ApprovalPanel() {
   const pendingApprovals = useApprovalStore((s) => s.pendingApprovals);
   const removeApproval = useApprovalStore((s) => s.removeApproval);
   const [instructions, setInstructions] = useState("");
-  const [timers, setTimers] = useState<Map<string, number>>(new Map());
+  const [timers, _setTimers] = useState<Map<string, number>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 

@@ -7,7 +7,20 @@ pub struct EngineState {
     pub child: Option<CommandChild>,
 }
 
-fn find_engine_dir() -> std::path::PathBuf {
+/// Try to locate the engine source directory.
+/// Priority: Tauri resource dir (production) > relative paths (development).
+fn find_engine_dir(app: &App) -> std::path::PathBuf {
+    // Production: engine files bundled via tauri.conf.json bundle.resources
+    // Only use if the dist directory has the actual compiled output
+    if let Ok(res_dir) = app.path().resource_dir() {
+        let bundled = res_dir.join("src-engine");
+        if bundled.join("dist/index.js").exists() {
+            println!("[sidecar] Found bundled engine at {:?}", bundled);
+            return bundled;
+        }
+    }
+
+    // Development fallback
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
@@ -24,9 +37,32 @@ fn find_engine_dir() -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("../src-engine"))
 }
 
-/// Resolve npx binary path from common locations
+/// Same logic for AppHandle (used in Tauri commands).
+fn find_engine_dir_handle(app: &AppHandle) -> std::path::PathBuf {
+    if let Ok(res_dir) = app.path().resource_dir() {
+        let bundled = res_dir.join("src-engine");
+        if bundled.join("dist/index.js").exists() {
+            return bundled;
+        }
+    }
+
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let candidates = vec![
+        exe_dir.join("../../src-engine"),
+        exe_dir.join("../../../src-engine"),
+        std::path::PathBuf::from("../src-engine"),
+    ];
+
+    candidates.into_iter()
+        .find(|d| d.join("src/index.ts").exists())
+        .unwrap_or_else(|| std::path::PathBuf::from("../src-engine"))
+}
+
 fn find_npx() -> String {
-    // Platform-specific npx resolution
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA") {
@@ -40,10 +76,7 @@ fn find_npx() -> String {
 
     #[cfg(target_os = "linux")]
     {
-        let linux_candidates = vec![
-            "/usr/bin/npx",
-            "/usr/local/bin/npx",
-        ];
+        let linux_candidates = vec!["/usr/bin/npx", "/usr/local/bin/npx"];
         for path in &linux_candidates {
             if std::path::Path::new(path).exists() {
                 println!("[sidecar] Found npx at {}", path);
@@ -61,7 +94,6 @@ fn find_npx() -> String {
             "/usr/local/bin/npx".to_string(),
             format!("{home}/.local/bin/npx"),
         ];
-
         for path in &candidates {
             if std::path::Path::new(path).exists() {
                 println!("[sidecar] Found npx at {}", path);
@@ -70,12 +102,8 @@ fn find_npx() -> String {
         }
     }
 
-    // Fallback: try to resolve via which
     #[cfg(unix)]
-    if let Ok(output) = std::process::Command::new("/usr/bin/which")
-        .arg("npx")
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("/usr/bin/which").arg("npx").output() {
         if output.status.success() {
             let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !path.is_empty() && std::path::Path::new(&path).exists() {
@@ -86,10 +114,7 @@ fn find_npx() -> String {
     }
 
     #[cfg(target_os = "windows")]
-    if let Ok(output) = std::process::Command::new("where")
-        .arg("npx")
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("where").arg("npx").output() {
         if output.status.success() {
             let path = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or("").trim().to_string();
             if !path.is_empty() && std::path::Path::new(&path).exists() {
@@ -99,7 +124,6 @@ fn find_npx() -> String {
         }
     }
 
-    // Last resort
     println!("[sidecar] npx not found in common paths, using 'npx' as-is");
     "npx".to_string()
 }
@@ -113,16 +137,18 @@ pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let engine_dir = find_engine_dir();
+    let engine_dir = find_engine_dir(app);
     let engine_dir = std::fs::canonicalize(&engine_dir).unwrap_or(engine_dir);
     println!("[sidecar] Engine dir: {:?}", engine_dir);
 
-    if !engine_dir.join("src/index.ts").exists() {
+    let has_src = engine_dir.join("src/index.ts").exists();
+    let has_dist = engine_dir.join("dist/index.js").exists();
+
+    if !has_src && !has_dist {
         eprintln!("[sidecar] Engine dir invalid: {:?} — frontend can use restart_engine RPC", engine_dir);
         return Ok(());
     }
 
-    // Try sidecar binary first
     let child = match app.shell().sidecar("bin/engine") {
         Ok(cmd) => {
             println!("[sidecar] Trying sidecar binary...");
@@ -133,11 +159,21 @@ pub fn start_engine(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     eprintln!("[sidecar] Sidecar spawn failed: {}", e);
-                    spawn_npx_app(app, &engine_dir)?
+                    if has_src {
+                        spawn_npx_app(app, &engine_dir)?
+                    } else {
+                        spawn_node_app(app, &engine_dir)?
+                    }
                 }
             }
         }
-        Err(_) => spawn_npx_app(app, &engine_dir)?,
+        Err(_) => {
+            if has_src {
+                spawn_npx_app(app, &engine_dir)?
+            } else {
+                spawn_node_app(app, &engine_dir)?
+            }
+        }
     };
 
     engine.child = child;
@@ -170,6 +206,18 @@ fn spawn_npx_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Opt
     Ok(Some(child))
 }
 
+fn spawn_node_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
+    println!("[sidecar] Starting engine: node dist/index.js in {:?}", engine_dir);
+    let (_rx, child) = app.shell()
+        .command("node")
+        .args(["dist/index.js"])
+        .current_dir(engine_dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .spawn()?;
+    println!("[sidecar] Engine process spawned (node)");
+    Ok(Some(child))
+}
+
 pub fn stop_engine(app: &AppHandle) {
     let state = app.state::<Mutex<EngineState>>();
     let mut engine = state.lock().unwrap();
@@ -183,11 +231,26 @@ pub fn stop_engine(app: &AppHandle) {
 pub fn restart_engine(app: AppHandle) -> Result<String, String> {
     stop_engine(&app);
     std::thread::sleep(std::time::Duration::from_millis(500));
-    let engine_dir = find_engine_dir();
+    let engine_dir = find_engine_dir_handle(&app);
     let engine_dir = std::fs::canonicalize(&engine_dir).unwrap_or(engine_dir);
     let state = app.state::<Mutex<EngineState>>();
     let mut engine = state.lock().unwrap();
-    match spawn_npx_handle(&app, &engine_dir) {
+
+    let has_src = engine_dir.join("src/index.ts").exists();
+    let result = if has_src {
+        spawn_npx_handle(&app, &engine_dir)
+    } else {
+        let (_rx, child) = app.shell()
+            .command("node")
+            .args(["dist/index.js"])
+            .current_dir(&engine_dir)
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(Some(child))
+    };
+
+    match result {
         Ok(child) => {
             engine.child = child;
             Ok("Engine restarted".to_string())
