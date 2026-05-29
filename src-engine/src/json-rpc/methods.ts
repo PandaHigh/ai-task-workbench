@@ -109,6 +109,11 @@ const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> =
   maxAutoRetries: { min: 0, max: 10 },
   maxConcurrentTasks: { min: 1, max: 10 },
   defaultTimeout: { min: 5, max: 180 },
+  maxFixIterations: { min: 1, max: 10 },
+  plannerMaxTurns: { min: 1, max: 100 },
+  developerMaxTurns: { min: 1, max: 200 },
+  testerMaxTurns: { min: 1, max: 100 },
+  reviewerMaxTurns: { min: 1, max: 100 },
 };
 
 const ALLOWED_CONFIG_KEYS = new Set([
@@ -123,6 +128,11 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "publicUrl",
   "defaultTimeout",
   "claudePath",
+  "maxFixIterations",
+  "plannerMaxTurns",
+  "developerMaxTurns",
+  "testerMaxTurns",
+  "reviewerMaxTurns",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -759,45 +769,6 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     sessionManager.recordActivity({ userId: "system", runId, action: "approval.responded", details: { approvalId, action } });
     return { approvalId, resolved: true };
-  },
-
-  // ─── Multi-agent ──────────────────────────────────────────────────────────
-
-  "run.setExecutionMode": async (params) => {
-    const runId = requireString(params, "runId");
-    const mode = requireString(params, "mode") as "sequential" | "parallel";
-    if (!["sequential", "parallel"].includes(mode)) {
-      throw new RpcValidationError("mode must be sequential or parallel");
-    }
-    validateRunId(runId);
-    const run = store.getRun(runId);
-    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
-    run.executionMode = mode;
-    store.saveRun(run);
-    return { runId, executionMode: mode };
-  },
-
-  "run.setMaxConcurrent": async (params) => {
-    const runId = requireString(params, "runId");
-    const count = typeof params.count === "number" ? params.count : 2;
-    if (count < 1 || count > 10) {
-      throw new RpcValidationError("count must be between 1 and 10");
-    }
-    validateRunId(runId);
-    const run = store.getRun(runId);
-    if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
-    run.maxConcurrentAgents = count;
-    store.saveRun(run);
-    return { runId, maxConcurrentAgents: count };
-  },
-
-  "role.list": async () => {
-    const { BUILTIN_ROLES } = await import("../engine/agent-roles.js");
-    return { roles: BUILTIN_ROLES };
-  },
-
-  "role.create": async (_params) => {
-    return { created: true };
   },
 
   // ─── Session & Identity ─────────────────────────────────────────────────
