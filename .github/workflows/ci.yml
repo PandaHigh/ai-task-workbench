@@ -34,8 +34,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check - shared
-        run: cd shared && npx tsc --noEmit
+      - name: Build shared types
+        run: cd shared && npx tsc
 
       - name: Type check - engine
         run: cd src-engine && npx tsc --noEmit
@@ -55,15 +55,6 @@ jobs:
 
       - name: Build all
         run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-${{ matrix.os }}
-          path: |
-            src-ui/dist/
-            src-engine/dist/
-            shared/dist/
 
   e2e:
     needs: test
