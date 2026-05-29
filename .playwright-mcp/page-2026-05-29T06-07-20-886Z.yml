@@ -1,0 +1,52 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 已就绪
+      - button "切换到深色模式" [ref=e494] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e1472]:
+      - heading "设置" [level=2] [ref=e1473]
+      - generic [ref=e1474]:
+        - generic [ref=e1475]:
+          - heading "连接状态" [level=3] [ref=e1476]
+          - generic [ref=e1479]: 已连接
+        - generic [ref=e1480]:
+          - heading "质量要求" [level=3] [ref=e1481]
+          - paragraph [ref=e1482]: "AI 完成的任务需要达到这个质量分数。当前: 70%"
+          - 'slider "质量要求: 当前 70%，范围 0% 到 100%" [ref=e1496]': "70"
+          - spinbutton "质量要求数值输入" [ref=e1485]: "0.7"
+        - generic [ref=e1486]:
+          - heading "每个任务最长用时" [level=3] [ref=e1487]
+          - paragraph [ref=e1488]: 每个任务最多运行 60 分钟
+          - 'slider "每个任务最长用时: 当前 60 分钟，范围 5 到 180 分钟" [ref=e1489]': "60"
+          - generic [ref=e1490]:
+            - spinbutton "最长用时数值输入" [ref=e1491]: "60"
+            - generic [ref=e1492]: 分钟
+        - button "保存设置" [ref=e1497]
+        - button "收起高级设置" [active] [ref=e1498] [cursor=pointer]
+        - generic [ref=e1499]:
+          - generic [ref=e1500]:
+            - heading "AI 程序位置" [level=3] [ref=e1501]
+            - paragraph [ref=e1502]: 如果你安装的 AI 程序不在默认路径，可以在这里修改
+            - textbox [ref=e1503]: /usr/local/bin/claude
+          - generic [ref=e1504]:
+            - heading "分享设置" [level=3] [ref=e1505]
+            - paragraph [ref=e1506]: 如果你需要把任务分享给别人，填写公网访问地址
+            - textbox "https://my-tunnel.ngrok.io" [ref=e1507]
+            - paragraph [ref=e1508]: 留空则使用 http://localhost:9731

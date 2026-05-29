@@ -38,10 +38,12 @@ const TOAST_STYLES: Record<ToastType, { border: string; icon: string }> = {
 function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
   const style = TOAST_STYLES[toast.type];
 
+  const DURATION: Record<ToastType, number> = { success: 2500, info: 4000, warning: 5000, error: 6000 };
+
   useEffect(() => {
-    const timer = setTimeout(() => onRemove(toast.id), 3000);
+    const timer = setTimeout(() => onRemove(toast.id), DURATION[toast.type]);
     return () => clearTimeout(timer);
-  }, [toast.id, onRemove]);
+  }, [toast.id, onRemove, toast.type]);
 
   return (
     <div

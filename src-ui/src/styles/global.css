@@ -388,7 +388,7 @@ textarea,
 /* TaskCard fixed layout */
 .task-card-inner {
   display: flex;
-  height: 180px;
+  min-height: 180px;
 }
 
 /* Custom range input */

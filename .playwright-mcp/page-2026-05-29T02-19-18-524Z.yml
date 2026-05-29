@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 未连接
+      - button "切换到深色模式" [ref=e36] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - heading "我的任务" [level=2] [ref=e44]
+          - paragraph [ref=e45]: AI 未连接
+        - generic [ref=e46]:
+          - button "导入" [ref=e47]
+          - button "新建" [ref=e48]
+      - generic [ref=e49]:
+        - img [ref=e51]
+        - paragraph [ref=e56]: 欢迎使用 Forge
+        - paragraph [ref=e57]: 点击下方按钮，告诉我你想做什么
+        - button "开始第一个任务" [ref=e58] [cursor=pointer]

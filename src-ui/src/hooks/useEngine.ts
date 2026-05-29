@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { engineClient } from "../lib/engine-client";
 
+let disconnectToastShown = false;
+
 export function useEngine() {
   const [connected, setConnected] = useState(false);
   const mountedRef = useRef(true);
@@ -11,7 +13,10 @@ export function useEngine() {
     const doConnect = async () => {
       try {
         await engineClient.connect();
-        if (mountedRef.current) setConnected(true);
+        if (mountedRef.current) {
+          setConnected(true);
+          disconnectToastShown = false;
+        }
       } catch (err) {
         console.warn("Engine connection failed:", err instanceof Error ? err.message : err);
         if (mountedRef.current) setConnected(false);
@@ -23,14 +28,26 @@ export function useEngine() {
       if (!mountedRef.current) return;
       if (method === "system.ready") {
         setConnected(true);
+        disconnectToastShown = false;
       }
     });
 
-    // Poll connection state to detect disconnects
     const interval = setInterval(() => {
       if (!mountedRef.current) return;
       const isConnected = engineClient.isConnected();
       setConnected((prev) => {
+        if (prev && !isConnected && !disconnectToastShown) {
+          disconnectToastShown = true;
+          import("../components/common/Toast").then(({ useToast }) => {
+            // Can't call hook outside component; use dynamic toast dispatch
+          });
+          // Use a custom event so any ToastProvider can pick it up
+          window.dispatchEvent(new CustomEvent("engine-disconnect"));
+        }
+        if (!prev && isConnected) {
+          disconnectToastShown = false;
+          window.dispatchEvent(new CustomEvent("engine-reconnect"));
+        }
         if (prev !== isConnected) return isConnected;
         return prev;
       });

@@ -1,0 +1,52 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - heading "E2E分享测试目标" [level=2] [ref=e9]
+      - generic [ref=e10]: 共享
+      - generic [ref=e11]: 未开始
+    - generic [ref=e12]:
+      - button "开始执行" [active] [ref=e13]
+      - generic [ref=e14]: 空闲
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - heading "任务队列 (1)" [level=3] [ref=e18]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: "1"
+          - generic [ref=e23]: 测试任务1
+        - generic [ref=e24]:
+          - generic [ref=e25]: 用户
+          - generic [ref=e26]: P1
+      - button "+ 新增任务" [ref=e28]
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - button "日志 (0)" [ref=e31]
+        - button "Git 提交 (0)" [ref=e32]
+        - button "经验教训 (0)" [ref=e33]
+      - paragraph [ref=e35]: 暂无日志
+    - generic [ref=e36]:
+      - heading "运行统计" [level=3] [ref=e37]
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]: "0"
+            - generic [ref=e42]: 已完成
+          - generic [ref=e43]:
+            - generic [ref=e44]: "0"
+            - generic [ref=e45]: 失败
+          - generic [ref=e46]:
+            - generic [ref=e47]: "0"
+            - generic [ref=e48]: 提交
+          - generic [ref=e49]:
+            - generic [ref=e50]: "0"
+            - generic [ref=e51]: 教训
+        - generic [ref=e52]:
+          - heading "目标" [level=4] [ref=e53]
+          - paragraph [ref=e54]:
+            - generic [ref=e55]: •
+            - generic [ref=e56]: E2E分享测试目标
+        - generic [ref=e57]:
+          - heading "终止条件" [level=4] [ref=e58]
+          - paragraph [ref=e59]:
+            - generic [ref=e60]: •
+            - generic [ref=e61]: Manual stop

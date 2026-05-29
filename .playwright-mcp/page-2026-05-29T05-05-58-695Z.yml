@@ -1,0 +1,111 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 已就绪
+      - button "切换到深色模式" [ref=e494] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e815]:
+      - generic [ref=e816]:
+        - generic [ref=e817]:
+          - generic [ref=e818]:
+            - button "返回" [ref=e819]: ←
+            - heading "任务详情" [level=2] [ref=e820]
+            - generic [ref=e821]: 6c45d8fa
+            - generic [ref=e822]: ai-workspace
+            - generic [ref=e823]: —
+          - generic [ref=e824]:
+            - button "分享" [ref=e825]
+            - img "Robot mascot, idle mood" [ref=e827]
+            - generic [ref=e837]: 准备中
+        - generic [ref=e838]:
+          - generic [ref=e839]:
+            - heading "待办 (1)" [level=3] [ref=e841]
+            - listbox "任务队列，可通过拖拽或 Ctrl+上下箭头排序" [ref=e842]:
+              - 'option "任务 1: 创建一个简单的 Hello World 网页，使用单个 HTML 文件，包含简单的居中样式，优先级 P1" [ref=e843]':
+                - generic [ref=e844]:
+                  - generic [ref=e845]: "1"
+                  - generic [ref=e846]: 创建一个简单的 Hello World 网页，使用单个 HTML 文件，包含简单的居中样式
+                  - button "删除任务" [ref=e847]: 移除
+                - generic [ref=e849]: 用户
+            - button "+ 添加任务" [ref=e851]
+          - generic [ref=e852]:
+            - generic [ref=e853]:
+              - button "动态" [ref=e855] [cursor=pointer]
+              - button "详细" [ref=e856] [cursor=pointer]
+            - generic [ref=e858]: 暂无活动记录
+      - generic [ref=e859]:
+        - heading "操作" [level=3] [ref=e861]
+        - generic [ref=e862]:
+          - button "▶ 开始" [ref=e864]
+          - generic [ref=e901]:
+            - generic [ref=e902]: "超时: 60min"
+            - slider "任务超时时间" [ref=e903]: "60"
+          - generic [ref=e865]:
+            - generic [ref=e866]:
+              - heading "概况" [level=4] [ref=e867]
+              - generic [ref=e868]:
+                - generic [ref=e869]:
+                  - generic [ref=e870]: 已完成
+                  - generic [ref=e871]: "0"
+                - generic [ref=e872]:
+                  - generic [ref=e873]: 费用
+                  - generic [ref=e874]: $0.0000
+                - generic [ref=e875]:
+                  - generic [ref=e876]: 保存
+                  - generic [ref=e877]: "0"
+                - generic [ref=e878]:
+                  - generic [ref=e879]: 经验
+                  - generic [ref=e880]: "0"
+            - generic [ref=e881]:
+              - heading "目标" [level=4] [ref=e882]
+              - paragraph [ref=e883]:
+                - generic [ref=e884]: •
+                - generic [ref=e885]: 生成一个可独立运行的 HTML 文件，页面上显示 "Hello World" 文字并居中展示
+            - generic [ref=e886]:
+              - heading "完成标准" [level=4] [ref=e887]
+              - paragraph [ref=e888]:
+                - generic [ref=e889]: •
+                - generic [ref=e890]: HTML 文件生成且语法正确
+              - paragraph [ref=e891]:
+                - generic [ref=e892]: •
+                - generic [ref=e893]: 在浏览器中打开文件，能看到 "Hello World" 文字居中显示
+            - button "收起高级选项" [ref=e904] [cursor=pointer]
+      - dialog "添加任务" [ref=e905]:
+        - generic [ref=e906]:
+          - heading "添加任务" [level=3] [ref=e907]
+          - textbox "描述你的任务..." [active] [ref=e908]
+          - paragraph [ref=e909]: Ctrl+Enter 快速保存
+          - generic [ref=e910]:
+            - generic [ref=e911]:
+              - generic [ref=e912]: 优先级
+              - generic [ref=e913]: 中（数值越小越优先）
+            - generic [ref=e914]:
+              - button "1" [ref=e915] [cursor=pointer]
+              - button "2" [ref=e916] [cursor=pointer]
+              - button "3" [ref=e917] [cursor=pointer]
+              - button "4" [ref=e918] [cursor=pointer]
+              - button "5" [ref=e919] [cursor=pointer]
+              - button "6" [ref=e920] [cursor=pointer]
+              - button "7" [ref=e921] [cursor=pointer]
+              - button "8" [ref=e922] [cursor=pointer]
+              - button "9" [ref=e923] [cursor=pointer]
+              - button "10" [ref=e924] [cursor=pointer]
+          - generic [ref=e925]:
+            - button "取消" [ref=e926] [cursor=pointer]
+            - button "确认添加" [disabled] [ref=e927] [cursor=pointer]

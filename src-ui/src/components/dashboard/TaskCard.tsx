@@ -91,7 +91,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
-                  className="w-5 h-5 rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity delete-btn"
+                  className="w-5 h-5 rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 max-md:opacity-50 transition-opacity delete-btn"
                   style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                   title="删除"
                   aria-label="删除任务"

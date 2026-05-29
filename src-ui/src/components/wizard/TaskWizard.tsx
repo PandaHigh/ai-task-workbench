@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useToast } from "../common/Toast";
 import { Spinner } from "../common/Spinner";
@@ -69,6 +70,7 @@ export function TaskWizard() {
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
@@ -229,8 +231,11 @@ export function TaskWizard() {
     setIsLoading(false);
   };
 
+  const [creating, setCreating] = useState(false);
+
   const handleConfirm = async () => {
-    if (!taskParams) return;
+    if (!taskParams || creating) return;
+    setCreating(true);
     try {
       const run = (await call("run.create", {
         workingDir,
@@ -250,6 +255,8 @@ export function TaskWizard() {
       navigate(`/evolution/${run.id}`);
     } catch (err) {
       toast.error(`创建失败: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -285,13 +292,20 @@ export function TaskWizard() {
   );
 
   return (
+    <>
     <div className="flex-1 flex flex-col overflow-hidden" style={pageEnterStyle()}>
       <div
         className="px-6 py-4 border-b max-md:px-4 max-md:py-3"
         style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
       >
         <div className="flex items-center gap-3">
-          <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
+          <button onClick={() => {
+            if (messages.length > 0 || step > 0) {
+              setShowBackConfirm(true);
+            } else {
+              reset(); navigate("/");
+            }
+          }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">创建新任务</h2>
         </div>
         <div className="flex gap-2 mt-3 max-md:hidden" role="tablist" aria-label="任务创建步骤">
@@ -517,10 +531,20 @@ export function TaskWizard() {
           </div>
           <div className="flex gap-3 mt-6">
             <button onClick={() => setStep(1)} className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>继续对话</button>
-            <button onClick={handleConfirm} className="px-8 py-3 rounded text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>开始</button>
+            <button onClick={handleConfirm} disabled={creating} className="px-8 py-3 rounded text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#fff" }}>{creating ? "创建中..." : "开始"}</button>
           </div>
         </div>
       )}
     </div>
+      <ConfirmDialog
+        open={showBackConfirm}
+        title="放弃当前进度？"
+        message="你正在编辑的任务内容将会丢失，确定要返回吗？"
+        confirmLabel="放弃并返回"
+        variant="danger"
+        onConfirm={() => { setShowBackConfirm(false); reset(); navigate("/"); }}
+        onCancel={() => setShowBackConfirm(false)}
+      />
+    </>
   );
 }

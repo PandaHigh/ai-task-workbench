@@ -59,45 +59,29 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!connected) return;
-    let qt = 0.6;
-    let dt = 60;
-    let cp = "claude";
     let cancelled = false;
 
     const load = async () => {
-      try {
-        const res = await call("config.get", { key: "qualityThreshold" });
-        const val = (res as Record<string, unknown> | null)?.value;
-        if (val != null) qt = Number(val);
-      } catch (err) {
-        console.warn("Failed to load quality threshold:", err instanceof Error ? err.message : err);
-        toast.error("加载质量设置失败");
-      }
-      try {
-        const res = await call("config.get", { key: "defaultTimeout" });
-        const val = (res as Record<string, unknown> | null)?.value;
-        if (val != null) dt = Number(val);
-      } catch (err) {
-        console.warn("Failed to load default timeout:", err instanceof Error ? err.message : err);
-        toast.error("加载超时设置失败");
-      }
-      try {
-        const res = await call("config.get", { key: "claudePath" });
-        const val = (res as Record<string, unknown> | null)?.value;
-        if (val) cp = String(val);
-      } catch (err) {
-        console.warn("Failed to load claude path:", err instanceof Error ? err.message : err);
-        toast.error("加载 AI 路径失败");
-      }
-
-      let pu = "";
-      try {
-        const res = await call("config.get", { key: "publicUrl" });
-        const val = (res as Record<string, unknown> | null)?.value;
-        if (val) pu = String(val);
-      } catch { /* ignore */ }
+      const [qtRes, dtRes, cpRes, puRes] = await Promise.allSettled([
+        call("config.get", { key: "qualityThreshold" }),
+        call("config.get", { key: "defaultTimeout" }),
+        call("config.get", { key: "claudePath" }),
+        call("config.get", { key: "publicUrl" }),
+      ]);
 
       if (cancelled) return;
+
+      const qt = qtRes.status === "fulfilled" ? Number((qtRes.value as Record<string, unknown>)?.value ?? 0.6) : 0.6;
+      const dt = dtRes.status === "fulfilled" ? Number((dtRes.value as Record<string, unknown>)?.value ?? 60) : 60;
+      const cpRaw = cpRes.status === "fulfilled" ? (cpRes.value as Record<string, unknown>)?.value : null;
+      const cp = cpRaw ? String(cpRaw) : "claude";
+      const puRaw = puRes.status === "fulfilled" ? (puRes.value as Record<string, unknown>)?.value : null;
+      const pu = puRaw ? String(puRaw) : "";
+
+      if (qtRes.status === "rejected") toast.error("加载质量设置失败");
+      if (dtRes.status === "rejected") toast.error("加载超时设置失败");
+      if (cpRes.status === "rejected") toast.error("加载 AI 路径失败");
+
       setQualityThreshold(qt);
       setDefaultTimeout(dt);
       setClaudePath(cp);

@@ -1,0 +1,49 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 已就绪
+      - button "切换到深色模式" [ref=e494] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e712]:
+      - generic [ref=e713]:
+        - generic [ref=e714]:
+          - button "返回" [ref=e715]: ← 返回
+          - heading "创建新任务" [level=2] [ref=e716]
+        - tablist "任务创建步骤" [ref=e717]:
+          - tab "1 准备工作" [ref=e718]:
+            - generic [ref=e719]: "1"
+            - generic [ref=e720]: 准备工作
+          - tab "2 告诉 AI" [selected] [ref=e721]:
+            - generic [ref=e722]: "2"
+            - generic [ref=e723]: 告诉 AI
+          - tab "3 确认任务" [ref=e724]:
+            - generic [ref=e725]: "3"
+            - generic [ref=e726]: 确认任务
+      - tabpanel "2 告诉 AI" [ref=e739]:
+        - generic [ref=e741]:
+          - paragraph [ref=e742]: 告诉我你想要完成什么，我会帮你规划。
+          - generic [ref=e743]:
+            - button "帮我写一个网站" [ref=e744]
+            - button "优化我的代码" [ref=e745]
+            - button "修复 bug" [ref=e746]
+        - generic [ref=e749]:
+          - textbox "你想做什么？" [ref=e750]
+          - generic [ref=e751]:
+            - generic [ref=e752]: Enter 发送 · Shift+Enter 换行
+            - button "发送" [ref=e753]

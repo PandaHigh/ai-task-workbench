@@ -1,0 +1,202 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 已就绪
+      - button "切换到深色模式" [ref=e494] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e1200]:
+      - generic [ref=e1201]:
+        - generic [ref=e1202]:
+          - generic [ref=e1203]:
+            - button "返回" [ref=e1204]: ←
+            - heading "任务详情" [level=2] [ref=e1205]
+            - generic [ref=e1206]: f4d054a4
+            - generic [ref=e1207]: ai-workbench-self-evolve
+            - generic [ref=e1208]: 6m 43s
+          - generic [ref=e1209]:
+            - button "分享" [ref=e1210]
+            - img "Robot mascot, celebrating mood" [ref=e1212]
+            - generic [ref=e1223]: 已完成
+        - generic [ref=e1224]:
+          - generic [ref=e1225]:
+            - heading "待办 (0)" [level=3] [ref=e1227]
+            - listbox "任务队列，可通过拖拽或 Ctrl+上下箭头排序" [ref=e1228]:
+              - generic [ref=e1229]:
+                - img [ref=e1231]
+                - paragraph [ref=e1235]: 没有待办任务
+                - paragraph [ref=e1236]: 点击开始
+                - button "继续" [ref=e1237] [cursor=pointer]
+              - generic [ref=e1238]:
+                - heading "已完成 (1)" [level=4] [ref=e1239]
+                - generic [ref=e1241]:
+                  - generic [ref=e1242]:
+                    - generic [ref=e1243]: ✓
+                    - generic [ref=e1244]: "Create shared/src/utils.ts with a formatDuration function: takes ms (number), returns a human-readable string like '2h 30m', '15m 42s', or '8s'. Then add 'export * from ./utils.js' to shared/src/index.ts. Do NOT modify any other files."
+                  - generic [ref=e1245]:
+                    - generic [ref=e1246]: 用户
+                    - generic [ref=e1247]: 21:17:41
+              - generic [ref=e1248]:
+                - heading "出错了 (1)" [level=4] [ref=e1249]
+                - generic [ref=e1252]:
+                  - generic [ref=e1253]: "Add input validation to Store constructor in src-engine/src/db/store.ts. If a customDataDir is provided: check it's a non-empty string. If validation fails, throw new Error('Invalid data directory path: ...'). Keep all existing behavior unchanged. Do NOT break existing tests."
+                  - generic [ref=e1254]:
+                    - button "再试一次" [ref=e1255]
+                    - button "移除" [ref=e1256]
+            - button "+ 添加任务" [ref=e1258]
+          - generic [ref=e1259]:
+            - generic [ref=e1260]:
+              - generic [ref=e1261]:
+                - button "记录 (15)" [active] [ref=e1322] [cursor=pointer]
+                - button "保存 (1)" [ref=e1323] [cursor=pointer]
+                - button "经验 (2)" [ref=e1324] [cursor=pointer]
+                - button "动态" [ref=e1262] [cursor=pointer]
+                - button "报告" [ref=e1263] [cursor=pointer]
+              - button "简单" [ref=e1325] [cursor=pointer]
+            - generic [ref=e1336]:
+              - generic [ref=e1337]:
+                - generic [ref=e1338]: "[21:12:45]"
+                - generic [ref=e1339]: "[INFO]"
+                - generic [ref=e1340]: "[engine]"
+                - text: Execution loop started
+              - generic [ref=e1341]:
+                - generic [ref=e1342]: "[21:12:45]"
+                - generic [ref=e1343]: "[INFO]"
+                - generic [ref=e1344]: "[cc]"
+                - text: "Executing: Add a health-check HTTP endpoint to the engine. In src-engine/src/index.ts, crea..."
+              - generic [ref=e1345]:
+                - generic [ref=e1346]: "[21:14:23]"
+                - generic [ref=e1347]: "[INFO]"
+                - generic [ref=e1348]: "[cc]"
+                - text: CC completed in 95072ms, cost $0.1612
+              - generic [ref=e1349]:
+                - generic [ref=e1350]: "[21:15:00]"
+                - generic [ref=e1351]: "[WARN]"
+                - generic [ref=e1352]: "[scorer]"
+                - text: "Score: 0% — FAIL (reverting)"
+              - generic [ref=e1353]:
+                - generic [ref=e1354]: "[21:15:00]"
+                - generic [ref=e1355]: "[ERROR]"
+                - generic [ref=e1356]: "[git]"
+                - text: "Revert failed: Error: error: Your local changes to the following files would be overwritten by merge: src-engine/src/index.ts Please commit your changes or stash them before you merge. Aborting fatal: revert failed"
+              - generic [ref=e1357]:
+                - generic [ref=e1358]: "[21:15:00]"
+                - generic [ref=e1359]: "[INFO]"
+                - generic [ref=e1360]: "[cc]"
+                - text: "Executing: Add input validation to Store constructor in src-engine/src/db/store.ts. If a cu..."
+              - generic [ref=e1361]:
+                - generic [ref=e1362]: "[21:15:37]"
+                - generic [ref=e1363]: "[INFO]"
+                - generic [ref=e1364]: "[cc]"
+                - text: CC completed in 35071ms, cost $0.1094
+              - generic [ref=e1365]:
+                - generic [ref=e1366]: "[21:16:07]"
+                - generic [ref=e1367]: "[WARN]"
+                - generic [ref=e1368]: "[scorer]"
+                - text: "Score: 52% — FAIL (reverting)"
+              - generic [ref=e1369]:
+                - generic [ref=e1370]: "[21:16:07]"
+                - generic [ref=e1371]: "[ERROR]"
+                - generic [ref=e1372]: "[git]"
+                - text: "Revert failed: Error: error: Your local changes to the following files would be overwritten by merge: src-engine/src/db/store.ts src-engine/src/index.ts Please commit your changes or stash them before you merge. Aborting fatal: revert failed"
+              - generic [ref=e1373]:
+                - generic [ref=e1374]: "[21:16:07]"
+                - generic [ref=e1375]: "[INFO]"
+                - generic [ref=e1376]: "[cc]"
+                - text: "Executing: Create shared/src/utils.ts with a formatDuration function: takes ms (number), re..."
+              - generic [ref=e1377]:
+                - generic [ref=e1378]: "[21:16:29]"
+                - generic [ref=e1379]: "[INFO]"
+                - generic [ref=e1380]: "[cc]"
+                - text: CC completed in 21169ms, cost $0.0633
+              - generic [ref=e1381]:
+                - generic [ref=e1382]: "[21:17:41]"
+                - generic [ref=e1383]: "[INFO]"
+                - generic [ref=e1384]: "[scorer]"
+                - text: "Score: 98% — PASS"
+              - generic [ref=e1385]:
+                - generic [ref=e1386]: "[21:17:41]"
+                - generic [ref=e1387]: "[INFO]"
+                - generic [ref=e1388]: "[git]"
+                - text: "Committed: dc6ff7d #AI commit#"
+              - generic [ref=e1389]:
+                - generic [ref=e1390]: "[21:17:41]"
+                - generic [ref=e1391]: "[INFO]"
+                - generic [ref=e1392]: "[engine]"
+                - text: Queue empty — evaluating goals (cycle 1/20)
+              - generic [ref=e1393]:
+                - generic [ref=e1394]: "[21:18:39]"
+                - generic [ref=e1395]: "[INFO]"
+                - generic [ref=e1396]: "[engine]"
+                - text: "Goals complete! Progress: 100%"
+      - generic [ref=e1267]:
+        - heading "操作" [level=3] [ref=e1269]
+        - generic [ref=e1270]:
+          - button "▶ 继续" [ref=e1272]
+          - generic [ref=e1274]:
+            - generic [ref=e1275]: 费用
+            - generic [ref=e1276]: $0.33 / $50
+          - generic [ref=e1326]:
+            - generic [ref=e1327]: "超时: 60min"
+            - slider "任务超时时间" [ref=e1328]: "60"
+          - generic [ref=e1279]:
+            - generic [ref=e1280]:
+              - heading "概况" [level=4] [ref=e1281]
+              - generic [ref=e1282]:
+                - generic [ref=e1283]:
+                  - generic [ref=e1284]: 已完成
+                  - generic [ref=e1285]: "3"
+                - generic [ref=e1286]:
+                  - generic [ref=e1287]: 费用
+                  - generic [ref=e1288]: $0.3339
+                - generic [ref=e1289]:
+                  - generic [ref=e1290]: 保存
+                  - generic [ref=e1291]: "1"
+                - generic [ref=e1292]:
+                  - generic [ref=e1293]: 经验
+                  - generic [ref=e1294]: "2"
+            - generic [ref=e1295]:
+              - heading "目标" [level=4] [ref=e1296]
+              - paragraph [ref=e1297]:
+                - generic [ref=e1298]: •
+                - generic [ref=e1299]: "Add a health-check HTTP endpoint to the engine (src-engine/src/index.ts) that returns {status: 'ok', uptime: <seconds>} when receiving a GET /health request"
+              - paragraph [ref=e1300]:
+                - generic [ref=e1301]: •
+                - generic [ref=e1302]: "Add input validation to Store constructor: if customDataDir is provided and not a valid directory path, throw a descriptive error"
+              - paragraph [ref=e1303]:
+                - generic [ref=e1304]: •
+                - generic [ref=e1305]: "Create a shared utility file (shared/src/utils.ts) with a formatDuration(ms: number): string function and export it from shared/src/index.ts"
+            - generic [ref=e1306]:
+              - heading "完成标准" [level=4] [ref=e1307]
+              - paragraph [ref=e1308]:
+                - generic [ref=e1309]: •
+                - generic [ref=e1310]: Engine has a /health endpoint accessible via HTTP GET that returns JSON with status and uptime
+              - paragraph [ref=e1311]:
+                - generic [ref=e1312]: •
+                - generic [ref=e1313]: Store constructor validates customDataDir parameter
+              - paragraph [ref=e1314]:
+                - generic [ref=e1315]: •
+                - generic [ref=e1316]: shared/src/utils.ts exists with formatDuration function and is exported from shared/src/index.ts
+              - paragraph [ref=e1317]:
+                - generic [ref=e1318]: •
+                - generic [ref=e1319]: All existing tests still pass (npx vitest run in src-engine)
+            - generic [ref=e1329]:
+              - heading "运行方式" [level=4] [ref=e1330]
+              - generic [ref=e1332]:
+                - button "逐个执行" [ref=e1333]
+                - button "同时执行" [ref=e1334]

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useApprovalStore } from "../../stores/approval-store";
 import { engineClient } from "../../lib/engine-client";
+import { useToast } from "../common/Toast";
 import type { CheckpointType } from "@ai-workbench/shared";
 
 export function ApprovalPanel() {
@@ -8,29 +9,13 @@ export function ApprovalPanel() {
   const removeApproval = useApprovalStore((s) => s.removeApproval);
   const [instructions, setInstructions] = useState("");
   const [timers, setTimers] = useState<Map<string, number>>(new Map());
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
-  useEffect(() => {
-    if (pendingApprovals.length === 0) return;
-    const interval = setInterval(() => {
-      setTimers((prev) => {
-        const next = new Map(prev);
-        for (const approval of pendingApprovals) {
-          if (approval.timeoutMs) {
-            const remaining = Math.max(0, approval.timeoutMs - (Date.now() - approval.createdAt));
-            next.set(approval.id, remaining);
-          }
-        }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [pendingApprovals]);
-
-  if (pendingApprovals.length === 0) return null;
-
-  const approval = pendingApprovals[0];
-
-  const respond = async (action: "approve" | "reject" | "modify") => {
+  const respond = useCallback(async (action: "approve" | "reject" | "modify") => {
+    if (pendingApprovals.length === 0 || submitting) return;
+    const approval = pendingApprovals[0];
+    setSubmitting(true);
     try {
       await engineClient.call("approval.respond", {
         runId: approval.runId,
@@ -41,9 +26,28 @@ export function ApprovalPanel() {
       removeApproval(approval.id);
       setInstructions("");
     } catch (err) {
-      console.error("Failed to respond to approval:", err);
+      toast.error(`操作失败: ${err instanceof Error ? err.message : "未知错误"}`);
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }, [pendingApprovals, submitting, instructions, removeApproval, toast]);
+
+  // Register Y/N/M keyboard shortcuts
+  useEffect(() => {
+    if (pendingApprovals.length === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "y" || e.key === "Y") { e.preventDefault(); respond("approve"); }
+      else if (e.key === "n" || e.key === "N") { e.preventDefault(); respond("reject"); }
+      else if (e.key === "m" || e.key === "M") { e.preventDefault(); respond("modify"); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [pendingApprovals.length, respond]);
+
+  if (pendingApprovals.length === 0) return null;
+
+  const approval = pendingApprovals[0];
 
   const formatTimer = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -150,25 +154,28 @@ export function ApprovalPanel() {
         <div className="flex gap-2">
           <button
             onClick={() => respond("approve")}
-            className="px-4 py-1.5 font-mono text-sm rounded-lg"
+            disabled={submitting}
+            className="px-4 py-1.5 font-mono text-sm rounded-lg disabled:opacity-50"
             style={{ background: "var(--green)", color: "#fff" }}
           >
-            通过 (Y)
+            {submitting ? "提交中..." : "通过 (Y)"}
           </button>
           <button
             onClick={() => respond("reject")}
-            className="px-4 py-1.5 font-mono text-sm rounded-lg"
+            disabled={submitting}
+            className="px-4 py-1.5 font-mono text-sm rounded-lg disabled:opacity-50"
             style={{ background: "var(--red)", color: "#fff" }}
           >
-            拒绝 (N)
+            {submitting ? "提交中..." : "拒绝 (N)"}
           </button>
           {approval.checkpointType === "goal_stagnation" && (
             <button
               onClick={() => respond("modify")}
-              className="px-4 py-1.5 font-mono text-sm rounded-lg"
+              disabled={submitting}
+              className="px-4 py-1.5 font-mono text-sm rounded-lg disabled:opacity-50"
               style={{ background: "var(--yellow)", color: "#fff" }}
             >
-              重定向 (M)
+              {submitting ? "提交中..." : "重定向 (M)"}
             </button>
           )}
         </div>

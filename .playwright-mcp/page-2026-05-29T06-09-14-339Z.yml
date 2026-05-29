@@ -1,0 +1,139 @@
+- generic [ref=e3]:
+  - link "跳到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "Forge" [level=1] [ref=e13]
+    - navigation "主导航" [ref=e14]:
+      - button "首页" [ref=e15] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 首页
+      - button "创建任务" [ref=e21] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e24]: 创建任务
+      - button "设置" [ref=e25] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 设置
+    - generic [ref=e32]:
+      - generic [ref=e35]: AI 已就绪
+      - button "切换到深色模式" [ref=e494] [cursor=pointer]:
+        - img [ref=e37]
+  - main [ref=e39]:
+    - generic [ref=e1516]:
+      - generic [ref=e1517]:
+        - generic [ref=e1518]:
+          - heading "我的任务" [level=2] [ref=e1519]
+          - paragraph [ref=e1520]: AI 已就绪 · 共 8 个任务
+        - generic [ref=e1521]:
+          - button "导入" [ref=e1522]
+          - button "新建" [ref=e1523]
+      - generic [ref=e2029]:
+        - generic [ref=e2032] [cursor=pointer]:
+          - img "Robot mascot, celebrating mood" [ref=e2035]
+          - generic [ref=e2046]:
+            - generic [ref=e2047]:
+              - generic [ref=e2048]: 已完成
+              - generic [ref=e2050]:
+                - generic [ref=e2051]: 6m 43s
+                - button "删除任务" [ref=e2052]:
+                  - img [ref=e2053]
+            - paragraph [ref=e2056]: "Add a health-check HTTP endpoint to the engine (src-engine/src/index.ts) that returns {status: 'ok', uptime: <seconds>} when receiving a GET /health request"
+            - generic [ref=e2057]:
+              - generic [ref=e2058]:
+                - generic [ref=e2059]: ai-workbench-self-evolve
+                - generic [ref=e2060]: 已完成 3/3 项
+              - generic [ref=e2061]: $0.33
+        - generic [ref=e2064] [cursor=pointer]:
+          - img "Robot mascot, celebrating mood" [ref=e2067]
+          - generic [ref=e2078]:
+            - generic [ref=e2079]:
+              - generic [ref=e2080]: 已完成
+              - generic [ref=e2082]:
+                - generic [ref=e2083]: 3h 11m
+                - button "删除任务" [ref=e2084]:
+                  - img [ref=e2085]
+            - paragraph [ref=e2088]: 在上一轮进化基础上，将项目从"基本达标"提升到"优秀产品"水准
+            - generic [ref=e2089]:
+              - generic [ref=e2090]:
+                - generic [ref=e2091]: ai-task-workbench
+                - generic [ref=e2092]: 已完成 22/7 项
+              - generic [ref=e2093]: $28.03
+        - generic [ref=e2096] [cursor=pointer]:
+          - img "Robot mascot, thinking mood" [ref=e2099]
+          - generic [ref=e2109]:
+            - generic [ref=e2110]:
+              - generic [ref=e2111]: 已暂停
+              - generic [ref=e2113]:
+                - generic [ref=e2114]: 25h 13m
+                - button "删除任务" [ref=e2115]:
+                  - img [ref=e2116]
+            - paragraph [ref=e2119]: 实现一个美观、响应式的网页界面，包含贷款金额、贷款年限、贷款利率等输入项
+            - generic [ref=e2120]:
+              - generic [ref=e2121]:
+                - generic [ref=e2122]: ai-workspace
+                - generic [ref=e2123]: 已完成 3/6 项
+              - generic [ref=e2124]: $1.28
+        - generic [ref=e2127] [cursor=pointer]:
+          - img "Robot mascot, idle mood" [ref=e2130]
+          - generic [ref=e2140]:
+            - generic [ref=e2141]:
+              - generic [ref=e2142]: 准备中
+              - generic [ref=e2144]:
+                - generic [ref=e2145]: 未开始
+                - button "删除任务" [ref=e2146]:
+                  - img [ref=e2147]
+            - paragraph [ref=e2150]: E2E分享测试目标
+            - generic [ref=e2152]:
+              - generic [ref=e2153]: e2e-share-test
+              - generic [ref=e2154]: 已完成 0/1 项
+        - generic [ref=e2157] [cursor=pointer]:
+          - img "Robot mascot, idle mood" [ref=e2160]
+          - generic [ref=e2170]:
+            - generic [ref=e2171]:
+              - generic [ref=e2172]: 准备中
+              - generic [ref=e2174]:
+                - generic [ref=e2175]: 未开始
+                - button "删除任务" [ref=e2176]:
+                  - img [ref=e2177]
+            - paragraph [ref=e2180]: 回归测试目标
+            - generic [ref=e2182]:
+              - generic [ref=e2183]: regression-test
+              - generic [ref=e2184]: 已完成 0/1 项
+        - generic [ref=e2187] [cursor=pointer]:
+          - img "Robot mascot, idle mood" [ref=e2190]
+          - generic [ref=e2200]:
+            - generic [ref=e2201]:
+              - generic [ref=e2202]: 准备中
+              - generic [ref=e2204]:
+                - generic [ref=e2205]: 未开始
+                - button "删除任务" [ref=e2206]:
+                  - img [ref=e2207]
+            - paragraph [ref=e2210]: 生成一个可独立运行的 HTML 文件，页面上显示 "Hello World" 文字并居中展示
+            - generic [ref=e2212]:
+              - generic [ref=e2213]: ai-workspace
+              - generic [ref=e2214]: 已完成 0/1 项
+        - generic [ref=e2217] [cursor=pointer]:
+          - img "Robot mascot, idle mood" [ref=e2220]
+          - generic [ref=e2230]:
+            - generic [ref=e2231]:
+              - generic [ref=e2232]: 准备中
+              - generic [ref=e2234]: 共享
+              - generic [ref=e2235]:
+                - generic [ref=e2236]: 未开始
+                - button "删除任务" [ref=e2237]:
+                  - img [ref=e2238]
+            - paragraph [ref=e2241]: E2E分享测试目标
+            - generic [ref=e2244]: 已完成 0/1 项
+        - generic [ref=e2247] [cursor=pointer]:
+          - img "Robot mascot, idle mood" [ref=e2250]
+          - generic [ref=e2260]:
+            - generic [ref=e2261]:
+              - generic [ref=e2262]: 准备中
+              - generic [ref=e2264]: 共享
+              - generic [ref=e2265]:
+                - generic [ref=e2266]: 未开始
+                - button "删除任务" [ref=e2267]:
+                  - img [ref=e2268]
+            - paragraph [ref=e2271]: 回归测试目标
+            - generic [ref=e2274]: 已完成 0/1 项

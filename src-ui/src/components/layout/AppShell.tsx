@@ -1,7 +1,8 @@
-import { type ReactNode, useState, useCallback } from "react";
+import { type ReactNode, useState, useCallback, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { useKeyboard, setToggleHelp } from "../../hooks/useKeyboard";
 import { useTheme } from "../../hooks/useTheme";
+import { useToast } from "../common/Toast";
 import { ShortcutHelp } from "../common/ShortcutHelp";
 
 interface AppShellProps {
@@ -12,6 +13,18 @@ export function AppShell({ children }: AppShellProps) {
   const [showHelp, setShowHelp] = useState(false);
   useKeyboard();
   useTheme();
+  const toast = useToast();
+
+  useEffect(() => {
+    const onDisconnect = () => toast.warning("引擎连接断开，正在尝试重连...");
+    const onReconnect = () => toast.success("引擎已重新连接");
+    window.addEventListener("engine-disconnect", onDisconnect);
+    window.addEventListener("engine-reconnect", onReconnect);
+    return () => {
+      window.removeEventListener("engine-disconnect", onDisconnect);
+      window.removeEventListener("engine-reconnect", onReconnect);
+    };
+  }, [toast]);
 
   const toggleHelpPanel = useCallback(() => setShowHelp((v) => !v), []);
   setToggleHelp(toggleHelpPanel);
