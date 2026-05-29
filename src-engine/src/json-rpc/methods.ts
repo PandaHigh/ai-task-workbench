@@ -553,8 +553,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
     validateRunId(runId);
     const taskId = requireString(params, "taskId");
     const removed = queueManager.remove(runId, taskId);
-    if (removed) store.deleteTask(runId, taskId);
-    return { runId, taskId, removed };
+    const deleted = store.deleteTask(runId, taskId);
+    return { runId, taskId, removed: removed || deleted };
   },
 
   "wizard.start": async (params) => {
@@ -639,10 +639,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "share.subscribe": async (params) => {
     const url = requireNonEmptyString(params, "url");
-    // Parse: http://<host>:<port>/api/share/<token>
-    const match = url.match(/^(https?:\/\/[^/]+)\/api\/share\/([a-f0-9-]+)$/i);
+    // Support both API URL (http://host/api/share/<token>) and frontend URL (http://host/#/share/<token>)
+    const apiMatch = url.match(/^(https?:\/\/[^/]+)\/api\/share\/([a-f0-9-]+)$/i);
+    const frontendMatch = url.match(/^(https?:\/\/[^/#]+)\/#\/share\/([a-f0-9-]+)$/i);
+    const match = apiMatch || frontendMatch;
     if (!match) {
-      throw new RpcValidationError("Invalid share URL format. Expected: http://<host>:<port>/api/share/<token>");
+      throw new RpcValidationError("Invalid share URL format. Expected: http://<host>:<port>/api/share/<token> or http://<host>:<port>/#/share/<token>");
     }
     const [, remoteUrl, remoteToken] = match;
 

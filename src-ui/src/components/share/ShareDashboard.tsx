@@ -3,6 +3,8 @@ import { useShareView } from "../../hooks/useShareView";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { useState, useMemo } from "react";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { useToast } from "../common/Toast";
 
 type TabType = "logs" | "commits" | "lessons" | "report";
 
@@ -18,6 +20,7 @@ function levelColor(level: string): string {
 export function ShareDashboard() {
   const { token } = useParams<{ token: string }>();
   const { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh } = useShareView(token!);
+  const toast = useToast();
   const [tab, setTab] = useState<TabType>("logs");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
@@ -33,25 +36,17 @@ export function ShareDashboard() {
 
   const handleStart = async () => {
     if (!token) return;
-    try {
-      const pendingTasks = tasks.filter(t => t.status === "pending");
-      for (const t of pendingTasks) {
-        await call("task.start", { taskId: t.id });
-      }
-      refresh();
-    } catch (err) {
-      console.error("Start failed:", err);
-    }
+    toast.info("分享页面无法直接控制执行，请在本地引擎操作");
   };
 
   const handleStop = async () => {
     if (!token) return;
-    try { await call("run.stop"); refresh(); } catch (err) { console.error("Stop failed:", err); }
+    toast.info("分享页面无法直接控制执行，请在本地引擎操作");
   };
 
   const handleRetry = async (taskId: string) => {
     if (!token) return;
-    try { await call("task.retry", { taskId }); refresh(); } catch (err) { console.error("Retry failed:", err); }
+    try { await call("task.retry", { taskId }); refresh(); } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : "未知错误"}`); }
   };
 
   const handleAddTask = async () => {
@@ -62,7 +57,7 @@ export function ShareDashboard() {
       setShowAddModal(false);
       refresh();
     } catch (err) {
-      console.error("Add task failed:", err);
+      toast.error(`添加失败: ${err instanceof Error ? err.message : "未知错误"}`);
     }
   };
 
@@ -83,7 +78,14 @@ export function ShareDashboard() {
         <div className="text-center max-w-md px-6">
           <div className="text-4xl mb-4" style={{ opacity: 0.3 }}>:(</div>
           <p className="text-sm font-semibold mb-2" style={{ color: "var(--red)" }}>加载失败</p>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{error}</p>
+          <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>{error}</p>
+          <button
+            onClick={() => refresh()}
+            className="px-4 py-2 rounded-lg text-xs font-semibold"
+            style={{ background: "var(--blue)", color: "#fff" }}
+          >
+            重试
+          </button>
         </div>
       </div>
     );
@@ -101,11 +103,11 @@ export function ShareDashboard() {
         </div>
         <div className="flex items-center gap-2">
           {isRunning ? (
-            <button onClick={handleStop} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--yellow)", color: "#fff" }}>暂停</button>
+            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--yellow)", color: "#fff" }}>暂停（只读）</span>
           ) : run?.status === "completed" ? (
-            <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--green)", color: "#fff" }}>继续运行</button>
+            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--green)", color: "#fff" }}>已完成</span>
           ) : (
-            <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded font-semibold" style={{ background: "var(--green)", color: "#fff" }}>开始执行</button>
+            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--text-secondary)", color: "#fff" }}>等待执行</span>
           )}
           <span className="status-badge" style={{
             background: isRunning ? "rgba(16, 185, 129, 0.15)" : run?.status === "completed" ? "rgba(77, 107, 254, 0.15)" : "rgba(125, 133, 144, 0.15)",
@@ -265,7 +267,7 @@ export function ShareDashboard() {
             )}
             {tab === "report" && (
               report ? (
-                <div className="markdown-body prose-sm max-w-none" style={{ fontFamily: "inherit" }} dangerouslySetInnerHTML={{ __html: marked(report.report) }} />
+                <div className="markdown-body prose-sm max-w-none" style={{ fontFamily: "inherit" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(report.report) as string) }} />
               ) : (
                 <p className="text-center py-8" style={{ color: "var(--text-secondary)" }}>暂无报告</p>
               )

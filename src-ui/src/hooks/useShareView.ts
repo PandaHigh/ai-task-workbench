@@ -3,6 +3,7 @@ import type { ExecutionRun, TaskDefinition, GitCommit, LessonLearned } from "@ai
 import { ShareClient } from "../lib/share-client";
 
 const POLL_INTERVAL = 5000;
+const FULL_REFRESH_INTERVAL = 30_000;
 
 export function useShareView(token: string) {
   const client = useRef(new ShareClient());
@@ -15,8 +16,10 @@ export function useShareView(token: string) {
   const [queue, setQueue] = useState<TaskDefinition[]>([]);
   const [report, setReport] = useState<{ report: string; generatedAt: number } | null>(null);
   const [logs, setLogs] = useState<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>>([]);
+  const prevStatusRef = useRef<string | null>(null);
+  const lastFullRefreshRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const fullRefresh = useCallback(async () => {
     const c = client.current;
     try {
       const [runData, taskData, commitData, lessonData, queueData, reportData, logsData] = await Promise.allSettled([
@@ -29,26 +32,68 @@ export function useShareView(token: string) {
         c.getLogs(token),
       ]);
 
-      if (runData.status === "fulfilled") setRun(runData.value);
+      if (runData.status === "fulfilled") {
+        setRun(runData.value);
+        const prevStatus = prevStatusRef.current;
+        prevStatusRef.current = runData.value.status;
+        if (prevStatus && prevStatus !== runData.value.status) {
+          lastFullRefreshRef.current = 0;
+        }
+      }
       if (taskData.status === "fulfilled") setTasks(taskData.value);
       if (commitData.status === "fulfilled") setCommits(commitData.value);
       if (lessonData.status === "fulfilled") setLessons(lessonData.value);
       if (queueData.status === "fulfilled") setQueue(queueData.value);
       if (reportData.status === "fulfilled") setReport(reportData.value);
       if (logsData.status === "fulfilled") setLogs(logsData.value);
+      lastFullRefreshRef.current = Date.now();
     } catch (err) {
-      console.warn("Share refresh failed:", err);
+      console.warn("Share full refresh failed:", err);
     }
   }, [token]);
 
+  const lightRefresh = useCallback(async () => {
+    const c = client.current;
+    try {
+      const runData = await c.getRun(token);
+      setRun(runData);
+      const prevStatus = prevStatusRef.current;
+      prevStatusRef.current = runData.status;
+      if (prevStatus && prevStatus !== runData.status) {
+        await fullRefresh();
+        return;
+      }
+      const now = Date.now();
+      if (now - lastFullRefreshRef.current >= FULL_REFRESH_INTERVAL) {
+        await fullRefresh();
+      }
+    } catch (err) {
+      console.warn("Share light refresh failed:", err);
+    }
+  }, [token, fullRefresh]);
+
+  // Reset all state and reload when token changes
   useEffect(() => {
+    setError("");
+    setRun(null);
+    setTasks([]);
+    setCommits([]);
+    setLessons([]);
+    setQueue([]);
+    setReport(null);
+    setLogs([]);
+    prevStatusRef.current = null;
+    lastFullRefreshRef.current = 0;
+
     let cancelled = false;
     const load = async () => {
+      setLoading(true);
       try {
         const runData = await client.current.getRun(token);
         if (cancelled) return;
         setRun(runData);
-        await refresh();
+        prevStatusRef.current = runData.status;
+        await fullRefresh();
         if (!cancelled) setLoading(false);
       } catch (err) {
         if (!cancelled) {
@@ -59,13 +104,13 @@ export function useShareView(token: string) {
     };
     load();
     return () => { cancelled = true; };
-  }, [token, refresh]);
+  }, [token, fullRefresh]);
 
   useEffect(() => {
     if (loading || error) return;
-    const interval = setInterval(refresh, POLL_INTERVAL);
+    const interval = setInterval(lightRefresh, POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [loading, error, refresh]);
+  }, [loading, error, lightRefresh]);
 
   const call = useCallback(async (method: string, params?: Record<string, unknown>) => {
     const c = client.current;
@@ -99,5 +144,5 @@ export function useShareView(token: string) {
     }
   }, [token, queue, tasks, commits, lessons, run, report, logs]);
 
-  return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh };
+  return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh: fullRefresh };
 }

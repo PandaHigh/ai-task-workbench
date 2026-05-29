@@ -330,7 +330,10 @@ describe("Share HTTP API Integration", () => {
       expect(retryRes.status).toBe(200);
       const data = retryRes.data as Record<string, unknown>;
       expect(data.taskId).toBe(taskId);
-      expect(data.newQueueTaskId).toBeDefined();
+      // After retry, task should be back in queue with same id (no duplicate)
+      const queueRes = await fetchShare(share.token, "queue");
+      const queueData = queueRes.data as { queue: Array<{ id: string }> };
+      expect(queueData.queue.some((t) => t.id === taskId)).toBe(true);
     });
   });
 
@@ -427,6 +430,7 @@ describe("Share HTTP API Integration", () => {
           port: serverPort,
           path: `/api/share/${share.token}/run`,
           method: "OPTIONS",
+          headers: { origin: "http://localhost:9731" },
         }, (res) => {
           resolve(res.headers);
         });
@@ -434,7 +438,7 @@ describe("Share HTTP API Integration", () => {
         req.end();
       });
 
-      expect(corsHeaders["access-control-allow-origin"]).toBe("*");
+      expect(corsHeaders["access-control-allow-origin"]).toBe("http://localhost:9731");
       expect(corsHeaders["access-control-allow-methods"]).toContain("GET");
     });
   });

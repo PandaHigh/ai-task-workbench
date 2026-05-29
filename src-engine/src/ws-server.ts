@@ -151,7 +151,7 @@ export class WsServer {
 
     // CORS preflight
     if (method === "OPTIONS") {
-      this.setCorsHeaders(res);
+      this.setCorsHeaders(req, res);
       res.writeHead(204);
       res.end();
       return;
@@ -159,7 +159,7 @@ export class WsServer {
 
     // Share API
     if (url.startsWith("/api/share/")) {
-      this.setCorsHeaders(res);
+      this.setCorsHeaders(req, res);
       this.handleShareApi(req, res, url, method);
       return;
     }
@@ -168,8 +168,14 @@ export class WsServer {
     this.serveFrontend(req, res, url);
   }
 
-  private setCorsHeaders(res: ServerResponse): void {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+  private setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+    const origin = req.headers.origin;
+    if (origin) {
+      const { host } = new URL(origin);
+      if (host === "localhost:9731" || host === "127.0.0.1:9731" || host.startsWith("localhost:") || host.startsWith("127.0.0.1:")) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   }
@@ -267,17 +273,16 @@ export class WsServer {
             const tasks = this.store.listTasks(runId);
             const task = tasks.find((t: { id: string }) => t.id === params.taskId);
             if (!task) { this.sendJson(res, 404, { error: "Task not found" }); return; }
-            this.store.updateTask(runId, params.taskId, {
-              status: "pending", score: undefined, scoreDetails: undefined,
+            const resetTask = {
+              ...task,
+              status: "pending" as const, score: undefined, scoreDetails: undefined,
               result: undefined, errorMessage: undefined, completedAt: undefined,
               durationMs: undefined, costUsd: undefined,
-            });
-            const restored = this.queueManager.enqueue(runId, {
-              content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
-            });
-            this.store.saveTask(runId, restored);
+            };
+            this.store.updateTask(runId, params.taskId, resetTask);
+            this.queueManager.restore(runId, resetTask);
             this.broadcast("queue.updated", { runId, queue: this.queueManager.list(runId) });
-            this.sendJson(res, 200, { taskId: params.taskId, newQueueTaskId: restored.id });
+            this.sendJson(res, 200, { taskId: params.taskId });
             break;
           }
           case "task.pause":
