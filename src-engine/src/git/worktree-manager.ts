@@ -1,4 +1,5 @@
 import simpleGit, { type SimpleGit } from "simple-git";
+import path from "path";
 
 export class WorktreeManager {
   private getGit(baseDir: string): SimpleGit {
@@ -7,7 +8,7 @@ export class WorktreeManager {
 
   async create(baseDir: string, branchName: string): Promise<string> {
     const git = this.getGit(baseDir);
-    const worktreePath = `${baseDir}/.worktrees/${branchName}`;
+    const worktreePath = path.join(baseDir, ".worktrees", branchName);
 
     // Create worktree with new branch
     await git.raw(["worktree", "add", worktreePath, "-b", branchName, "HEAD"]);

@@ -15,7 +15,7 @@
     "lint": "npx eslint 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx}'",
     "format": "npx prettier --write 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx,css}'",
     "format:check": "npx prettier --check 'src-engine/src/**/*.ts' 'src-ui/src/**/*.{ts,tsx,css}'",
-    "clean": "rm -rf src-engine/dist src-ui/dist shared/dist node_modules/.cache"
+    "clean": "npx rimraf src-engine/dist src-ui/dist shared/dist node_modules/.cache"
   },
   "workspaces": [
     "shared",

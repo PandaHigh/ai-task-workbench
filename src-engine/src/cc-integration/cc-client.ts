@@ -1,7 +1,9 @@
 import { spawn } from "child_process";
 import { platform, homedir } from "os";
 
-const SAFE_ENV_KEYS = ["PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP"] as const;
+const SAFE_ENV_KEYS = ["PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC"] as const;
+
+const isWin = platform() === "win32";
 
 // PID tracking for orphan detection and cleanup
 const activePids = new Set<number>();
@@ -20,7 +22,11 @@ export function getActivePids(): number[] {
 
 export async function killProcessTree(pid: number): Promise<void> {
   try {
-    process.kill(pid, "SIGTERM");
+    if (isWin) {
+      process.kill(pid);
+    } else {
+      process.kill(pid, "SIGTERM");
+    }
   } catch {
     // Process already gone
   }
@@ -40,7 +46,7 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
     if (val !== undefined) env[key] = val;
   }
   if (!env.HOME) env.HOME = homedir();
-  if (!env.PATH) env.PATH = "/usr/bin:/bin";
+  if (!env.PATH) env.PATH = isWin ? process.env.SYSTEMROOT ? `${process.env.SYSTEMROOT}\\System32` : "C:\\Windows\\System32" : "/usr/bin:/bin";
   env.LANG = env.LANG || "en_US.UTF-8";
   return env;
 }
@@ -117,7 +123,7 @@ export class CCClient {
 
       const timeout = setTimeout(() => {
         settled = true;
-        proc.kill("SIGTERM");
+        proc.kill(isWin ? undefined : "SIGTERM");
         sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
         reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
       }, options.timeoutMinutes * 60 * 1000);
@@ -138,7 +144,6 @@ export class CCClient {
               durationMs = msg.duration_ms || 0;
               numTurns = msg.num_turns || 0;
             } else {
-              // Capture error results from stream-json output
               stderrBuffer += `[CC ${msg.subtype || "error"}] ${msg.result || msg.error || JSON.stringify(msg)}`;
             }
           }
@@ -159,7 +164,6 @@ export class CCClient {
       });
 
       proc.on("close", (code) => {
-        // Flush remaining buffer
         parseAndCollect(stdoutBuffer);
         stdoutBuffer = "";
         if (proc.pid) untrackPid(proc.pid);
@@ -169,8 +173,6 @@ export class CCClient {
           if (code === 0 || result) {
             resolve({ result, sessionId, totalCostUsd, durationMs, numTurns, messages });
           } else {
-            // Fallback: CC exited non-zero but may have done useful work.
-            // Try to extract result from assistant messages in the stream.
             const assistantTexts = messages
               .filter((m) => m.type === "assistant")
               .map((m) => typeof m.content === "string" ? m.content : (m.content as Array<{text: string}>)?.map?.(c => c.text)?.join?.("") || "")
@@ -192,7 +194,6 @@ export class CCClient {
             } else {
               const errorParts = [`CC process exited with code ${code}`];
               if (stderrBuffer) errorParts.push(stderrBuffer);
-              // Include error messages from stream-json output
               const streamErrors = messages
                 .filter((m) => m.type === "result" && m.subtype !== "success")
                 .map((m) => m.result || m.error || "")
@@ -217,7 +218,7 @@ export class CCClient {
         const onAbort = () => {
           if (settled) return;
           settled = true;
-          proc.kill("SIGTERM");
+          proc.kill(isWin ? undefined : "SIGTERM");
           sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
           reject(new Error("Task was aborted"));
         };
@@ -256,7 +257,7 @@ export class CCClient {
     const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
-      proc.kill("SIGTERM");
+      proc.kill(isWin ? undefined : "SIGTERM");
       sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
     }, options.timeoutMinutes * 60 * 1000);
 
@@ -287,7 +288,6 @@ export class CCClient {
     proc.on("close", () => {
       if (proc.pid) untrackPid(proc.pid);
       cleanup();
-      // Flush remaining buffer
       if (buffer.trim()) {
         try {
           const msg = JSON.parse(buffer.trim());
@@ -322,7 +322,7 @@ export class CCClient {
       const onAbort = () => {
         if (settled) return;
         settled = true;
-        proc.kill("SIGTERM");
+        proc.kill(isWin ? undefined : "SIGTERM");
         sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
       };
       options.abortSignal.addEventListener("abort", onAbort);

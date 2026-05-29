@@ -1,7 +1,9 @@
 import { WsServer } from "./ws-server.js";
 import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
+import { platform } from "os";
 
+const isWin = platform() === "win32";
 let isShuttingDown = false;
 
 async function main() {
@@ -42,7 +44,11 @@ async function main() {
   };
 
   process.on("SIGINT", gracefulShutdown);
-  process.on("SIGTERM", gracefulShutdown);
+  // SIGTERM is not supported on Windows; the Tauri sidecar uses TerminateProcess (hard kill).
+  // On Windows, we handle cleanup via process exit hooks instead.
+  if (!isWin) {
+    process.on("SIGTERM", gracefulShutdown);
+  }
 
   process.on("uncaughtException", (err) => {
     console.error("[engine] Uncaught exception — initiating shutdown:", err);
