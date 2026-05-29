@@ -147,24 +147,26 @@ export class SkillManager {
         return;
       }
 
-      // Extract using system unzip (available on macOS/Linux)
+      // Extract zip (cross-platform: PowerShell on Windows, unzip on Unix)
       const skillName = fileName.replace(/\.zip$/i, "").replace(/[^a-zA-Z0-9_-]/g, "_");
       const customDir = this.skillStore.getCustomSkillsDir();
       const extractDir = path.join(customDir, skillName);
 
-      // Clean up existing
       if (fs.existsSync(extractDir)) {
         fs.rmSync(extractDir, { recursive: true });
       }
       fs.mkdirSync(extractDir, { recursive: true });
 
-      // Write zip to temp file and extract
       const tmpZip = path.join(customDir, `${skillName}.tmp.zip`);
       fs.writeFileSync(tmpZip, fileData);
 
       try {
         const { execSync } = await import("child_process");
-        execSync(`unzip -o "${tmpZip}" -d "${extractDir}"`, { stdio: "pipe" });
+        if (process.platform === "win32") {
+          execSync(`powershell -Command "Expand-Archive -Path '${tmpZip}' -DestinationPath '${extractDir}' -Force"`, { stdio: "pipe" });
+        } else {
+          execSync(`unzip -o "${tmpZip}" -d "${extractDir}"`, { stdio: "pipe" });
+        }
       } finally {
         fs.unlinkSync(tmpZip);
       }

@@ -61,6 +61,88 @@ fn find_engine_dir_handle(app: &AppHandle) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("../src-engine"))
 }
 
+fn find_node() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let node_path = std::path::PathBuf::from(appdata).join("fnm").join("node-versions");
+            if node_path.exists() {
+                if let Ok(entries) = std::fs::read_dir(&node_path) {
+                    for entry in entries.flatten() {
+                        let node_exe = entry.path().join("installation").join("node.exe");
+                        if node_exe.exists() {
+                            println!("[sidecar] Found node via fnm at {:?}", node_exe);
+                            return node_exe.to_string_lossy().to_string();
+                        }
+                    }
+                }
+            }
+        }
+        // Check common locations
+        let candidates = vec![
+            "C:\\Program Files\\nodejs\\node.exe",
+            "C:\\nodejs\\node.exe",
+        ];
+        for path in &candidates {
+            if std::path::Path::new(path).exists() {
+                println!("[sidecar] Found node at {}", path);
+                return path.to_string();
+            }
+        }
+        // Fallback to `where`
+        if let Ok(output) = std::process::Command::new("where").arg("node.exe").output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or("").trim().to_string();
+                if !path.is_empty() && std::path::Path::new(&path).exists() {
+                    println!("[sidecar] Found node via where: {}", path);
+                    return path;
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let candidates = vec!["/usr/bin/node", "/usr/local/bin/node"];
+        for path in &candidates {
+            if std::path::Path::new(path).exists() {
+                println!("[sidecar] Found node at {}", path);
+                return path.to_string();
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let candidates = vec![
+            format!("{home}/.nvm/versions/node/default/bin/node"),
+            "/opt/homebrew/bin/node".to_string(),
+            "/usr/local/bin/node".to_string(),
+        ];
+        for path in &candidates {
+            if std::path::Path::new(path).exists() {
+                println!("[sidecar] Found node at {}", path);
+                return path.clone();
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    if let Ok(output) = std::process::Command::new("/usr/bin/which").arg("node").output() {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() && std::path::Path::new(&path).exists() {
+                println!("[sidecar] Found node via which: {}", path);
+                return path;
+            }
+        }
+    }
+
+    println!("[sidecar] node not found in common paths, using 'node' as-is");
+    "node".to_string()
+}
+
 fn find_npx() -> String {
     #[cfg(target_os = "windows")]
     {
@@ -206,9 +288,10 @@ fn spawn_npx_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Opt
 }
 
 fn spawn_node_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
-    println!("[sidecar] Starting engine: node dist/engine.js in {:?}", engine_dir);
+    let node = find_node();
+    println!("[sidecar] Starting engine: {} dist/engine.js in {:?}", node, engine_dir);
     let (_rx, child) = app.shell()
-        .command("node")
+        .command(&node)
         .args(["dist/engine.js"])
         .current_dir(engine_dir)
         .env("PATH", std::env::var("PATH").unwrap_or_default())
@@ -239,8 +322,9 @@ pub fn restart_engine(app: AppHandle) -> Result<String, String> {
     let result = if has_src {
         spawn_npx_handle(&app, &engine_dir)
     } else {
+        let node = find_node();
         let (_rx, child) = app.shell()
-            .command("node")
+            .command(&node)
             .args(["dist/engine.js"])
             .current_dir(&engine_dir)
             .env("PATH", std::env::var("PATH").unwrap_or_default())

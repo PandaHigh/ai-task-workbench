@@ -124,7 +124,7 @@ export class CCClient {
       const timeout = setTimeout(() => {
         settled = true;
         proc.kill(isWin ? undefined : "SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+        sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
         reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
       }, options.timeoutMinutes * 60 * 1000);
 
@@ -219,7 +219,7 @@ export class CCClient {
           if (settled) return;
           settled = true;
           proc.kill(isWin ? undefined : "SIGTERM");
-          sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+          sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
           reject(new Error("Task was aborted"));
         };
         options.abortSignal.addEventListener("abort", onAbort);
@@ -258,7 +258,7 @@ export class CCClient {
       if (settled) return;
       settled = true;
       proc.kill(isWin ? undefined : "SIGTERM");
-      sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+      sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
     }, options.timeoutMinutes * 60 * 1000);
 
     let buffer = "";
@@ -323,7 +323,7 @@ export class CCClient {
         if (settled) return;
         settled = true;
         proc.kill(isWin ? undefined : "SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+        sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
       };
       options.abortSignal.addEventListener("abort", onAbort);
       const removeAbortListener = () => {
