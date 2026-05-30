@@ -732,12 +732,19 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     const [, remoteUrl, remoteToken] = match;
 
-    // Fetch remote run metadata
+    // Check if this is a local token (same engine) — skip HTTP fetch
+    const localShare = shareStore.getByToken(remoteToken);
     let remoteRun: ExecutionRun;
-    try {
-      remoteRun = await remoteProxy.fetchRemoteRun(remoteUrl, remoteToken);
-    } catch (err) {
-      throw new RpcValidationError(`Failed to fetch remote run: ${errorToMessage(err)}`);
+    if (localShare) {
+      const localData = store.getRun(localShare.runId);
+      if (!localData) throw new RpcValidationError(`Local share token found but run ${localShare.runId} does not exist`);
+      remoteRun = localData;
+    } else {
+      try {
+        remoteRun = await remoteProxy.fetchRemoteRun(remoteUrl, remoteToken);
+      } catch (err) {
+        throw new RpcValidationError(`Failed to fetch remote run: ${errorToMessage(err)}`);
+      }
     }
 
     const localRunId = `remote-${remoteRun.id.slice(0, 8)}-${Date.now().toString(36)}`;
@@ -749,13 +756,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
       label: remoteRun.goals[0] || "Remote dashboard",
     });
 
-    // Establish real-time WebSocket connection to remote engine
+    // Establish real-time WebSocket connection to remote engine (skip for local shares)
+    if (!localShare) {
     try {
       const { connectRemoteWS } = await import("../remote/remote-proxy.js");
       connectRemoteWS(localRunId, remoteUrl, remoteToken, notify);
     } catch (wsErr) {
       console.warn("[share.subscribe] WebSocket connection to remote failed, will retry:", errorToMessage(wsErr));
     }
+    } // end if (!localShare)
 
     return {
       runId: sub.runId,
