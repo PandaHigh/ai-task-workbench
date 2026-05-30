@@ -8,6 +8,11 @@ import { generateClaudeMd } from "../skills/claude-md-generator.js";
 import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
 import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
+import { ErrorWatcher } from "./error-watcher.js";
+import { BackgroundReviewer } from "./agents/background-reviewer.js";
+import { AgentExecutor } from "./agents/agent-executor.js";
+import { AdaptiveConfig } from "./adaptive-config.js";
+import type { OrchestratorProfile } from "@ai-workbench/shared";
 
 import { errorToMessage } from "../lib/error-utils.js";
 import { extractJson } from "../lib/json-extract.js";
@@ -53,6 +58,8 @@ export class Executor {
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
   private tracer: Tracer;
+  private errorWatcher: ErrorWatcher;
+  private activeProfile: OrchestratorProfile | null = null;
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -90,6 +97,8 @@ export class Executor {
     } catch (err) {
       console.warn("[executor] failed to load config from store, using defaults:", errorToMessage(err));
     }
+
+    this.errorWatcher = new ErrorWatcher(notify, this.store);
   }
 
   async start(run: ExecutionRun): Promise<void> {
@@ -310,6 +319,18 @@ export class Executor {
     return tasks.reduce((sum, t) => sum + (t.costUsd || 0), 0);
   }
 
+  private loadProfile(): OrchestratorProfile | null {
+    try {
+      const profileId = this.store.getConfig("activeProfile") as string | undefined;
+      if (!profileId) return null;
+      const adaptive = new AdaptiveConfig({});
+      const builtIn = adaptive.getBuiltInProfiles();
+      return builtIn.find((p) => p.id === profileId) ?? this.store.listProfiles().find((p) => p.id === profileId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(resolve, ms);
@@ -344,13 +365,19 @@ export class Executor {
       this.tracer.startTrace();
       const taskSpanId = this.tracer.startSpan("task.execute", undefined, { taskId: task.id, content: task.content.substring(0, 100) });
 
+      // Load active profile for pipeline config
+      this.activeProfile = this.loadProfile();
+
       // Use TaskPipeline for structured execution
       const pipelineConfig = {
-        maxFixIterations: (this.store.getConfig("maxFixIterations") as number) || undefined,
-        plannerMaxTurns: (this.store.getConfig("plannerMaxTurns") as number) || undefined,
-        developerMaxTurns: (this.store.getConfig("developerMaxTurns") as number) || undefined,
-        testerMaxTurns: (this.store.getConfig("testerMaxTurns") as number) || undefined,
-        reviewerMaxTurns: (this.store.getConfig("reviewerMaxTurns") as number) || undefined,
+        maxFixIterations: this.activeProfile?.config?.maxFixIterations ?? ((this.store.getConfig("maxFixIterations") as number) || undefined),
+        plannerMaxTurns: this.activeProfile?.config?.agents?.planner?.maxTurns ?? ((this.store.getConfig("plannerMaxTurns") as number) || undefined),
+        developerMaxTurns: this.activeProfile?.config?.agents?.developer?.maxTurns ?? ((this.store.getConfig("developerMaxTurns") as number) || undefined),
+        testerMaxTurns: this.activeProfile?.config?.agents?.tester?.maxTurns ?? ((this.store.getConfig("testerMaxTurns") as number) || undefined),
+        reviewerMaxTurns: this.activeProfile?.config?.agents?.reviewer?.maxTurns ?? ((this.store.getConfig("reviewerMaxTurns") as number) || undefined),
+        stderrCallback: this.activeProfile?.config?.errorWatchEnabled
+          ? (data: string) => this.errorWatcher.processStderr(data, run.id, task.id)
+          : undefined,
       };
       const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), run.workingDir, pipelineConfig);
       const pipelineResult: PipelineResult = await pipeline.run(task, context, abortController.signal);
@@ -403,6 +430,24 @@ export class Executor {
       this.store.appendScore(run.id, task.id, score);
       this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score });
       this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
+
+      // Background review (non-blocking, runs in separate worktree)
+      if (this.activeProfile?.config?.backgroundReview) {
+        const bgReviewer = new BackgroundReviewer(
+          new AgentExecutor(this.ccClient, this.broadcast.bind(this)),
+          this.store,
+          this.broadcast.bind(this),
+        );
+        bgReviewer.runBackgroundReview({
+          runId: run.id,
+          taskId: task.id,
+          workingDir: run.workingDir,
+          plan: pipelineResult.plan,
+          testResult: pipelineResult.testResult,
+        }).catch((err) => {
+          this.log(run.id, "reviewer", "warn", `Background review failed: ${errorToMessage(err)}`, task.id);
+        });
+      }
 
       this.log(run.id, "scorer", score.passed ? "info" : "warn",
         `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`, task.id);

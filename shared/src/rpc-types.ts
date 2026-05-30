@@ -107,7 +107,13 @@ export type EngineMethod =
   | "plugin.install"
   | "plugin.remove"
   | "plugin.toggle"
-  | "config.adaptive";
+  | "config.adaptive"
+  | "profile.list"
+  | "profile.get"
+  | "profile.set"
+  | "profile.delete"
+  | "suggestion.list"
+  | "error.history";
 
 export type EngineNotification =
   | "task.progress"
@@ -131,4 +137,8 @@ export type EngineNotification =
   | "skill.removed"
   | "trace.span"
   | "agent.decision"
-  | "plugin.updated";
+  | "plugin.updated"
+  | "agent.progress"
+  | "review.suggestion"
+  | "error.detected"
+  | "task.autoFix";

@@ -45,6 +45,7 @@ const DEFAULT_PIPELINE_CONFIG = {
   developerMaxTurns: 40,
   testerMaxTurns: 25,
   reviewerMaxTurns: 20,
+  stderrCallback: undefined as ((data: string) => void) | undefined,
 };
 
 export class TaskPipeline {
@@ -272,6 +273,10 @@ export class TaskPipeline {
     taskId: string,
     allMessages: CCMessage[],
   ): Promise<CCTaskResult> {
+    // Inject stderr callback from pipeline config
+    if (this.config.stderrCallback && !options.stderrCallback) {
+      options = { ...options, stderrCallback: this.config.stderrCallback };
+    }
     const collectedMessages: CCMessage[] = [];
     let result: CCTaskResult | null = null;
     let streamResult = "";
@@ -285,6 +290,12 @@ export class TaskPipeline {
       collectedMessages.push(message);
       allMessages.push(message);
       this.notify("task.stream", { taskId, message });
+
+      // Emit structured progress based on current phase
+      const progress = this.parsePipelineProgress(message, taskId, allMessages.length);
+      if (progress) {
+        this.notify("agent.progress", progress);
+      }
 
       if (message.type === "result" && message.subtype === "success") {
         streamResult = message.result || "";
@@ -339,6 +350,37 @@ export class TaskPipeline {
   }
 
   private broadcastPhase(taskId: string, runId: string, phase: TaskPhase, iteration: number): void {
+    this.currentPhase = phase;
     this.notify("task.phase", { taskId, runId, phase, iteration });
+  }
+
+  private currentPhase: string = "planner";
+
+  private parsePipelineProgress(
+    message: CCMessage,
+    taskId: string,
+    messageCount: number,
+  ): import("@ai-workbench/shared").AgentProgress | null {
+    if (message.type !== "tool_use" && message.type !== "assistant") return null;
+
+    const maxTurns = this.config.plannerMaxTurns + this.config.developerMaxTurns + this.config.testerMaxTurns + this.config.reviewerMaxTurns;
+    const progress = Math.min(95, Math.round((messageCount / (maxTurns * 2)) * 100));
+    const name = (message as { name?: string }).name ?? "";
+    let phase = "处理中";
+    if (name.includes("Read") || name.includes("Glob") || name.includes("Grep")) phase = "分析代码";
+    else if (name.includes("Write") || name.includes("Edit")) phase = "编写代码";
+    else if (name.includes("Bash")) phase = "执行命令";
+    else if (message.type === "assistant") phase = "思考中";
+
+    return {
+      runId: "",
+      taskId,
+      role: this.currentPhase,
+      progress,
+      phase,
+      files: [],
+      message: phase,
+      timestamp: Date.now(),
+    };
   }
 }

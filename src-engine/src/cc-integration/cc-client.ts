@@ -61,6 +61,7 @@ export interface CCExecutionOptions {
   systemPrompt?: string;
   jsonSchema?: Record<string, unknown>;
   abortSignal?: AbortSignal;
+  stderrCallback?: (data: string) => void;
 }
 
 export interface CCMessage {
@@ -265,6 +266,11 @@ export class CCClient {
     let resolveNext: ((value: IteratorResult<CCMessage>) => void) | null = null;
     let done = false;
     let streamError: Error | null = null;
+
+    proc.stderr.on("data", (chunk: Buffer) => {
+      const data = chunk.toString();
+      options.stderrCallback?.(data);
+    });
 
     proc.stdout.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();

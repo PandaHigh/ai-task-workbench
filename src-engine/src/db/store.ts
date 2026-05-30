@@ -9,12 +9,17 @@ import type {
   ScoreDetails,
   ApprovalRequest,
   TraceSpan,
+  OrchestratorProfile,
+  ReviewSuggestion,
+  DetectedError,
 } from "@ai-workbench/shared";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile, cleanupTmpFiles } from "./store-utils.js";
 
 const MAX_LOG_ENTRIES = 1000;
 const MAX_HISTORY_ENTRIES = 500;
 const MAX_TRACE_ENTRIES = 500;
+const MAX_SUGGESTION_ENTRIES = 200;
+const MAX_ERROR_ENTRIES = 500;
 
 export class Store {
   private dataDir: string;
@@ -307,5 +312,65 @@ export class Store {
       Object.assign(approvals[idx], updates);
       writeJsonFile(file, approvals);
     }
+  }
+
+  // ---- Orchestrator Profiles ----
+
+  listProfiles(): OrchestratorProfile[] {
+    const file = path.join(this.dataDir, "profiles.json");
+    return readJsonFile<OrchestratorProfile[]>(file, []);
+  }
+
+  saveProfile(profile: OrchestratorProfile): void {
+    const file = path.join(this.dataDir, "profiles.json");
+    const profiles = this.listProfiles();
+    const idx = profiles.findIndex((p) => p.id === profile.id);
+    if (idx >= 0) {
+      profiles[idx] = profile;
+    } else {
+      profiles.push(profile);
+    }
+    writeJsonFile(file, profiles);
+  }
+
+  deleteProfile(id: string): boolean {
+    const file = path.join(this.dataDir, "profiles.json");
+    const profiles = this.listProfiles();
+    const filtered = profiles.filter((p) => p.id !== id);
+    if (filtered.length === profiles.length) return false;
+    writeJsonFile(file, filtered);
+    return true;
+  }
+
+  // ---- Review Suggestions ----
+
+  appendSuggestion(runId: string, suggestion: ReviewSuggestion): void {
+    const file = path.join(this.runDir(runId), "suggestions.json");
+    const suggestions = readJsonFile<ReviewSuggestion[]>(file, []);
+    suggestions.push(suggestion);
+    const trimmed = suggestions.length > MAX_SUGGESTION_ENTRIES ? suggestions.slice(-MAX_SUGGESTION_ENTRIES) : suggestions;
+    writeJsonFile(file, trimmed);
+  }
+
+  getSuggestions(runId: string, taskId?: string): ReviewSuggestion[] {
+    const file = path.join(this.runDir(runId), "suggestions.json");
+    const suggestions = readJsonFile<ReviewSuggestion[]>(file, []);
+    return taskId ? suggestions.filter((s) => s.taskId === taskId) : suggestions;
+  }
+
+  // ---- Detected Errors ----
+
+  appendDetectedError(runId: string, error: DetectedError): void {
+    const file = path.join(this.runDir(runId), "errors.json");
+    const errors = readJsonFile<DetectedError[]>(file, []);
+    errors.push(error);
+    const trimmed = errors.length > MAX_ERROR_ENTRIES ? errors.slice(-MAX_ERROR_ENTRIES) : errors;
+    writeJsonFile(file, trimmed);
+  }
+
+  getDetectedErrors(runId: string, taskId?: string): DetectedError[] {
+    const file = path.join(this.runDir(runId), "errors.json");
+    const errors = readJsonFile<DetectedError[]>(file, []);
+    return taskId ? errors.filter((e) => e.taskId === taskId) : errors;
   }
 }

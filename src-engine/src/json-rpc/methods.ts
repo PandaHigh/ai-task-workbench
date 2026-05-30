@@ -147,6 +147,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "reviewerMaxTurns",
   "crewMode",
   "adaptiveEnabled",
+  "activeProfile",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -958,5 +959,69 @@ export const methodHandlers: Record<string, MethodHandler> = {
       store.setConfig("adaptiveEnabled", enabled);
     }
     return { adaptiveEnabled: store.getConfig("adaptiveEnabled") ?? false };
+  },
+
+  // ─── Orchestrator Profiles ─────────────────────────────────────────────
+
+  "profile.list": async () => {
+    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
+    const adaptive = new AdaptiveConfig({});
+    const builtIn = adaptive.getBuiltInProfiles();
+    const custom = store.listProfiles();
+    return [...builtIn, ...custom];
+  },
+
+  "profile.get": async (params) => {
+    const id = requireString(params, "id");
+    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
+    const adaptive = new AdaptiveConfig({});
+    const builtIn = adaptive.getBuiltInProfiles();
+    const found = builtIn.find((p) => p.id === id) ?? store.listProfiles().find((p) => p.id === id);
+    if (!found) throw new Error(`Profile not found: ${id}`);
+    return found;
+  },
+
+  "profile.set": async (params) => {
+    const profile = params.profile as import("@ai-workbench/shared").OrchestratorProfile | undefined;
+    if (!profile || !profile.id || !profile.name || !profile.config) {
+      throw new Error("Missing required parameter: profile (with id, name, config)");
+    }
+    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
+    const adaptive = new AdaptiveConfig({});
+    const builtIn = adaptive.getBuiltInProfiles();
+    if (builtIn.some((p) => p.id === profile.id)) {
+      throw new Error("Cannot modify built-in profiles");
+    }
+    profile.updatedAt = Date.now();
+    store.saveProfile({ ...profile, isBuiltIn: false });
+    return { saved: true };
+  },
+
+  "profile.delete": async (params) => {
+    const id = requireString(params, "id");
+    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
+    const adaptive = new AdaptiveConfig({});
+    const builtIn = adaptive.getBuiltInProfiles();
+    if (builtIn.some((p) => p.id === id)) {
+      throw new Error("Cannot delete built-in profiles");
+    }
+    const deleted = store.deleteProfile(id);
+    return { deleted };
+  },
+
+  // ─── Review Suggestions ────────────────────────────────────────────────
+
+  "suggestion.list": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    return store.getSuggestions(runId, params.taskId as string | undefined);
+  },
+
+  // ─── Error History ─────────────────────────────────────────────────────
+
+  "error.history": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    return store.getDetectedErrors(runId, params.taskId as string | undefined);
   },
 };

@@ -3,7 +3,7 @@ import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
-import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -204,6 +204,38 @@ export function useNotifications() {
           addLog({
             id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
             message: `${userId} 评论了任务 ${taskId.substring(0, 6)}`,
+          });
+          break;
+        }
+        case "agent.progress": {
+          const progress = params as AgentProgress;
+          const { updateAgentProgress } = useEvolutionStore.getState();
+          updateAgentProgress(progress.role, progress);
+          break;
+        }
+        case "error.detected": {
+          const error = params as { message: string; severity: string; category: string; fixTaskId?: string };
+          addLog({
+            id: Date.now(), timestamp: Date.now(),
+            level: error.severity === "critical" ? "error" : "warn",
+            source: "engine",
+            message: `检测到错误: ${error.message.substring(0, 100)}${error.fixTaskId ? " (已创建修复任务)" : ""}`,
+          });
+          break;
+        }
+        case "review.suggestion": {
+          const suggestion = params as { summary: string; score: number };
+          addLog({
+            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            message: `后台审查完成: ${suggestion.summary} (评分: ${(suggestion.score * 100).toFixed(0)}%)`,
+          });
+          break;
+        }
+        case "task.autoFix": {
+          const { originalError } = params as { taskId: string; originalError: string };
+          addLog({
+            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            message: `自动修复任务已创建: ${originalError}`,
           });
           break;
         }

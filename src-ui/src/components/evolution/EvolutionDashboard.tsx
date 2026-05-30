@@ -18,9 +18,12 @@ import { PresencePanel } from "./PresencePanel";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { TaskComments } from "./TaskComments";
 import { TraceTimeline } from "./TraceTimeline";
+import { AgentProgressPanel } from "./AgentProgressPanel";
+import { ErrorStream } from "./ErrorStream";
+import { ReviewSuggestions } from "./ReviewSuggestions";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 
-type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "report";
+type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
 
 const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(77, 107, 254,0.15)" },
@@ -531,8 +534,8 @@ export function EvolutionDashboard() {
             <div className="px-4 py-2 border-b relative flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
               <div className="flex">
               {(simpleMode
-                ? (["activity" as const, "trace" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+                ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
               ).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-sm px-4 py-2 rounded-md transition-all" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
@@ -541,7 +544,7 @@ export function EvolutionDashboard() {
                   fontWeight: tab === t ? 600 : 400,
                   cursor: "pointer",
                 }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
-                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", report: "报告" }[t]}
+                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", errors: "错误", suggestions: "审查", report: "报告" }[t]}
                 </button>
               ))}
               </div>
@@ -667,6 +670,16 @@ export function EvolutionDashboard() {
                 <TraceTab runId={runId ?? ""} call={call} />
               )}
 
+              {/* Errors Tab */}
+              {tab === "errors" && (
+                <ErrorStream runId={runId ?? ""} />
+              )}
+
+              {/* Review Suggestions Tab */}
+              {tab === "suggestions" && (
+                <ReviewSuggestions runId={runId ?? ""} />
+              )}
+
               {/* Report Tab — rendered as markdown */}
               {tab === "report" && run?.finalReport && (
                 <ReportTab content={run.finalReport} />
@@ -688,6 +701,9 @@ export function EvolutionDashboard() {
           <button onClick={() => setShowPanel(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }} aria-label="关闭面板">✕</button>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+          {/* Agent Progress */}
+          <AgentProgressPanel />
+
           {/* Start / Pause */}
           <div className="flex gap-2">
             {!isRunning ? (

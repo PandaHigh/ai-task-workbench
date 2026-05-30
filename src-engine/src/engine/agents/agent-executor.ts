@@ -8,6 +8,7 @@
 
 import type { CCClient, CCMessage, CCExecutionOptions } from "../../cc-integration/cc-client.js";
 import type { AgentRole } from "./agent-role.js";
+import type { AgentProgress } from "@ai-workbench/shared";
 
 // ─── Result type ────────────────────────────────────────────────────────────
 
@@ -86,6 +87,12 @@ export class AgentExecutor {
       collectedMessages.push(message);
       this.notify("task.stream", { taskId, message });
 
+      // Emit structured agent progress
+      const progress = this.parseProgress(message, role, taskId, collectedMessages.length, ccOptions.maxTurns ?? role.maxTurns);
+      if (progress) {
+        this.notify("agent.progress", progress);
+      }
+
       if (message.type === "result" && message.subtype === "success") {
         streamResult = message.result || "";
         streamSessionId = message.session_id || "";
@@ -128,5 +135,57 @@ export class AgentExecutor {
       numTurns: streamTurns,
       messages: collectedMessages,
     };
+  }
+
+  private parseProgress(
+    message: CCMessage,
+    role: AgentRole,
+    taskId: string,
+    messageCount: number,
+    maxTurns: number,
+  ): AgentProgress | null {
+    // Only emit progress for tool_use and assistant messages
+    if (message.type !== "tool_use" && message.type !== "assistant") return null;
+
+    const progress = Math.min(95, Math.round((messageCount / (maxTurns * 2)) * 100));
+    const files = this.extractFiles(message);
+    const phase = this.inferPhase(message);
+
+    return {
+      runId: "",
+      taskId,
+      role: role.id,
+      progress,
+      phase,
+      files,
+      message: phase,
+      timestamp: Date.now(),
+    };
+  }
+
+  private extractFiles(message: CCMessage): string[] {
+    const files: string[] = [];
+    const content = message.content;
+    if (typeof content === "string") {
+      const matches = content.match(/(?:^|\s)([\w./-]+\.\w{1,10})(?:\s|$)/g);
+      if (matches) files.push(...matches.map((m) => m.trim()).slice(0, 3));
+    } else if (Array.isArray(content)) {
+      for (const block of content as Array<{ file_path?: string; path?: string }>) {
+        if (block.file_path) files.push(block.file_path);
+        else if (block.path) files.push(block.path);
+      }
+    }
+    return files.slice(0, 5);
+  }
+
+  private inferPhase(message: CCMessage): string {
+    if (message.type === "assistant") return "思考中";
+    const content = typeof message.content === "string" ? message.content : "";
+    const name = (message as { name?: string }).name ?? "";
+    if (name.includes("Read") || name.includes("Glob") || name.includes("Grep")) return "分析代码";
+    if (name.includes("Write") || name.includes("Edit")) return "编写代码";
+    if (name.includes("Bash")) return "执行命令";
+    if (content.includes("test") || name.includes("test")) return "运行测试";
+    return "处理中";
   }
 }

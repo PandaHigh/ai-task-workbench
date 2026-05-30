@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TaskDefinition, GitCommit, LessonLearned } from "@ai-workbench/shared";
+import type { TaskDefinition, GitCommit, LessonLearned, AgentProgress } from "@ai-workbench/shared";
 
 interface LogEntry {
   id: number;
@@ -16,6 +16,7 @@ interface EvolutionStore {
   commits: GitCommit[];
   lessons: LessonLearned[];
   isRunning: boolean;
+  agentProgress: Record<string, AgentProgress>;
 
   setQueue: (queue: TaskDefinition[]) => void;
   setActiveTask: (id: string | null) => void;
@@ -24,6 +25,7 @@ interface EvolutionStore {
   setCommits: (commits: GitCommit[]) => void;
   setLessons: (lessons: LessonLearned[]) => void;
   setRunning: (running: boolean) => void;
+  updateAgentProgress: (role: string, progress: AgentProgress) => void;
   reset: () => void;
 }
 
@@ -34,6 +36,7 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
   commits: [],
   lessons: [],
   isRunning: false,
+  agentProgress: {},
 
   setQueue: (queue) => set({ queue }),
   setActiveTask: (id) => set({ activeTaskId: id }),
@@ -43,5 +46,7 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
   setCommits: (commits) => set({ commits }),
   setLessons: (lessons) => set({ lessons }),
   setRunning: (running) => set({ isRunning: running }),
-  reset: () => set({ queue: [], activeTaskId: null, logs: [], commits: [], lessons: [], isRunning: false }),
+  updateAgentProgress: (role, progress) =>
+    set((state) => ({ agentProgress: { ...state.agentProgress, [role]: progress } })),
+  reset: () => set({ queue: [], activeTaskId: null, logs: [], commits: [], lessons: [], isRunning: false, agentProgress: {} }),
 }));

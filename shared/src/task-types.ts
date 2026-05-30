@@ -272,6 +272,74 @@ export interface FeatureItem {
   verifiedBy?: string;
 }
 
+// ─── Agent Progress ──────────────────────────────────────────
+
+export interface AgentProgress {
+  runId: string;
+  taskId: string;
+  role: string;
+  progress: number;
+  phase: string;
+  files: string[];
+  message: string;
+  timestamp: number;
+}
+
+// ─── Background Review ──────────────────────────────────────
+
+export interface ReviewSuggestion {
+  id: string;
+  runId: string;
+  taskId: string;
+  issues: ReviewIssue[];
+  summary: string;
+  score: number;
+  status: "pending" | "dismissed" | "fix_created";
+  createdAt: number;
+}
+
+// ─── Error Detection ────────────────────────────────────────
+
+export type ErrorSeverity = "critical" | "warning" | "info";
+
+export interface DetectedError {
+  id: string;
+  runId: string;
+  taskId?: string;
+  severity: ErrorSeverity;
+  category: "syntax" | "type" | "runtime" | "import" | "test_failure" | "unknown";
+  message: string;
+  file?: string;
+  line?: number;
+  timestamp: number;
+  fixTaskId?: string;
+}
+
+// ─── Orchestrator Profile ───────────────────────────────────
+
+export interface OrchestratorProfile {
+  id: string;
+  name: string;
+  description: string;
+  isBuiltIn: boolean;
+  createdAt: number;
+  updatedAt: number;
+  config: {
+    mode: "sequential" | "fixloop" | "parallel" | "adaptive";
+    maxFixIterations: number;
+    qualityThreshold: number;
+    timeoutMinutes: number;
+    backgroundReview: boolean;
+    errorWatchEnabled: boolean;
+    agents: {
+      planner:   { maxTurns: number; enabled: boolean };
+      developer: { maxTurns: number; enabled: boolean };
+      tester:    { maxTurns: number; enabled: boolean };
+      reviewer:  { maxTurns: number; enabled: boolean };
+    };
+  };
+}
+
 // ─── Multi-user collaboration ──────────────────────────────────────────
 
 export interface RunPermission {
