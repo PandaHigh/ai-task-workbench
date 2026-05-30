@@ -1,17 +1,9 @@
 import path from "path";
 import { randomUUID } from "crypto";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile } from "./store-utils.js";
+import type { UserTaskTemplate } from "@ai-workbench/shared";
 
-export interface UserTaskTemplate {
-  id: string;
-  name: string;
-  content: string;
-  priority: number;
-  timeoutMinutes: number;
-  isBuiltIn: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
+export type { UserTaskTemplate } from "@ai-workbench/shared";
 
 export class TemplateStore {
   private filePath: string;

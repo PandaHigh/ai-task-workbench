@@ -6,17 +6,8 @@ import { usePersistedDir } from "../../hooks/usePersistedDir";
 import { useToast } from "../common/Toast";
 import { BUILT_IN_TEMPLATES, type TaskTemplate } from "../../lib/task-templates";
 import { pageEnterStyle } from "../../hooks/useAnimations";
-import type { ExecutionRun } from "@ai-workbench/shared";
+import type { ExecutionRun, UserTaskTemplate } from "@ai-workbench/shared";
 import { open } from "@tauri-apps/plugin-dialog";
-
-interface UserTpl {
-  id: string;
-  name: string;
-  content: string;
-  priority: number;
-  timeoutMinutes: number;
-  isBuiltIn: boolean;
-}
 
 export function QuickCreate() {
   const navigate = useNavigate();
@@ -31,7 +22,7 @@ export function QuickCreate() {
   const [priority, setPriority] = useState(5);
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [userTemplates, setUserTemplates] = useState<UserTpl[]>([]);
+  const [userTemplates, setUserTemplates] = useState<UserTaskTemplate[]>([]);
   const [creating, setCreating] = useState(false);
   const [dirError, setDirError] = useState("");
   const [contentError, setContentError] = useState("");
@@ -42,7 +33,7 @@ export function QuickCreate() {
     let cancelled = false;
     (async () => {
       try {
-        const list = (await call("template.list", {}) as UserTpl[] | null) ?? [];
+        const list = (await call("template.list", {}) as UserTaskTemplate[] | null) ?? [];
         if (!cancelled) setUserTemplates(list);
       } catch { /* ignore */ }
     })();
@@ -76,10 +67,12 @@ export function QuickCreate() {
     setSelectedTemplate(t.id);
     setContent(t.content);
     setGoalsText(t.goals.join(", "));
+    setPriority(5);
+    setTimeoutMinutes(60);
     setContentError("");
   }, []);
 
-  const applyUserTemplate = useCallback((t: UserTpl) => {
+  const applyUserTemplate = useCallback((t: UserTaskTemplate) => {
     setSelectedTemplate(t.id);
     setContent(t.content);
     setPriority(t.priority);

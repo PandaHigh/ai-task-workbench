@@ -6,6 +6,7 @@ import { pageEnterStyle } from "../../hooks/useAnimations";
 import { SkillsManager } from "./SkillsManager";
 import { PluginManager } from "./PluginManager";
 import { ProfileManager } from "./ProfileManager";
+import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface OrigValues {
   qualityThreshold: number;
@@ -292,28 +293,22 @@ export function SettingsPage() {
   );
 }
 
-interface UserTpl {
-  id: string;
-  name: string;
-  content: string;
-  priority: number;
-  timeoutMinutes: number;
-  isBuiltIn: boolean;
-  createdAt: number;
-}
-
 function TemplateSection() {
   const { call } = useEngine();
   const toast = useToast();
-  const [templates, setTemplates] = useState<UserTpl[]>([]);
+  const [templates, setTemplates] = useState<UserTaskTemplate[]>([]);
   const [newName, setNewName] = useState("");
   const [newContent, setNewContent] = useState("");
+  const [newPriority, setNewPriority] = useState(5);
+  const [newTimeout, setNewTimeout] = useState(60);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editPriority, setEditPriority] = useState(5);
+  const [editTimeout, setEditTimeout] = useState(60);
 
   const loadTemplates = useCallback(async () => {
-    try { setTemplates(((await call("template.list", {})) as UserTpl[] | null) ?? []); } catch { /* ignore */ }
+    try { setTemplates(((await call("template.list", {})) as UserTaskTemplate[] | null) ?? []); } catch { /* ignore */ }
   }, [call]);
 
   useEffect(() => { loadTemplates(); }, [loadTemplates]);
@@ -321,9 +316,11 @@ function TemplateSection() {
   const handleCreate = async () => {
     if (!newName.trim() || !newContent.trim()) return;
     try {
-      await call("template.create", { name: newName.trim(), content: newContent.trim() });
+      await call("template.create", { name: newName.trim(), content: newContent.trim(), priority: newPriority, timeoutMinutes: newTimeout });
       setNewName("");
       setNewContent("");
+      setNewPriority(5);
+      setNewTimeout(60);
       loadTemplates();
       toast.success("模板已创建");
     } catch (err) { toast.error(`创建失败: ${err instanceof Error ? err.message : err}`); }
@@ -335,7 +332,7 @@ function TemplateSection() {
 
   const handleUpdate = async (id: string) => {
     try {
-      await call("template.update", { id, name: editName.trim(), content: editContent.trim() });
+      await call("template.update", { id, name: editName.trim(), content: editContent.trim(), priority: editPriority, timeoutMinutes: editTimeout });
       setEditingId(null);
       loadTemplates();
       toast.success("已更新");
@@ -344,7 +341,6 @@ function TemplateSection() {
 
   return (
     <div className="space-y-3">
-      {/* Template list */}
       {templates.length === 0 && <p className="text-xs text-center py-2" style={{ color: "var(--text-secondary)" }}>暂无自定义模板</p>}
       {templates.map((tpl) => (
         <div key={tpl.id} className="px-3 py-2.5 rounded-lg text-xs" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
@@ -352,6 +348,20 @@ function TemplateSection() {
             <div className="space-y-2">
               <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-2 py-1.5 rounded text-xs outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
               <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={2} className="w-full px-2 py-1.5 rounded text-xs outline-none resize-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+              <div className="flex items-center gap-4 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                <div className="flex items-center gap-1">
+                  <span>优先级</span>
+                  <select value={editPriority} onChange={(e) => setEditPriority(Number(e.target.value))} className="px-1 py-0.5 rounded text-[10px] outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+                    {Array.from({ length: 10 }, (_, i) => <option key={i + 1} value={i + 1}>P{i + 1}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>超时</span>
+                  <select value={editTimeout} onChange={(e) => setEditTimeout(Number(e.target.value))} className="px-1 py-0.5 rounded text-[10px] outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+                    {[15, 30, 60, 90, 120, 180].map((v) => <option key={v} value={v}>{v}分钟</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>取消</button>
                 <button onClick={() => handleUpdate(tpl.id)} className="px-2 py-1 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>保存</button>
@@ -363,12 +373,14 @@ function TemplateSection() {
                 <div className="flex items-center gap-2">
                   <span className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>{tpl.name}</span>
                   {tpl.isBuiltIn && <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(125,133,144,0.15)", color: "var(--text-secondary)" }}>内置</span>}
+                  <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>P{tpl.priority}</span>
+                  <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{tpl.timeoutMinutes}min</span>
                 </div>
                 <p className="truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{tpl.content}</p>
               </div>
               {!tpl.isBuiltIn && (
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => { setEditingId(tpl.id); setEditName(tpl.name); setEditContent(tpl.content); }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--blue)", color: "#fff" }}>编辑</button>
+                  <button onClick={() => { setEditingId(tpl.id); setEditName(tpl.name); setEditContent(tpl.content); setEditPriority(tpl.priority); setEditTimeout(tpl.timeoutMinutes); }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--blue)", color: "#fff" }}>编辑</button>
                   <button onClick={() => handleDelete(tpl.id)} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--red)", color: "#fff" }}>删除</button>
                 </div>
               )}
@@ -377,11 +389,24 @@ function TemplateSection() {
         </div>
       ))}
 
-      {/* Create new */}
       <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
         <h4 className="text-[10px] font-bold" style={{ color: "var(--text-secondary)" }}>创建模板</h4>
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="模板名称" className="w-full px-2 py-1.5 rounded text-xs outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
         <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} placeholder="任务描述模板..." rows={2} className="w-full px-2 py-1.5 rounded text-xs outline-none resize-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+        <div className="flex items-center gap-4 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+          <div className="flex items-center gap-1">
+            <span>优先级</span>
+            <select value={newPriority} onChange={(e) => setNewPriority(Number(e.target.value))} className="px-1 py-0.5 rounded text-[10px] outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+              {Array.from({ length: 10 }, (_, i) => <option key={i + 1} value={i + 1}>P{i + 1}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <span>超时</span>
+            <select value={newTimeout} onChange={(e) => setNewTimeout(Number(e.target.value))} className="px-1 py-0.5 rounded text-[10px] outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+              {[15, 30, 60, 90, 120, 180].map((v) => <option key={v} value={v}>{v}分钟</option>)}
+            </select>
+          </div>
+        </div>
         <button onClick={handleCreate} disabled={!newName.trim() || !newContent.trim()} className="w-full px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#fff" }}>创建</button>
       </div>
     </div>

@@ -1,20 +1,12 @@
 import { useState, useEffect } from "react";
-
-interface TaskTemplateItem {
-  id: string;
-  name: string;
-  content: string;
-  priority: number;
-  timeoutMinutes: number;
-  isBuiltIn?: boolean;
-}
+import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface TaskCreateFormProps {
   onSubmit: (params: { content: string; priority: number; timeoutMinutes: number }) => void;
   onCancel?: () => void;
   defaultPriority?: number;
   defaultTimeout?: number;
-  templates?: TaskTemplateItem[];
+  templates?: UserTaskTemplate[];
   submitLabel?: string;
   autoFocus?: boolean;
   initialContent?: string;
@@ -43,7 +35,7 @@ export function TaskCreateForm({
 
   const canSubmit = content.trim().length > 0;
 
-  const applyTemplate = (tpl: TaskTemplateItem) => {
+  const applyTemplate = (tpl: UserTaskTemplate) => {
     setContent(tpl.content);
     setPriority(tpl.priority);
     setTimeoutMinutes(tpl.timeoutMinutes);

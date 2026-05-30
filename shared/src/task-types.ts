@@ -97,6 +97,17 @@ export interface TaskQueueEntry {
   isUserPriority: boolean;
 }
 
+export interface UserTaskTemplate {
+  id: string;
+  name: string;
+  content: string;
+  priority: number;
+  timeoutMinutes: number;
+  isBuiltIn: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TaskLog {
   id: number;
   taskId: string;

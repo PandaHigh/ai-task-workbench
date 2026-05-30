@@ -1,14 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { TaskCreateForm } from "../common/TaskCreateForm";
-
-interface UserTaskTemplate {
-  id: string;
-  name: string;
-  content: string;
-  priority: number;
-  timeoutMinutes: number;
-  isBuiltIn?: boolean;
-}
+import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface AddTaskModalProps {
   open: boolean;

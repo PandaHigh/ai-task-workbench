@@ -558,12 +558,18 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     const updates: Partial<import("@ai-workbench/shared").TaskDefinition> = {};
     if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
-    if (typeof params.priority === "number") updates.priority = params.priority;
-    if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
+    if (typeof params.priority === "number" && Number.isFinite(params.priority) && params.priority >= 1 && params.priority <= 10) updates.priority = params.priority;
+    if (typeof params.timeoutMinutes === "number" && Number.isFinite(params.timeoutMinutes) && params.timeoutMinutes >= 1 && params.timeoutMinutes <= 1440) updates.timeoutMinutes = params.timeoutMinutes;
     if (Object.keys(updates).length === 0) throw new RpcValidationError("No valid fields to update");
     store.updateTask(runId, taskId, updates);
+    // Sync the in-memory queue entry with updated fields
+    const queueList = queueManager.list(runId);
+    const queueEntry = queueList.find((t: import("@ai-workbench/shared").TaskDefinition) => t.id === taskId);
+    if (queueEntry) {
+      Object.assign(queueEntry, updates);
+    }
     if (updates.priority !== undefined) {
-      notify("queue.updated", { runId, queue: queueManager.peekNext(runId) });
+      notify("queue.updated", { runId, queue: queueManager.list(runId) });
     }
     return store.getTask(runId, taskId);
   },
@@ -585,11 +591,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "template.update": async (params) => {
     const id = requireString(params, "id");
-    const updates: Record<string, unknown> = {};
-    if (typeof params.name === "string") updates.name = params.name;
-    if (typeof params.content === "string") updates.content = params.content;
-    if (typeof params.priority === "number") updates.priority = params.priority;
-    if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
+    const updates: Partial<Pick<import("@ai-workbench/shared").UserTaskTemplate, "name" | "content" | "priority" | "timeoutMinutes">> = {};
+    if (typeof params.name === "string" && params.name.trim()) updates.name = params.name.trim();
+    if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
+    if (typeof params.priority === "number" && Number.isFinite(params.priority) && params.priority >= 1 && params.priority <= 10) updates.priority = params.priority;
+    if (typeof params.timeoutMinutes === "number" && Number.isFinite(params.timeoutMinutes) && params.timeoutMinutes >= 1 && params.timeoutMinutes <= 1440) updates.timeoutMinutes = params.timeoutMinutes;
+    if (Object.keys(updates).length === 0) throw new RpcValidationError("No valid fields to update");
     const result = templateStore.update(id, updates);
     if (!result) throw new RpcValidationError("Template not found");
     return result;

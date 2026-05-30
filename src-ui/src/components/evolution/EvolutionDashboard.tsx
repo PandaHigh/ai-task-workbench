@@ -83,11 +83,9 @@ export function EvolutionDashboard() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [newTaskPriority, setNewTaskPriority] = useState(5);
   const showLoading = loading || !connected;
   const [showQueue, setShowQueue] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
-  const [newTaskText, setNewTaskText] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; content: string } | null>(null);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
@@ -277,13 +275,10 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async (text?: string, priority?: number, timeoutMinutes?: number) => {
-    const content = (text ?? newTaskText).trim();
-    const prio = priority ?? newTaskPriority;
-    if (!runId || !content) return;
+  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number) => {
+    if (!runId || !text.trim()) return;
     try {
-      await call("task.create", { runId, content, type: "user_defined", priority: prio, timeoutMinutes });
-      setNewTaskText("");
+      await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes });
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       toast.success("任务已添加到队列");
@@ -535,7 +530,7 @@ export function EvolutionDashboard() {
             {/* Add task button — always pinned at bottom */}
             <div className="shrink-0 px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
               <button
-                onClick={() => { setNewTaskText(""); setNewTaskPriority(5); setShowAddModal(true); }}
+                onClick={() => setShowAddModal(true)}
                 className="w-full px-4 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
                 style={{
                   background: "var(--green)",
@@ -977,7 +972,6 @@ export function EvolutionDashboard() {
           handleAddTask(text, priority, timeoutMinutes);
           setShowAddModal(false);
         }}
-        defaultPriority={newTaskPriority}
         call={call}
       />
 
