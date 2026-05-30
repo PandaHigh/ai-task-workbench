@@ -54,6 +54,15 @@ describe("New Features Integration", () => {
       })),
     }));
 
+    vi.doMock("../../src-engine/src/plugins/plugin-registry.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src-engine/src/plugins/plugin-registry.js")>();
+      return {
+        PluginRegistry: vi.fn(function (this: unknown) {
+          return new actual.PluginRegistry(testDir);
+        }),
+      };
+    });
+
     vi.doMock("../../src-engine/src/git/git-manager.js", () => ({
       GitManager: vi.fn(() => ({
         ensureInit: vi.fn(async () => {}),

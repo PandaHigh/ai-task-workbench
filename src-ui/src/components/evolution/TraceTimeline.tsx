@@ -35,7 +35,7 @@ export function TraceTimeline({ spans }: TraceTimelineProps) {
   if (spans.length === 0) {
     return (
       <div className="font-mono text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>
-        No trace data available
+        暂无追踪数据
       </div>
     );
   }

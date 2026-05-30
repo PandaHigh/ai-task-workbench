@@ -929,7 +929,13 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (enabled) {
       try {
         await mcpManager.startServer(entry.name, entry.config);
-        pluginRegistry.setStatus(id, "running");
+        // Verify the process didn't exit immediately (e.g. non-MCP command like "echo")
+        await new Promise((r) => setTimeout(r, 500));
+        if (!mcpManager.isRunning(entry.name)) {
+          pluginRegistry.setStatus(id, "error", "Process exited immediately — not a valid MCP server");
+        } else {
+          pluginRegistry.setStatus(id, "running");
+        }
       } catch (err) {
         pluginRegistry.setStatus(id, "error", errorToMessage(err));
       }

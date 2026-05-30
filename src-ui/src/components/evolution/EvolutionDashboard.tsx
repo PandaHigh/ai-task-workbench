@@ -82,6 +82,7 @@ export function EvolutionDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; content: string } | null>(null);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
+  const [sharing, setSharing] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
@@ -89,13 +90,16 @@ export function EvolutionDashboard() {
   const toast = useToast();
 
   const handleShare = async () => {
-    if (!runId) return;
+    if (!runId || sharing) return;
+    setSharing(true);
     try {
       const result = await call("share.create", { runId }) as { token: string; url: string };
       await navigator.clipboard.writeText(result.url);
       toast.success("分享链接已复制到剪贴板");
     } catch (err) {
       toast.error(`创建分享链接出错了: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -334,10 +338,11 @@ export function EvolutionDashboard() {
             {/* Share button */}
             <button
               onClick={handleShare}
+              disabled={sharing}
               className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-              style={{ background: "var(--blue)", color: "#fff" }}
+              style={{ background: sharing ? "var(--bg-tertiary)" : "var(--blue)", color: sharing ? "var(--text-secondary)" : "#fff", opacity: sharing ? 0.7 : 1 }}
             >
-              分享
+              {sharing ? "分享中..." : "分享"}
             </button>
             {/* Mobile drawer toggles */}
             <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 待办</button>
@@ -526,7 +531,7 @@ export function EvolutionDashboard() {
             <div className="px-4 py-2 border-b relative flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
               <div className="flex">
               {(simpleMode
-                ? (["activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+                ? (["activity" as const, "trace" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
                 : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
               ).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-sm px-4 py-2 rounded-md transition-all" style={{
@@ -536,7 +541,7 @@ export function EvolutionDashboard() {
                   fontWeight: tab === t ? 600 : 400,
                   cursor: "pointer",
                 }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
-                  {t === "logs" ? `记录 (${logs.length})` : t === "commits" ? `保存 (${commits.length})` : t === "lessons" ? `经验 (${lessons.length})` : t === "features" ? `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "动态" : t === "trace" ? "追踪" : "报告"}
+                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", report: "报告" }[t]}
                 </button>
               ))}
               </div>
