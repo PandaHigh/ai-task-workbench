@@ -42,7 +42,7 @@ describe("TaskCreateForm", () => {
 
   it("should show template selector when templates provided", () => {
     const templates = [
-      { id: "t1", name: "Bug Fix", content: "Fix bug", priority: 3, timeoutMinutes: 30 },
+      { id: "t1", name: "Bug Fix", content: "Fix bug", priority: 3, timeoutMinutes: 30, isBuiltIn: false, createdAt: 1, updatedAt: 1 },
     ];
     render(<TaskCreateForm onSubmit={mockOnSubmit} templates={templates} />);
     expect(screen.getByText("使用模板")).toBeInTheDocument();
@@ -52,7 +52,7 @@ describe("TaskCreateForm", () => {
 
   it("should apply template on click", () => {
     const templates = [
-      { id: "t1", name: "Bug Fix", content: "Fix the bug", priority: 7, timeoutMinutes: 90 },
+      { id: "t1", name: "Bug Fix", content: "Fix the bug", priority: 7, timeoutMinutes: 90, isBuiltIn: false, createdAt: 1, updatedAt: 1 },
     ];
     render(<TaskCreateForm onSubmit={mockOnSubmit} templates={templates} />);
     fireEvent.click(screen.getByText("使用模板"));

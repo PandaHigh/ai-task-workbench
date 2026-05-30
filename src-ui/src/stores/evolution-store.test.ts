@@ -97,7 +97,7 @@ describe("evolution-store", () => {
       store.addError({ id: "e1", message: "err", severity: "critical", category: "runtime", runId: "r1", timestamp: 1 });
       store.addSuggestion({ id: "s1", summary: "rev", score: 0.5, issues: [], status: "pending", runId: "r1", taskId: "t1", createdAt: 1 });
       store.setRunning(true);
-      store.setQueue([{ id: "t1", content: "task", type: "user_defined", priority: 5, status: "pending", timeoutMinutes: 60, runId: "r1" }]);
+      store.setQueue([{ id: "t1", content: "task", type: "user_defined", priority: 5, status: "pending", timeoutMinutes: 60, runId: "r1", promptJson: "", createdAt: Date.now() }]);
 
       store.reset();
 
