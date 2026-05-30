@@ -26,6 +26,7 @@ import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
 import { LogSearchBar } from "./LogSearchBar";
 import { AddTaskModal } from "./AddTaskModal";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
+import { SharePanel } from "../share/SharePanel";
 
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
 
@@ -89,7 +90,7 @@ export function EvolutionDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; content: string } | null>(null);
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
-  const [sharing, setSharing] = useState(false);
+  const [showSharePanel, setShowSharePanel] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
@@ -99,19 +100,7 @@ export function EvolutionDashboard() {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
-  const handleShare = async () => {
-    if (!runId || sharing) return;
-    setSharing(true);
-    try {
-      const result = await call("share.create", { runId }) as { token: string; url: string };
-      await navigator.clipboard.writeText(result.url);
-      toast.success("分享链接已复制到剪贴板");
-    } catch (err) {
-      toast.error(`创建分享链接出错了: ${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSharing(false);
-    }
-  };
+  const handleShare = () => setShowSharePanel(true);
 
   // Load data on mount — only reset when runId changes
   const prevRunIdRef = useRef(runId);
@@ -362,11 +351,10 @@ export function EvolutionDashboard() {
             {/* Share button */}
             <button
               onClick={handleShare}
-              disabled={sharing}
               className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-              style={{ background: sharing ? "var(--bg-tertiary)" : "var(--blue)", color: sharing ? "var(--text-secondary)" : "#fff", opacity: sharing ? 0.7 : 1 }}
+              style={{ background: "var(--blue)", color: "#fff" }}
             >
-              {sharing ? "分享中..." : "分享"}
+              分享
             </button>
             {/* Mobile drawer toggles */}
             <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 待办</button>
@@ -952,11 +940,10 @@ export function EvolutionDashboard() {
             <div className="border-t pt-3 md:hidden" style={{ borderColor: "var(--border)" }}>
               <button
                 onClick={handleShare}
-                disabled={sharing}
                 className="w-full text-xs px-3 py-2 rounded font-semibold"
-                style={{ background: sharing ? "var(--bg-tertiary)" : "var(--blue)", color: sharing ? "var(--text-secondary)" : "#fff", opacity: sharing ? 0.7 : 1 }}
+                style={{ background: "var(--blue)", color: "#fff" }}
               >
-                {sharing ? "分享中..." : "分享"}
+                分享
               </button>
             </div>
           )}
@@ -1002,6 +989,13 @@ export function EvolutionDashboard() {
         variant="danger"
         onConfirm={handleStop}
         onCancel={() => setStopTarget(null)}
+      />
+
+      <SharePanel
+        open={showSharePanel}
+        onClose={() => setShowSharePanel(false)}
+        runId={runId ?? ""}
+        call={call}
       />
     </div>
     </>

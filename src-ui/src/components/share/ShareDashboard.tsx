@@ -8,6 +8,8 @@ import { useToast } from "../common/Toast";
 
 type TabType = "logs" | "commits" | "lessons" | "report";
 
+type PermissionMode = "view" | "collaborate";
+
 function levelColor(level: string): string {
   switch (level) {
     case "error": return "var(--red)";
@@ -19,13 +21,19 @@ function levelColor(level: string): string {
 
 export function ShareDashboard() {
   const { token } = useParams<{ token: string }>();
-  const { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh } = useShareView(token!);
+  const { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh, wsConnected } = useShareView(token!);
   const toast = useToast();
   const [tab, setTab] = useState<TabType>("logs");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Permission: default to "collaborate" for now — the token itself doesn't carry permission info yet
+  // When engine adds permission to ShareToken, we can read it from the initial data
+  const permission: PermissionMode = "collaborate";
+  const canEdit = permission === "collaborate";
 
   const completedTasks = useMemo(() => tasks.filter(t => t.status === "completed"), [tasks]);
   const failedTasks = useMemo(() => tasks.filter(t => t.status === "failed" || t.status === "reverted"), [tasks]);
@@ -35,14 +43,24 @@ export function ShareDashboard() {
     ? formatDuration((run.completedAt || Date.now()) - run.startedAt)
     : "未开始";
   const budgetUsed = run?.totalCostUsd ?? 0;
+  const budgetMax = 50;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+      toast.success("已刷新");
+    } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
 
   const handleRetry = async (taskId: string) => {
-    if (!token) return;
+    if (!token || !canEdit) return;
     try { await call("task.retry", { taskId }); refresh(); } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : "未知错误"}`); }
   };
 
   const handleAddTask = async () => {
-    if (!newTaskText.trim() || !token) return;
+    if (!newTaskText.trim() || !token || !canEdit) return;
     try {
       await call("task.create", { content: newTaskText.trim(), type: "user_defined", priority: 1, timeoutMinutes: 60 });
       setNewTaskText("");
@@ -65,19 +83,26 @@ export function ShareDashboard() {
   }
 
   if (error) {
+    const isExpired = error.includes("expired") || error.includes("过期");
     return (
       <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
         <div className="text-center max-w-md px-6">
-          <div className="text-4xl mb-4" style={{ opacity: 0.3 }}>:(</div>
-          <p className="text-sm font-semibold mb-2" style={{ color: "var(--red)" }}>加载失败</p>
-          <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>{error}</p>
-          <button
-            onClick={() => refresh()}
-            className="px-4 py-2 rounded-lg text-xs font-semibold"
-            style={{ background: "var(--blue)", color: "#fff" }}
-          >
-            重试
-          </button>
+          <div className="text-4xl mb-4" style={{ opacity: 0.3 }}>{isExpired ? "🔒" : ":("}</div>
+          <p className="text-sm font-semibold mb-2" style={{ color: isExpired ? "var(--yellow)" : "var(--red)" }}>
+            {isExpired ? "此分享链接已过期" : "加载失败"}
+          </p>
+          <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>
+            {isExpired ? "请联系分享者获取新的链接" : error}
+          </p>
+          {!isExpired && (
+            <button
+              onClick={() => refresh()}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: "var(--blue)", color: "#fff" }}
+            >
+              重试
+            </button>
+          )}
         </div>
       </div>
     );
@@ -90,25 +115,46 @@ export function ShareDashboard() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: isRunning ? "var(--green)" : run?.status === "completed" ? "var(--blue)" : "var(--text-secondary)" }} />
           <h2 className="text-sm font-bold truncate">{run?.goals?.[0] || "分享看板"}</h2>
-          <span className="text-xs px-2 py-0.5 rounded shrink-0" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>共享</span>
-          <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowQueue(true)}>☰ 任务</button>
-          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowSidebar(true)}>📊 统计</button>
-          {isRunning ? (
-            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--yellow)", color: "#fff" }}>暂停（只读）</span>
-          ) : run?.status === "completed" ? (
-            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--green)", color: "#fff" }}>已完成</span>
-          ) : (
-            <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--text-secondary)", color: "#fff" }}>等待执行</span>
-          )}
           <span className="status-badge" style={{
             background: isRunning ? "rgba(16, 185, 129, 0.15)" : run?.status === "completed" ? "rgba(77, 107, 254, 0.15)" : "rgba(125, 133, 144, 0.15)",
             color: isRunning ? "var(--green)" : run?.status === "completed" ? "var(--blue)" : "var(--text-secondary)",
           }}>
             {isRunning ? "运行中" : run?.status === "completed" ? "已完成" : run?.status === "failed" ? "失败" : "空闲"}
           </span>
+          {/* Connection indicator */}
+          <span className="text-[10px] px-1.5 py-0.5 rounded hidden md:inline" style={{
+            background: wsConnected ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+            color: wsConnected ? "var(--green)" : "var(--yellow)",
+          }}>
+            {wsConnected ? "实时" : "轮询中"}
+          </span>
+          {/* Permission badge */}
+          <span className="text-[10px] px-1.5 py-0.5 rounded hidden md:inline" style={{
+            background: canEdit ? "rgba(77, 107, 254, 0.15)" : "rgba(125, 133, 144, 0.15)",
+            color: canEdit ? "var(--blue)" : "var(--text-secondary)",
+          }}>
+            {canEdit ? "协作" : "查看"}
+          </span>
+          <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-xs px-2 py-1 rounded hidden md:inline"
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+              opacity: refreshing ? 0.5 : 1,
+            }}
+          >
+            {refreshing ? "刷新中..." : "刷新"}
+          </button>
+          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowQueue(true)}>☰ 任务</button>
+          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowSidebar(true)}>📊 统计</button>
+          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={handleRefresh}>
+            {refreshing ? "..." : "刷新"}
+          </button>
         </div>
       </div>
 
@@ -117,6 +163,7 @@ export function ShareDashboard() {
         <div className={`w-72 border-r flex flex-col shrink-0 max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`} style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
           <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
             <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务队列 ({queue.length})</h3>
+            <button onClick={() => setShowQueue(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }}>✕</button>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {queue.map((task, i) => (
@@ -167,7 +214,9 @@ export function ShareDashboard() {
                   }}>
                     <div className="flex items-center justify-between gap-1">
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
-                      <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>重试</button>
+                      {canEdit && (
+                        <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>重试</button>
+                      )}
                     </div>
                     {t.errorMessage && <p className="mt-1 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
                   </div>
@@ -178,12 +227,15 @@ export function ShareDashboard() {
               <p className="text-xs text-center py-8" style={{ color: "var(--text-secondary)" }}>暂无任务</p>
             )}
           </div>
-          <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
-            <button onClick={() => setShowAddModal(true)} className="w-full px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
-              style={{ background: "var(--green)", color: "#fff", boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)" }}>
-              + 新增任务
-            </button>
-          </div>
+          {/* Add task button — only in collaborate mode */}
+          {canEdit && (
+            <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <button onClick={() => setShowAddModal(true)} className="w-full px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
+                style={{ background: "var(--green)", color: "#fff", boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)" }}>
+                + 新增任务
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Center: Tabs */}
@@ -271,23 +323,24 @@ export function ShareDashboard() {
 
         {/* Right: Stats */}
         <div className={`w-64 border-l p-4 overflow-y-auto shrink-0 max-md:mobile-drawer max-md:mobile-drawer-right ${showSidebar ? "" : "max-md:drawer-closed"}`} style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>运行统计</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>运行统计</h3>
+            <button onClick={() => setShowSidebar(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }}>✕</button>
+          </div>
           <div className="space-y-3 text-xs">
-            {/* Budget */}
-            {budgetUsed > 0 && (
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
-                  <span style={{ color: budgetUsed > 40 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / $50</span>
-                </div>
-                <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
-                  <div className="h-full rounded transition-all" style={{
-                    width: `${Math.min(100, (budgetUsed / 50) * 100)}%`,
-                    background: budgetUsed > 40 ? "var(--red)" : budgetUsed > 25 ? "var(--yellow)" : "var(--green)",
-                  }} />
-                </div>
+            {/* Budget — always visible */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
+                <span style={{ color: budgetUsed > 40 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
               </div>
-            )}
+              <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
+                <div className="h-full rounded transition-all" style={{
+                  width: `${Math.min(100, (budgetUsed / budgetMax) * 100)}%`,
+                  background: budgetUsed > 40 ? "var(--red)" : budgetUsed > 25 ? "var(--yellow)" : "var(--green)",
+                }} />
+              </div>
+            </div>
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-2">
@@ -306,6 +359,16 @@ export function ShareDashboard() {
               <div className="px-2 py-2 rounded text-center" style={{ background: "var(--bg-tertiary)" }}>
                 <div className="text-lg font-bold" style={{ color: "var(--yellow)" }}>{lessons.length}</div>
                 <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>教训</div>
+              </div>
+            </div>
+
+            {/* Connection status */}
+            <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ background: wsConnected ? "var(--green)" : "var(--yellow)" }} />
+                <span className="text-[10px]" style={{ color: wsConnected ? "var(--green)" : "var(--yellow)" }}>
+                  {wsConnected ? "WebSocket 实时连接" : "HTTP 轮询模式"}
+                </span>
               </div>
             </div>
 
@@ -347,8 +410,8 @@ export function ShareDashboard() {
         />
       )}
 
-      {/* Add Task Modal */}
-      {showAddModal && (
+      {/* Add Task Modal — only in collaborate mode */}
+      {canEdit && showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setShowAddModal(false)}>
           <div className="p-6 w-full max-w-md" style={{
             background: "var(--bg-secondary)", border: "1px solid var(--border)",

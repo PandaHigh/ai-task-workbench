@@ -636,7 +636,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       return { token: remote.token, url: `${remote.url}/#/share/${remote.token}`, apiUrl: `${remote.url}/api/share/${remote.token}`, createdAt: Date.now() };
     }
     const label = typeof params.label === "string" ? params.label : "";
-    const token = shareStore.create(runId, label);
+    const expiresAt = typeof params.expiresAt === "number" ? params.expiresAt : null;
+    const token = shareStore.create(runId, label, expiresAt);
     const publicUrl = store.getConfig("publicUrl") || `http://localhost:${PORT}`;
     const directUrl = `${publicUrl}/#/share/${token.token}`;
     const apiUrl = `${publicUrl}/api/share/${token.token}`;

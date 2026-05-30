@@ -82,6 +82,28 @@ describe("Share Integration", () => {
       const result = await methodHandlers["share.create"]({ runId: run.id, label: "Team review" }) as Record<string, unknown>;
       expect(result.token).toBeDefined();
     });
+
+    it("should create share with expiresAt", async () => {
+      const run = await createRun();
+      const expiresAt = Date.now() + 3600_000;
+      const result = await methodHandlers["share.create"]({ runId: run.id, label: "1h link", expiresAt }) as Record<string, unknown>;
+      expect(result.token).toBeDefined();
+
+      // Verify expiresAt stored correctly
+      const shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(1);
+      expect(shares[0].expiresAt).toBe(expiresAt);
+      expect(shares[0].label).toBe("1h link");
+    });
+
+    it("should create share without expiresAt (null by default)", async () => {
+      const run = await createRun();
+      await methodHandlers["share.create"]({ runId: run.id });
+
+      const shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(1);
+      expect(shares[0].expiresAt).toBeNull();
+    });
   });
 
   describe("share.list", () => {
@@ -238,6 +260,85 @@ describe("Share Integration", () => {
 
       const otherShares = await methodHandlers["share.list"]({ runId: run2.id }) as unknown[];
       expect(otherShares).toHaveLength(1);
+    });
+  });
+
+  // ─── Token expiration ─────────────────────────────────────────────────────
+
+  describe("Token expiration", () => {
+    it("should list expired tokens but mark them", async () => {
+      const run = await createRun();
+      const pastExpiry = Date.now() - 1000; // expired 1s ago
+      await methodHandlers["share.create"]({ runId: run.id, label: "expired", expiresAt: pastExpiry });
+      await methodHandlers["share.create"]({ runId: run.id, label: "valid" });
+
+      const shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(2);
+      const expired = shares.find(s => s.label === "expired")!;
+      const valid = shares.find(s => s.label === "valid")!;
+      expect(expired.expiresAt).toBeLessThan(Date.now());
+      expect(valid.expiresAt).toBeNull();
+    });
+
+    it("should revoke expired token on access via getByToken", async () => {
+      const run = await createRun();
+      const pastExpiry = Date.now() - 1000;
+      const share = await methodHandlers["share.create"]({ runId: run.id, label: "expiring", expiresAt: pastExpiry }) as Record<string, unknown>;
+
+      // Import ShareStore directly to test getByToken cleanup
+      const { ShareStore } = await import("../../src-engine/src/db/share-store.js");
+      const ss = new ShareStore(testDir);
+      const found = ss.getByToken(share.token as string);
+      expect(found).toBeUndefined(); // auto-cleaned
+
+      // Verify removed from list
+      const shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares.find(s => s.token === share.token)).toBeUndefined();
+    });
+
+    it("should not revoke non-expired token on access", async () => {
+      const run = await createRun();
+      const futureExpiry = Date.now() + 86400_000;
+      const share = await methodHandlers["share.create"]({ runId: run.id, label: "future", expiresAt: futureExpiry }) as Record<string, unknown>;
+
+      const { ShareStore } = await import("../../src-engine/src/db/share-store.js");
+      const ss = new ShareStore(testDir);
+      const found = ss.getByToken(share.token as string);
+      expect(found).toBeDefined();
+      expect(found!.token).toBe(share.token);
+    });
+  });
+
+  // ─── Full lifecycle: create → list → revoke → verify empty ────────────
+
+  describe("Full share lifecycle", () => {
+    it("should handle create-list-revoke-verify flow", async () => {
+      const run = await createRun();
+
+      // Create multiple tokens
+      const t1 = await methodHandlers["share.create"]({ runId: run.id, label: "first" }) as Record<string, unknown>;
+      const t2 = await methodHandlers["share.create"]({ runId: run.id, label: "second", expiresAt: Date.now() + 3600_000 }) as Record<string, unknown>;
+
+      // List shows both
+      let shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(2);
+
+      // Revoke first
+      await methodHandlers["share.revoke"]({ token: t1.token as string });
+
+      // List shows only second
+      shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(1);
+      expect(shares[0].token).toBe(t2.token);
+      expect(shares[0].label).toBe("second");
+      expect(shares[0].expiresAt).toBeTypeOf("number");
+
+      // Revoke second
+      await methodHandlers["share.revoke"]({ token: t2.token as string });
+
+      // List empty
+      shares = await methodHandlers["share.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
+      expect(shares).toHaveLength(0);
     });
   });
 });

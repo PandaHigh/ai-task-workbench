@@ -476,6 +476,16 @@ describe("Share HTTP API Integration", () => {
       expect(res.status).toBe(400);
     });
 
+    it("should reject expired tokens", async () => {
+      const run = await createRun();
+      const pastExpiry = Date.now() - 1000;
+      const share = await methodHandlers["share.create"]({ runId: run.id, label: "expired", expiresAt: pastExpiry }) as { token: string; url: string; apiUrl: string };
+
+      const res = await fetchShare(share.token, "run");
+      expect(res.status).toBe(404);
+      expect((res.data as Record<string, unknown>).error).toContain("not found");
+    });
+
     it("should isolate data between different shares", async () => {
       // Create two runs with shares
       const run1 = await createRun();

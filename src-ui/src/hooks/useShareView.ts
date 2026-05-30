@@ -15,6 +15,7 @@ export function useShareView(token: string) {
   const [queue, setQueue] = useState<TaskDefinition[]>([]);
   const [report, setReport] = useState<{ report: string; generatedAt: number } | null>(null);
   const [logs, setLogs] = useState<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>>([]);
+  const [wsConnected, setWsConnected] = useState(false);
   const wsConnectedRef = useRef(false);
 
   const fullRefresh = useCallback(async () => {
@@ -52,6 +53,7 @@ export function useShareView(token: string) {
     setReport(null);
     setLogs([]);
     wsConnectedRef.current = false;
+    setWsConnected(false);
 
     let cancelled = false;
     const c = client.current;
@@ -63,6 +65,7 @@ export function useShareView(token: string) {
         const initial = await c.connectWebSocket(token);
         if (cancelled) return;
         wsConnectedRef.current = true;
+        setWsConnected(true);
         setRun(initial.run);
         setTasks(initial.tasks || []);
         setQueue(initial.queue || []);
@@ -183,5 +186,5 @@ export function useShareView(token: string) {
     }
   }, [token, queue, tasks, commits, lessons, run, report, logs]);
 
-  return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh: fullRefresh };
+  return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh: fullRefresh, wsConnected };
 }
