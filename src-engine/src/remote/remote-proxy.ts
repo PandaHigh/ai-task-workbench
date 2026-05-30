@@ -6,7 +6,7 @@ import type {
 } from "@ai-workbench/shared";
 import WebSocket from "ws";
 import { retryWithBackoff } from "../lib/retry.js";
-import { isRetryableError } from "../lib/error-utils.js";
+import { classifyError } from "../lib/error-types.js";
 
 const TIMEOUT_MS = 15_000;
 
@@ -93,7 +93,7 @@ async function remoteFetch(baseUrl: string, path: string): Promise<Response> {
       }
       return res;
     },
-    { maxAttempts: 3, shouldRetry: isRetryableError },
+    { maxAttempts: 3, shouldRetry: (err) => classifyError(err).retryable },
   );
 }
 
@@ -113,7 +113,7 @@ async function remotePost(baseUrl: string, path: string, body: Record<string, un
       }
       return res;
     },
-    { maxAttempts: 3, shouldRetry: isRetryableError },
+    { maxAttempts: 3, shouldRetry: (err) => classifyError(err).retryable },
   );
 }
 

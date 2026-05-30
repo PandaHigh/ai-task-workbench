@@ -15,6 +15,7 @@ import { AdaptiveConfig } from "./adaptive-config.js";
 import type { OrchestratorProfile } from "@ai-workbench/shared";
 
 import { errorToMessage } from "../lib/error-utils.js";
+import { classifyError, getRetryStrategy, TaskError, type ErrorCategory } from "../lib/error-types.js";
 import { extractJson } from "../lib/json-extract.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
 import { Tracer } from "../lib/tracer.js";
@@ -26,23 +27,6 @@ const DEFAULT_STAGNATION_WINDOW = 5;
 const DEFAULT_MAX_TURNS = 50;
 const DEFAULT_MAX_AUTO_RETRIES = 3;
 const CYCLE_COOLDOWN_MS = 5000;
-
-const TRANSIENT_ERROR_PATTERNS = [
-  "timed out",
-  "econnreset",
-  "econnrefused",
-  "etimedout",
-  "sigterm",
-  "sigkill",
-  "aborted",
-  "enoent",
-  "econnaborted",
-];
-
-function isTransientError(msg: string): boolean {
-  const lower = msg.toLowerCase();
-  return TRANSIENT_ERROR_PATTERNS.some((p) => lower.includes(p));
-}
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 
@@ -530,7 +514,7 @@ export class Executor {
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus, reason: failReason });
       }
     } catch (err) {
-      const msg = errorToMessage(err);
+      const taskErr = classifyError(err);
       // End trace on error
       try {
         const traceSpans = this.tracer.endTrace();
@@ -538,19 +522,30 @@ export class Executor {
           this.store.appendTrace(run.id, traceSpans);
         }
       } catch { /* trace cleanup failure is non-critical */ }
+
+      // Check ErrorWatcher for critical error accumulation
+      const detectedErrors = this.store.getDetectedErrors(run.id, task.id);
+      if (detectedErrors.filter((e) => e.severity === "critical").length >= 3 && taskErr.retryable) {
+        this.log(run.id, "engine", "warn", `3+ critical errors detected — degrading to permanent`, task.id);
+        const degraded = new TaskError(`Too many critical errors: ${taskErr.message}`, "permanent", { cause: taskErr });
+        this.handleFailedTask(run, task, degraded, gitManager);
+        return;
+      }
+
+      const strategy = getRetryStrategy(taskErr.category);
       const currentTask = this.store.getTask(run.id, task.id);
       const currentRetries = currentTask?.retryCount ?? 0;
-      const maxRetries = this.config.maxAutoRetries;
 
-      if (isTransientError(msg) && currentRetries < maxRetries) {
-        const backoffMs = Math.min(30000 * Math.pow(2, currentRetries), 300000);
+      if (strategy.shouldRetry && currentRetries < strategy.maxRetries) {
+        const backoffMs = Math.min(strategy.backoffMs * Math.pow(2, currentRetries), 300000);
+        const categoryLabel = taskErr.category;
         this.log(run.id, "engine", "warn",
-          `Transient error (retry ${currentRetries + 1}/${maxRetries}): ${msg.substring(0, 100)}. Retrying in ${backoffMs / 1000}s.`,
+          `${categoryLabel} error (retry ${currentRetries + 1}/${strategy.maxRetries}): ${taskErr.message.substring(0, 100)}. Retrying in ${backoffMs / 1000}s.`,
           task.id);
         this.store.updateTask(run.id, task.id, {
           status: "pending",
           retryCount: currentRetries + 1,
-          lastError: msg.substring(0, 500),
+          lastError: taskErr.message.substring(0, 500),
         });
         const requeued = this.queueManager.enqueue(run.id, {
           content: task.content,
@@ -559,22 +554,42 @@ export class Executor {
           timeoutMinutes: task.timeoutMinutes,
         });
         this.store.saveTask(run.id, requeued);
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${maxRetries}` });
-        try { await this.sleep(backoffMs); } catch { /* interrupted by stop */ }
-      } else {
-        // Clean up any partial changes left by the crashed CC process
-        try {
-          await gitManager.checkoutClean();
-        } catch (cleanupErr) {
-          this.log(run.id, "git", "warn", `Working dir cleanup failed: ${errorToMessage(cleanupErr)}`, task.id);
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${strategy.maxRetries} (${categoryLabel})` });
+
+        // Pause run if needed (e.g., rate limiting)
+        if (strategy.pauseRunMs > 0) {
+          this.log(run.id, "engine", "warn", `Pausing run for ${strategy.pauseRunMs / 1000}s (${categoryLabel})`);
+          try { await this.sleep(strategy.pauseRunMs); } catch { /* interrupted by stop */ }
         }
-        this.log(run.id, "engine", "error", `Task failed permanently: ${msg}`, task.id);
-        this.store.updateTask(run.id, task.id, { status: "failed", errorMessage: msg, completedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: msg });
+        try { await this.sleep(backoffMs); } catch { /* interrupted by stop */ }
+      } else if (taskErr.category === "quota_exceeded") {
+        this.log(run.id, "engine", "error", `Quota exceeded: ${taskErr.message}`);
+        this.stop();
+        await this.finalize(run, taskErr.message);
+      } else {
+        this.handleFailedTask(run, task, taskErr, gitManager);
       }
     } finally {
       this.abortControllers.delete(task.id);
     }
+  }
+
+  private async handleFailedTask(
+    run: ExecutionRun, task: TaskDefinition, taskErr: TaskError, gitManager: GitManager,
+  ): Promise<void> {
+    try {
+      await gitManager.checkoutClean();
+    } catch (cleanupErr) {
+      this.log(run.id, "git", "warn", `Working dir cleanup failed: ${errorToMessage(cleanupErr)}`, task.id);
+    }
+    const phaseInfo = taskErr.phase ? ` [${taskErr.phase}]` : "";
+    this.log(run.id, "engine", "error", `Task failed (${taskErr.category})${phaseInfo}: ${taskErr.message}`, task.id);
+    this.store.updateTask(run.id, task.id, {
+      status: "failed",
+      errorMessage: `${taskErr.category}${phaseInfo}: ${taskErr.message}`.substring(0, 500),
+      completedAt: Date.now(),
+    });
+    this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: taskErr.message });
   }
 
   private async buildContext(_task: TaskDefinition, run: ExecutionRun, gitManager: GitManager): Promise<TaskContext> {

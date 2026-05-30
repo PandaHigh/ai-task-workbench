@@ -21,6 +21,7 @@ import {
   buildFixFeedback,
 } from "./pipeline-prompts.js";
 import { errorToMessage } from "../lib/error-utils.js";
+import { TaskError } from "../lib/error-types.js";
 import { parseJsonOrThrow } from "../lib/json-extract.js";
 
 export interface PipelineResult {
@@ -107,7 +108,7 @@ export class TaskPipeline {
         iteration: 1,
       });
     } catch (err) {
-      throw new Error(`Planner phase failed: ${errorToMessage(err)}`);
+      throw new TaskError(`Planner phase failed: ${errorToMessage(err)}`, "pipeline_failure", { phase: "planner", retryable: true, cause: err instanceof Error ? err : undefined });
     }
 
     // ─── Phases 2-4: Developer → Tester → Reviewer (with fix loop) ─
@@ -145,7 +146,7 @@ export class TaskPipeline {
         if (iteration < maxIterations) {
           continue;
         }
-        throw new Error(`Developer phase failed after ${iteration} iterations: ${errorToMessage(err)}`);
+        throw new TaskError(`Developer phase failed after ${iteration} iterations: ${errorToMessage(err)}`, "pipeline_failure", { phase: "developer", retryable: true, cause: err instanceof Error ? err : undefined });
       }
 
       lastSessionId = devResult.sessionId;
