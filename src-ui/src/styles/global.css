@@ -169,6 +169,11 @@ html.dark * {
   to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
+@keyframes stepActiveGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(77, 107, 254, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(77, 107, 254, 0.15); }
+}
+
 @keyframes fadeOut {
   from { opacity: 1; transform: scale(1); }
   to { opacity: 0; transform: scale(0.97); }

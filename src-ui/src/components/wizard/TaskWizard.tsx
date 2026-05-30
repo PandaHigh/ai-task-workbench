@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTaskStore } from "../../stores/task-store";
 import { useEngine } from "../../hooks/useEngine";
+import { usePersistedDir } from "../../hooks/usePersistedDir";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { QuickCreate } from "./QuickCreate";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { useToast } from "../common/Toast";
 import { Spinner } from "../common/Spinner";
 import { pageEnterStyle } from "../../hooks/useAnimations";
 import { open } from "@tauri-apps/plugin-dialog";
 import { marked } from "marked";
+import { BUILT_IN_TEMPLATES } from "../../lib/task-templates";
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
@@ -47,20 +50,20 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
 
 const STEP_LABELS = ["准备工作", "告诉 AI", "确认任务"] as const;
 
-const SUGGESTION_PILLS = [
-  "帮我写一个网站",
-  "优化我的代码",
-  "修复 bug",
-];
-
 export function TaskWizard() {
   const navigate = useNavigate();
   const { call } = useEngine();
   const toast = useToast();
+  const { getLastDir, saveDir } = usePersistedDir();
+
   const {
-    step, workingDir, messages, taskParams, errors, sessionId,
-    setStep, setWorkingDir, setSessionId, addMessage, setTaskParams, setValidation, reset,
+    step, mode, workingDir, messages, taskParams, errors, sessionId,
+    editedContent, editedGoals, editedConditions,
+    setStep, setMode, setWorkingDir, setSessionId, addMessage, setTaskParams, setValidation, reset,
+    setEditedContent, setEditedGoals, setEditedConditions,
+    applyTemplate,
   } = useWizardStore();
+
   const addTask = useTaskStore((s) => s.addTask);
   const [input, setInput] = useState("");
   const [inputError, setInputError] = useState("");
@@ -69,13 +72,14 @@ export function TaskWizard() {
   const [dirError, setDirError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [isStartingSession, setIsStartingSession] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
-    return "~/ai-workspace";
-  }, []);
+    return getLastDir();
+  }, [getLastDir]);
 
   useEffect(() => {
     let idx = -1;
@@ -89,6 +93,15 @@ export function TaskWizard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // Sync taskParams to edited fields when entering step 2
+  useEffect(() => {
+    if (taskParams && step === 2) {
+      setEditedContent(taskParams.content);
+      setEditedGoals([...taskParams.goals]);
+      setEditedConditions([...taskParams.terminationConditions]);
+    }
+  }, [taskParams, step]);
+
   const handleSelectDir = () => {
     setShowDirInput(true);
   };
@@ -97,6 +110,7 @@ export function TaskWizard() {
     const dir = defaultDir();
     setDirInput(dir);
     setWorkingDir(dir);
+    saveDir(dir);
     startWizardSession(dir);
   };
 
@@ -108,6 +122,7 @@ export function TaskWizard() {
         if (dir) {
           setDirInput(dir);
           setWorkingDir(dir);
+          saveDir(dir);
           startWizardSession(dir);
           return;
         }
@@ -152,22 +167,22 @@ export function TaskWizard() {
   const confirmDir = () => {
     if (!validateDir(dirInput)) return;
     setWorkingDir(dirInput.trim());
+    saveDir(dirInput.trim());
     startWizardSession(dirInput.trim());
     setShowDirInput(false);
   };
 
   const startWizardSession = async (dir: string) => {
+    setIsStartingSession(true);
     try {
       const res = (await call("wizard.start", { workingDir: dir })) as { sessionId: string };
       setSessionId(res.sessionId);
       setStep(1);
     } catch (err) {
       toast.error(`启动向导失败: ${err}`);
+    } finally {
+      setIsStartingSession(false);
     }
-  };
-
-  const handleSuggestionClick = (text: string) => {
-    setInput(text);
   };
 
   const handleSend = async () => {
@@ -231,26 +246,36 @@ export function TaskWizard() {
     setIsLoading(false);
   };
 
-  const [creating, setCreating] = useState(false);
+  const doCreateRun = async (autoStart: boolean) => {
+    const content = editedContent.trim();
+    const goals = editedGoals.filter((g) => g.trim());
+    const conditions = editedConditions.filter((c) => c.trim());
 
-  const handleConfirm = async () => {
-    if (!taskParams || creating) return;
+    if (!content) { toast.error("任务内容不能为空"); return; }
+    if (goals.length === 0) { toast.error("至少需要一个目标"); return; }
+    if (creating) return;
+
     setCreating(true);
     try {
       const run = (await call("run.create", {
         workingDir,
-        goals: taskParams.goals,
-        terminationConditions: taskParams.terminationConditions,
+        goals,
+        terminationConditions: conditions.length > 0 ? conditions : ["所有目标均已达成并验证通过"],
         tasks: [{
-          content: taskParams.content,
+          content,
           type: "user_defined",
           priority: 1,
           timeoutMinutes: 60,
         }],
       })) as ExecutionRun;
 
+      if (autoStart) {
+        await call("task.start", { runId: run.id });
+      }
+
+      saveDir(workingDir);
       addTask(run);
-      toast.success("任务创建成功，开始执行");
+      toast.success(autoStart ? "任务已创建并开始执行" : "任务创建成功");
       reset();
       navigate(`/evolution/${run.id}`);
     } catch (err) {
@@ -259,6 +284,9 @@ export function TaskWizard() {
       setCreating(false);
     }
   };
+
+  const handleConfirm = () => doCreateRun(false);
+  const handleConfirmAndStart = () => doCreateRun(true);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -271,24 +299,70 @@ export function TaskWizard() {
     return `${msg.role}-${msg.timestamp}-${idx}`;
   };
 
+  const handleTemplateSelect = (t: typeof BUILT_IN_TEMPLATES[number]) => {
+    applyTemplate(t);
+    setStep(2);
+  };
+
   const renderStepIndicator = () => (
     <>
       {STEP_LABELS.map((label, i) => (
-        <div key={i} className="flex items-center gap-1" role="tab"
+        <div key={i} className="flex items-center gap-1.5" role="tab"
           aria-selected={step === i}
           aria-current={step === i ? "step" : undefined}
           tabIndex={step === i ? 0 : -1}
           id={`wizard-step-${i}`}
           aria-controls={`wizard-panel-${i}`}
         >
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{
-            background: i <= step ? "var(--blue)" : "var(--bg-tertiary)",
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300" style={{
+            background: i < step ? "var(--green)" : i === step ? "var(--blue)" : "var(--bg-tertiary)",
             color: i <= step ? "#fff" : "var(--text-secondary)",
-          }}>{i + 1}</div>
-          <span className="text-xs" style={{ color: i <= step ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</span>
+            animation: i === step ? "stepActiveGlow 2s ease-in-out infinite" : "none",
+          }}>
+            {i < step ? "✓" : i + 1}
+          </div>
+          <span className="text-xs font-medium" style={{ color: i <= step ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</span>
+          {i < STEP_LABELS.length - 1 && (
+            <div className="w-4 h-px" style={{ background: i < step ? "var(--green)" : "var(--border)" }} />
+          )}
         </div>
       ))}
     </>
+  );
+
+  const renderEditableList = (
+    items: string[],
+    setItems: (items: string[]) => void,
+    color: string,
+    addLabel: string,
+  ) => (
+    <div className="space-y-1.5">
+      {items.map((g, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="text-xs" style={{ color }}>•</span>
+          <input
+            value={g}
+            onChange={(e) => {
+              const next = [...items];
+              next[i] = e.target.value;
+              setItems(next);
+            }}
+            className="flex-1 px-2 py-1 rounded text-xs outline-none"
+            style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+          />
+          <button
+            onClick={() => setItems(items.filter((_, j) => j !== i))}
+            className="text-[10px] px-1"
+            style={{ color: "var(--red)" }}
+          >✕</button>
+        </div>
+      ))}
+      <button
+        onClick={() => setItems([...items, ""])}
+        className="text-xs px-2 py-0.5 rounded"
+        style={{ color: "var(--blue)", background: "rgba(77, 107, 254, 0.08)" }}
+      >{addLabel}</button>
+    </div>
   );
 
   return (
@@ -308,11 +382,39 @@ export function TaskWizard() {
           }} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)" }} aria-label="返回">← 返回</button>
           <h2 className="text-sm font-bold">创建新任务</h2>
         </div>
+
+        {/* Mode switcher */}
+        <div className="flex gap-1 mt-3 p-1 rounded-lg max-w-xs" style={{ background: "var(--bg-tertiary)" }}>
+          <button
+            onClick={() => setMode("quick")}
+            className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200"
+            style={{
+              background: mode === "quick" ? "var(--bg-primary)" : "transparent",
+              color: mode === "quick" ? "var(--text-primary)" : "var(--text-secondary)",
+              boxShadow: mode === "quick" ? "0 1px 3px rgba(0,0,0,0.2)" : "none",
+            }}
+          >快速创建</button>
+          <button
+            onClick={() => setMode("wizard")}
+            className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200"
+            style={{
+              background: mode === "wizard" ? "var(--bg-primary)" : "transparent",
+              color: mode === "wizard" ? "var(--text-primary)" : "var(--text-secondary)",
+              boxShadow: mode === "wizard" ? "0 1px 3px rgba(0,0,0,0.2)" : "none",
+            }}
+          >AI 对话创建</button>
+        </div>
+
+        {mode === "wizard" && (
         <div className="flex gap-2 mt-3 max-md:hidden" role="tablist" aria-label="任务创建步骤">
           {renderStepIndicator()}
         </div>
+        )}
       </div>
 
+      {mode === "quick" ? (
+        <QuickCreate />
+      ) : (<>
       <div
         className="hidden max-md:flex fixed bottom-0 left-0 right-0 z-50 px-4 py-3 justify-around"
         role="tablist"
@@ -326,13 +428,21 @@ export function TaskWizard() {
         <div className="flex-1 flex items-center justify-center max-md:pb-16" role="tabpanel"
           id="wizard-panel-0" aria-labelledby="wizard-step-0"
           style={{ animation: "fadeIn 0.4s ease-out" }}>
+          {isStartingSession ? (
+            <div className="text-center">
+              <div className="w-48 h-24 mx-auto rounded-lg mb-3" style={{ background: "var(--bg-tertiary)", animation: "pulse 1.5s ease-in-out infinite" }} />
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>正在初始化...</p>
+            </div>
+          ) : (
           <div className="text-center px-4 max-w-md w-full">
             <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>选择你的项目文件夹</p>
 
             <div className="glass-card p-4 mb-4 text-left">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>默认目录</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>推荐使用</span>
+                {getLastDir() !== "~/ai-workspace" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>上次使用</span>
+                )}
               </div>
               <p className="text-sm mb-3 font-mono" style={{ color: "var(--green)" }}>{defaultDir()}</p>
               <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>使用默认位置</button>
@@ -374,6 +484,7 @@ export function TaskWizard() {
 
             {workingDir && <p className="text-xs mt-3" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
           </div>
+          )}
         </div>
       )}
 
@@ -386,17 +497,19 @@ export function TaskWizard() {
               <div className="text-center py-10">
                 <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>告诉我你想要完成什么，我会帮你规划。</p>
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {SUGGESTION_PILLS.map((s) => (
+                  {BUILT_IN_TEMPLATES.map((t) => (
                     <button
-                      key={s}
-                      onClick={() => handleSuggestionClick(s)}
-                      className="px-3 py-1.5 rounded-full text-xs"
+                      key={t.id}
+                      onClick={() => handleTemplateSelect(t)}
+                      className="px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
                       style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
                     >
-                      {s}
+                      <span>{t.icon}</span>
+                      <span>{t.label}</span>
                     </button>
                   ))}
                 </div>
+                <p className="text-[10px] mt-3" style={{ color: "var(--text-muted)" }}>选择模板可跳过对话，直接确认任务</p>
               </div>
             )}
             {messages.map((msg, i) => {
@@ -487,41 +600,40 @@ export function TaskWizard() {
             className="glass-card p-4"
             style={{ animation: "slideUp 0.35s ease-out" }}
           >
-            <h3 className="text-sm font-bold mb-3">任务详情</h3>
+            <h3 className="text-sm font-bold mb-3">确认任务</h3>
             <div className="space-y-3 text-xs">
               <div>
                 <span style={{ color: "var(--text-secondary)" }}>项目:</span>
                 <span className="ml-2" style={{ color: "var(--blue)" }}>{workingDir}</span>
               </div>
+
+              {/* Editable content */}
               <div>
-                <span style={{ color: "var(--text-secondary)" }}>内容:</span>
-                <p className="mt-1" style={{ color: "var(--text-primary)" }}>{taskParams.content}</p>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>任务内容</label>
+                <textarea
+                  value={editedContent}
+                  onChange={(e) => setEditedContent(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded text-xs outline-none resize-none"
+                  style={{
+                    background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                    border: "1px solid var(--border)",
+                  }}
+                />
               </div>
+
+              {/* Editable goals */}
               <div>
-                <span style={{ color: "var(--text-secondary)" }}>目标:</span>
-                <ul className="mt-1 space-y-1">
-                  {taskParams.goals.map((g, i) => <li key={i} style={{ color: "var(--green)" }}>• {g}</li>)}
-                </ul>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>目标</label>
+                {renderEditableList(editedGoals, setEditedGoals, "var(--green)", "+ 添加目标")}
+              </div>
+
+              {/* Editable conditions (always visible) */}
+              <div>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>完成标准</label>
+                {renderEditableList(editedConditions, setEditedConditions, "var(--yellow)", "+ 添加条件")}
               </div>
             </div>
-
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="mt-3 text-xs underline"
-              style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
-            >
-              {showAdvanced ? "收起详细设置" : "查看详细设置"}
-            </button>
-            {showAdvanced && (
-              <div className="mt-2 text-xs">
-                <div>
-                  <span style={{ color: "var(--text-secondary)" }}>完成标准:</span>
-                  <ul className="mt-1 space-y-1">
-                    {taskParams.terminationConditions.map((c, i) => <li key={i} style={{ color: "var(--yellow)" }}>• {c}</li>)}
-                  </ul>
-                </div>
-              </div>
-            )}
 
             {errors.length > 0 && (
               <div className="mt-4 p-3 rounded" style={{ background: "rgba(239, 68, 68, 0.1)" }}>
@@ -531,9 +643,12 @@ export function TaskWizard() {
           </div>
           <div className="flex gap-3 mt-6">
             <button onClick={() => setStep(1)} className="px-4 py-2 rounded text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>继续对话</button>
-            <button onClick={handleConfirm} disabled={creating} className="px-8 py-3 rounded text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#fff" }}>{creating ? "创建中..." : "开始"}</button>
+            <button onClick={handleConfirm} disabled={creating} className="px-6 py-3 rounded text-sm font-semibold disabled:opacity-50" style={{ background: "var(--blue)", color: "#fff" }}>{creating ? "创建中..." : "创建"}</button>
+            <button onClick={handleConfirmAndStart} disabled={creating} className="px-6 py-3 rounded text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#fff" }}>{creating ? "创建中..." : "创建并开始"}</button>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
       <ConfirmDialog
