@@ -230,7 +230,8 @@ export class Store {
     const file = path.join(this.runDir(runId), "comments.json");
     const comments = readJsonFile<import("@ai-workbench/shared").TaskComment[]>(file, []);
     comments.push(comment);
-    writeJsonFile(file, comments);
+    const trimmed = comments.length > MAX_HISTORY_ENTRIES ? comments.slice(-MAX_HISTORY_ENTRIES) : comments;
+    writeJsonFile(file, trimmed);
   }
 
   getComments(runId: string): import("@ai-workbench/shared").TaskComment[] {

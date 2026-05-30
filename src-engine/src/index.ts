@@ -1,7 +1,8 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, subscriptionStore, queueManager, skillManager } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, subscriptionStore, queueManager, skillManager, mcpManager } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 import { connectRemoteWS, disconnectRemoteWS } from "./remote/remote-proxy.js";
+import { log } from "./lib/logger.js";
 import { platform } from "os";
 
 const isWin = platform() === "win32";
@@ -25,6 +26,7 @@ async function main() {
     console.log("\nShutting down gracefully...");
 
     await killAllActiveProcesses();
+    await mcpManager.stopAll();
     for (const sub of subscriptionStore.list()) {
       disconnectRemoteWS(sub.runId);
     }
@@ -58,7 +60,18 @@ async function main() {
 
   const recovery = recoverStaleRuns();
   if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
-    console.log(`[engine] Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset > 0 ? recovery.tasksReset : 0} tasks reset to pending`);
+    log.info(`Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset > 0 ? recovery.tasksReset : 0} tasks reset to pending`);
+  }
+
+  // Auto-cleanup runs completed more than 30 days ago
+  const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+  const allRuns = store.listRuns();
+  const staleRuns = allRuns.filter((r) => r.status === "completed" && r.completedAt && Date.now() - r.completedAt > MAX_AGE_MS);
+  if (staleRuns.length > 0) {
+    log.info(`Auto-cleanup: removing ${staleRuns.length} runs older than 30 days`);
+    for (const r of staleRuns) {
+      try { store.deleteRun(r.id); } catch { /* ignore */ }
+    }
   }
 
   process.on("SIGINT", gracefulShutdown);
@@ -70,7 +83,7 @@ async function main() {
 
   process.on("uncaughtException", (err) => {
     console.error("[engine] Uncaught exception — initiating shutdown:", err);
-    gracefulShutdown();
+    gracefulShutdown().catch(() => process.exit(1));
   });
 
   process.on("unhandledRejection", (reason) => {

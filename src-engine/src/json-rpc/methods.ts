@@ -19,7 +19,7 @@ import { PluginRegistry, type McpServerConfig } from "../plugins/plugin-registry
 import { McpManager } from "../plugins/mcp-manager.js";
 import { getDataDir } from "../db/store-utils.js";
 
-const PORT = 9731;
+const PORT = Number(process.env.ENGINE_PORT) || 9731;
 
 const store = new Store();
 const shareStore = new ShareStore();
@@ -33,7 +33,7 @@ export { store, shareStore, subscriptionStore, queueManager, skillStore, skillMa
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
 const pluginRegistry = new PluginRegistry(getDataDir());
-const mcpManager = new McpManager();
+export const mcpManager = new McpManager();
 
 export { sessionManager };
 

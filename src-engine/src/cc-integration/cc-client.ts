@@ -25,7 +25,14 @@ export async function killProcessTree(pid: number): Promise<void> {
     if (isWin) {
       process.kill(pid);
     } else {
-      process.kill(pid, "SIGTERM");
+      // Kill the entire process group by sending SIGTERM to -pid (negative = group)
+      try { process.kill(-pid, "SIGTERM"); } catch { /* fallback to single pid */ }
+      try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ }
+      // Give processes 2s then SIGKILL
+      await new Promise((r) => setTimeout(r, 2000));
+      try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+      try { process.kill(pid, 0); } catch { return; } // confirmed dead
+      try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ }
     }
   } catch {
     // Process already gone
@@ -110,6 +117,7 @@ export class CCClient {
         cwd: options.workingDir,
         env: buildSafeEnv(),
         stdio: ["ignore", "pipe", "pipe"],
+        detached: !isWin,
       });
 
       if (proc.pid) trackPid(proc.pid);
@@ -241,8 +249,9 @@ export class CCClient {
 
     const proc = spawn(this.claudePath, args, {
       cwd: options.workingDir,
-      env: { ...process.env },
+      env: buildSafeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
+      detached: !isWin,
     });
 
     if (proc.pid) trackPid(proc.pid);

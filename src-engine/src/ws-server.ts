@@ -8,7 +8,7 @@ import type { Store } from "./db/store.js";
 import type { QueueManager } from "./engine/queue-manager.js";
 import { SessionManager } from "./engine/session-manager.js";
 
-const PORT = 9731;
+const PORT = Number(process.env.ENGINE_PORT) || 9731;
 const HOST = process.env.ENGINE_HOST || "0.0.0.0";
 const HEARTBEAT_INTERVAL_MS = 30000;
 
