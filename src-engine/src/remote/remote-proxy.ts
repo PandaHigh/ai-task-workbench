@@ -5,6 +5,8 @@ import type {
   LessonLearned,
 } from "@ai-workbench/shared";
 import WebSocket from "ws";
+import { retryWithBackoff } from "../lib/retry.js";
+import { isRetryableError } from "../lib/error-utils.js";
 
 const TIMEOUT_MS = 15_000;
 
@@ -82,27 +84,37 @@ export function disconnectRemoteWS(runId: string): void {
 }
 
 async function remoteFetch(baseUrl: string, path: string): Promise<Response> {
-  const url = `${baseUrl}${path}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (!res.ok) {
-    throw new Error(`Remote request failed: ${res.status} ${url}`);
-  }
-  return res;
+  return retryWithBackoff(
+    async () => {
+      const url = `${baseUrl}${path}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (!res.ok) {
+        throw new Error(`Remote request failed: ${res.status} ${url}`);
+      }
+      return res;
+    },
+    { maxAttempts: 3, shouldRetry: isRetryableError },
+  );
 }
 
 async function remotePost(baseUrl: string, path: string, body: Record<string, unknown>): Promise<Response> {
-  const url = `${baseUrl}${path}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Remote write failed: ${res.status} ${url} ${text}`);
-  }
-  return res;
+  return retryWithBackoff(
+    async () => {
+      const url = `${baseUrl}${path}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Remote write failed: ${res.status} ${url} ${text}`);
+      }
+      return res;
+    },
+    { maxAttempts: 3, shouldRetry: isRetryableError },
+  );
 }
 
 // ─── Read operations ────────────────────────────────────────────────────

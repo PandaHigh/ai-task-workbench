@@ -7,47 +7,69 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Format check
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm install
+      - name: Build all (includes type checks via tsc)
+        run: npm run build
+      - name: Check Rust code
+        working-directory: src-tauri
+        run: cargo check
+
+  test-engine:
+    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust artifacts
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build all (includes type checks via tsc)
-        run: npm run build
-
-      - name: Check Rust code
-        working-directory: src-tauri
-        run: cargo check
-
+      - run: npm install
+      - run: npm run build --workspace=shared --workspace=src-engine
       - name: Run engine tests
         run: cd src-engine && npx vitest run
 
+  test-ui:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
       - name: Run UI component tests
         run: cd src-ui && npx vitest run src/components
 
   e2e:
-    needs: test
+    needs: [test-engine, test-ui]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,3 +86,25 @@ jobs:
         run: cd src-ui && npx playwright test
         env:
           CI: true
+
+  results:
+    if: always()
+    needs: [lint, build, test-engine, test-ui, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "lint: ${{ needs.lint.result }}"
+          echo "build: ${{ needs.build.result }}"
+          echo "test-engine: ${{ needs.test-engine.result }}"
+          echo "test-ui: ${{ needs.test-ui.result }}"
+          echo "e2e: ${{ needs.e2e.result }}"
+          if [[ "${{ needs.lint.result }}" == "failure" || \
+                "${{ needs.build.result }}" == "failure" || \
+                "${{ needs.test-engine.result }}" == "failure" || \
+                "${{ needs.test-ui.result }}" == "failure" || \
+                "${{ needs.e2e.result }}" == "failure" ]]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          echo "All CI jobs passed!"
