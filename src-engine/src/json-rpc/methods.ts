@@ -115,7 +115,7 @@ function validateWorkingDir(dir: string): string {
 // ─── Config constraints ────────────────────────────────────────────────
 
 const NUMERIC_CONFIG_CONSTRAINTS: Record<string, { min: number; max: number }> = {
-  maxBudgetUsd: { min: 0, max: 10000 },
+  maxBudgetUsd: { min: 0, max: 100000 },
   maxEvaluationCycles: { min: 1, max: 10000 },
   stagnationWindow: { min: 2, max: 100 },
   qualityThreshold: { min: 0.1, max: 1.0 },

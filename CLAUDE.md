@@ -124,7 +124,7 @@ npm run build
 
 ## 稳定性保障
 - 最大评估循环: 20 次
-- 预算上限: $50 USD
+- 预算上限: $50,000 USD
 - 停滞检测: 连续 5 轮进度 < 5% 自动停止
 - 僵尸进程: SIGTERM → 5s → SIGKILL
 - 原子写入: tmpfile + rename 防崩溃数据损坏
