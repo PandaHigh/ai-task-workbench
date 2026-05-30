@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus, CheckpointType } from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
@@ -287,6 +289,21 @@ export class Executor {
     run.completedAt = Date.now();
     this.store.saveRun(run);
     this.store.saveReport(run.id, run.finalReport);
+
+    // Generate README.md in working directory
+    try {
+      const tasks = this.store.listTasks(run.id);
+      const commits = this.store.getCommits(run.id);
+      const lessons = this.store.getLessons(run.id);
+      const totalCost = this.recalculateCost(run.id);
+      const { generateReadme } = await import("../lib/readme-generator.js");
+      const readmeContent = generateReadme({ run, tasks, commits, lessons, report: run.finalReport, totalCost });
+      fs.writeFileSync(path.join(run.workingDir, "README.md"), readmeContent, "utf-8");
+      this.log(run.id, "engine", "info", "README.md generated in working directory");
+    } catch (readmeErr) {
+      console.warn("[executor] README generation failed:", errorToMessage(readmeErr));
+    }
+
     this.broadcast("run.status", { runId: run.id, status: "completed", report: run.finalReport });
   }
 

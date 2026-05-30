@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket, type Data } from "ws";
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "http";
+import path from "path";
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
 import { RPC_ERRORS } from "@ai-workbench/shared";
 import { methodHandlers, RpcValidationError, skillManager } from "./json-rpc/methods.js";
@@ -196,6 +197,13 @@ export class WsServer {
       return;
     }
 
+    // Download working directory as ZIP
+    if (url.startsWith("/api/runs/") && url.endsWith("/download") && method === "GET") {
+      this.setCorsHeaders(req, res);
+      this.handleDownload(res, url);
+      return;
+    }
+
     // Graceful shutdown endpoint (for Windows Tauri close)
     if (url === "/api/shutdown" && method === "POST") {
       this.setCorsHeaders(req, res);
@@ -219,6 +227,27 @@ export class WsServer {
     }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+
+  private async handleDownload(res: ServerResponse, url: string): Promise<void> {
+    const runId = url.replace("/api/runs/", "").replace("/download", "");
+    if (!runId) { this.sendJson(res, 400, { error: "Missing runId" }); return; }
+
+    const run = this.store.getRun(runId);
+    if (!run) { this.sendJson(res, 404, { error: "Run not found" }); return; }
+    if (!run.workingDir) { this.sendJson(res, 400, { error: "Run has no working directory" }); return; }
+
+    const dirName = path.basename(run.workingDir);
+    const zipFileName = `${dirName}-${run.id.substring(0, 8)}.zip`;
+
+    try {
+      const { streamDirectoryAsZip } = await import("./lib/archive.js");
+      await streamDirectoryAsZip(run.workingDir, res, zipFileName);
+    } catch (err) {
+      console.error("[ws-server] download failed:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) this.sendJson(res, 500, { error: "Failed to create archive" });
+      else res.end();
+    }
   }
 
   private handleShareApi(req: IncomingMessage, res: ServerResponse, url: string, method: string): void {

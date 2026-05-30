@@ -3,6 +3,7 @@ import { useEvolutionStore } from "../../stores/evolution-store";
 import { useTaskStore } from "../../stores/task-store";
 import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
+import { ENGINE_HTTP_URL } from "../../lib/platform";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { TaskDefinition, GitCommit, LessonLearned, ExecutionRun } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
@@ -345,6 +346,15 @@ export function EvolutionDashboard() {
             <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Download ZIP button */}
+            <button
+              onClick={() => window.open(`${ENGINE_HTTP_URL}/api/runs/${runId}/download`)}
+              className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+              title="下载工作目录 ZIP"
+            >
+              下载
+            </button>
             {/* Share button */}
             <button
               onClick={handleShare}
