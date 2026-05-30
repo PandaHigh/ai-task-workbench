@@ -11,6 +11,8 @@ import * as wizardHandler from "../wizard/wizard-handler.js";
 import * as remoteProxy from "../remote/remote-proxy.js";
 import { resolve, normalize } from "path";
 import { homedir, tmpdir } from "os";
+import { errorToMessage } from "../lib/error-utils.js";
+import { serializeGoalState } from "../lib/goal-utils.js";
 
 const PORT = 9731;
 
@@ -156,17 +158,6 @@ export function shutdown(): void {
   }
 }
 
-function serializeGoalState(run: ExecutionRun): Record<string, unknown> {
-  return {
-    status: run.goalStatus ?? "unmet",
-    tokensUsed: run.goalTokensUsed ?? 0,
-    budgetTokens: run.goalBudgetTokens ?? 500_000,
-    timeElapsedMs: run.goalTimeElapsedMs ?? 0,
-    evaluationCycles: run.goalEvaluationCycles ?? 0,
-    lastEvaluationReason: run.goalLastEvalReason ?? "",
-    evidence: run.goalEvidence ?? [],
-  };
-}
 
 export function recoverStaleRuns(): { runsReset: number; tasksReset: number; approvalsReset: number } {
   let runsReset = 0;
@@ -395,6 +386,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       store.saveRun(currentRun);
       const executor = new Executor(queueManager, notify, runId);
       activeExecutors.set(runId, executor);
+      if (activeExecutors.has(runId)) return task;
       setImmediate(() => executor.start(currentRun).finally(() => { activeExecutors.delete(runId); }));
     }
 
@@ -671,7 +663,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     try {
       remoteRun = await remoteProxy.fetchRemoteRun(remoteUrl, remoteToken);
     } catch (err) {
-      throw new RpcValidationError(`Failed to fetch remote run: ${err instanceof Error ? err.message : err}`);
+      throw new RpcValidationError(`Failed to fetch remote run: ${errorToMessage(err)}`);
     }
 
     const localRunId = `remote-${remoteRun.id.slice(0, 8)}-${Date.now().toString(36)}`;
@@ -688,7 +680,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       const { connectRemoteWS } = await import("../remote/remote-proxy.js");
       connectRemoteWS(localRunId, remoteUrl, remoteToken, notify);
     } catch (wsErr) {
-      console.warn("[share.subscribe] WebSocket connection to remote failed, will retry:", wsErr instanceof Error ? wsErr.message : wsErr);
+      console.warn("[share.subscribe] WebSocket connection to remote failed, will retry:", errorToMessage(wsErr));
     }
 
     return {
@@ -805,8 +797,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
   // ─── Activity Timeline ──────────────────────────────────────────────────
 
   "activity.list": async (params) => {
-    const runId = params.runId as string;
-    if (!runId) throw new RpcValidationError("Missing runId");
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const limit = params.limit as number | undefined;
     return { activities: sessionManager.getActivities(runId, limit) };
   },
@@ -814,15 +806,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
   // ─── Comments ───────────────────────────────────────────────────────────
 
   "comment.create": async (params) => {
-    const runId = params.runId as string;
-    const taskId = params.taskId as string;
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const content = requireNonEmptyString(params, "content");
     const userId = (params.userId as string) || "anonymous";
     const displayName = (params.displayName as string) || userId;
-    const content = params.content as string;
-
-    if (!runId || !taskId || !content) {
-      throw new RpcValidationError("Missing runId, taskId, or content");
-    }
 
     const comment = sessionManager.addComment({ taskId, runId, userId, displayName, content });
 
@@ -835,8 +824,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "comment.list": async (params) => {
-    const runId = params.runId as string;
-    if (!runId) throw new RpcValidationError("Missing runId");
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
     const taskId = params.taskId as string | undefined;
     return { comments: sessionManager.getComments(runId, taskId) };
   },

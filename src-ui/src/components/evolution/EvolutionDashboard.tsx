@@ -179,6 +179,7 @@ export function EvolutionDashboard() {
   // Periodically refresh all tasks (completed/failed), queue, and run data while running
   useEffect(() => {
     if (!runId || !connected) return;
+    const POLL_INTERVAL = connected ? 30_000 : 5_000;
     const interval = setInterval(async () => {
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
@@ -195,7 +196,7 @@ export function EvolutionDashboard() {
           setRunning(freshRun.status === "running");
         }
       } catch { /* ignore */ }
-    }, 5000);
+    }, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [runId, call, connected]);
 
@@ -425,7 +426,7 @@ export function EvolutionDashboard() {
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id, task.content); }}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
+                        className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
                         style={{ color: "var(--red)", border: "1px solid transparent" }}
                         aria-label="删除任务"
                         title="删除任务"
@@ -910,7 +911,7 @@ export function EvolutionDashboard() {
             position: "fixed", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)",
-            zIndex: 10000,
+            zIndex: 50,
           }}
           onClick={() => setShowAddModal(false)}
         >

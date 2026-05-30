@@ -292,7 +292,10 @@ export class WsServer {
         const params = body ? JSON.parse(body) : {};
         switch (resource) {
           case "task.create": {
-            if (!params.content) { this.sendJson(res, 400, { error: "Missing content" }); return; }
+            if (!params.content || typeof params.content !== "string" || !params.content.trim()) {
+              this.sendJson(res, 400, { error: "Missing or invalid content" });
+              return;
+            }
             const task = this.queueManager.enqueue(runId, {
               content: params.content,
               type: params.type ?? "user_defined",

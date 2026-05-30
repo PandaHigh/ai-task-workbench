@@ -1,5 +1,6 @@
 import { mkdirSync } from "fs";
 import simpleGit, { type SimpleGit } from "simple-git";
+import { errorToMessage } from "../lib/error-utils.js";
 
 export interface GitManagerOptions {
   workingDir: string;
@@ -111,7 +112,7 @@ export class GitManager {
         return criticalPatterns.some((p) => file.includes(p));
       });
       return { filesChanged: files.length, linesChanged, hasCriticalFiles };
-    } catch {
+    } catch (err) { console.warn("[git] Diff stats failed:", errorToMessage(err));
       return { filesChanged: 0, linesChanged: 0, hasCriticalFiles: false };
     }
   }

@@ -262,7 +262,7 @@ describe("Share HTTP API Integration", () => {
       });
 
       expect(res.status).toBe(400);
-      expect((res.data as Record<string, unknown>).error).toContain("Missing content");
+      expect((res.data as Record<string, unknown>).error).toContain("Missing or invalid content");
     });
 
     it("task should appear in tasks list after creation", async () => {

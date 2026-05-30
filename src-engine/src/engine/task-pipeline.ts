@@ -20,6 +20,8 @@ import {
   buildReviewerSystemPrompt,
   buildFixFeedback,
 } from "./pipeline-prompts.js";
+import { errorToMessage } from "../lib/error-utils.js";
+import { parseJsonOrThrow } from "../lib/json-extract.js";
 
 export interface PipelineResult {
   finalOutput: string;
@@ -90,7 +92,7 @@ export class TaskPipeline {
         allMessages,
       );
 
-      plan = this.parseJsonResult<ExecutionPlan>(plannerResult.result);
+      plan = parseJsonOrThrow<ExecutionPlan>(plannerResult.result);
       lastSessionId = plannerResult.sessionId;
       totalCost += plannerResult.totalCostUsd;
       totalDuration += plannerResult.durationMs;
@@ -104,7 +106,7 @@ export class TaskPipeline {
         iteration: 1,
       });
     } catch (err) {
-      throw new Error(`Planner phase failed: ${err instanceof Error ? err.message : err}`);
+      throw new Error(`Planner phase failed: ${errorToMessage(err)}`);
     }
 
     // ─── Phases 2-4: Developer → Tester → Reviewer (with fix loop) ─
@@ -142,7 +144,7 @@ export class TaskPipeline {
         if (iteration < maxIterations) {
           continue;
         }
-        throw new Error(`Developer phase failed after ${iteration} iterations: ${err instanceof Error ? err.message : err}`);
+        throw new Error(`Developer phase failed after ${iteration} iterations: ${errorToMessage(err)}`);
       }
 
       lastSessionId = devResult.sessionId;
@@ -178,7 +180,7 @@ export class TaskPipeline {
           allMessages,
         );
 
-        testResult = this.parseJsonResult<TestResult>(testerResult.result);
+        testResult = parseJsonOrThrow<TestResult>(testerResult.result);
         lastSessionId = testerResult.sessionId;
         totalCost += testerResult.totalCostUsd;
         totalDuration += testerResult.durationMs;
@@ -194,7 +196,7 @@ export class TaskPipeline {
         testResult = {
           testsWritten: [],
           allPassed: false,
-          failures: [`Test execution failed: ${err instanceof Error ? err.message : err}`],
+          failures: [`Test execution failed: ${errorToMessage(err)}`],
           coverage: "Testing phase failed to execute",
         };
       }
@@ -217,7 +219,7 @@ export class TaskPipeline {
           allMessages,
         );
 
-        reviewResult = this.parseJsonResult<ReviewResult>(reviewerResult.result);
+        reviewResult = parseJsonOrThrow<ReviewResult>(reviewerResult.result);
         lastSessionId = reviewerResult.sessionId;
         totalCost += reviewerResult.totalCostUsd;
         totalDuration += reviewerResult.durationMs;
@@ -234,7 +236,7 @@ export class TaskPipeline {
           approved: false,
           score: 0,
           issues: [],
-          summary: `Review phase failed: ${err instanceof Error ? err.message : err}`,
+          summary: `Review phase failed: ${errorToMessage(err)}`,
         };
       }
 
@@ -324,58 +326,6 @@ export class TaskPipeline {
     return result;
   }
 
-  private parseJsonResult<T>(text: string): T {
-    // Handle case where text is already an object stringified incorrectly
-    if (typeof text !== "string") {
-      throw new Error(`parseJsonResult expected string, got ${typeof text}: ${String(text).substring(0, 100)}`);
-    }
-
-    let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
-
-    // Strip common non-JSON prefixes that Claude adds (e.g. "Here is the plan:\n")
-    const jsonStart = Math.min(
-      cleaned.indexOf("{") === -1 ? Infinity : cleaned.indexOf("{"),
-      cleaned.indexOf("[") === -1 ? Infinity : cleaned.indexOf("["),
-    );
-    if (jsonStart > 0 && jsonStart !== Infinity) {
-      cleaned = cleaned.substring(jsonStart);
-    }
-
-    try {
-      return JSON.parse(cleaned) as T;
-    } catch {
-      // Try extracting balanced JSON
-    }
-
-    const extract = (open: string, close: string): string | null => {
-      const startIdx = cleaned.indexOf(open);
-      if (startIdx === -1) return null;
-      let depth = 0;
-      let inString = false;
-      let escape = false;
-      for (let i = startIdx; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (escape) { escape = false; continue; }
-        if (ch === "\\") { escape = true; continue; }
-        if (ch === '"') { inString = !inString; continue; }
-        if (inString) continue;
-        if (ch === open) depth++;
-        if (ch === close) depth--;
-        if (depth === 0) {
-          const candidate = cleaned.substring(startIdx, i + 1);
-          try { return JSON.parse(candidate); } catch { return null; }
-        }
-      }
-      return null;
-    };
-
-    const extracted = extract("{", "}") || extract("[", "]");
-    if (extracted) {
-      return JSON.parse(extracted) as T;
-    }
-
-    throw new Error(`Failed to parse JSON from: ${text.substring(0, 200)}`);
-  }
 
   private async getDiffSummary(): Promise<string> {
     try {
@@ -383,7 +333,7 @@ export class TaskPipeline {
       const diff = await gitManager.getDiff();
       if (!diff || diff.length === 0) return "(no unstaged changes detected)";
       return diff.length > 8000 ? diff.substring(0, 8000) + "\n... (truncated)" : diff;
-    } catch {
+    } catch (err) { console.warn("[pipeline] Failed to get diff:", errorToMessage(err));
       return "(could not retrieve diff)";
     }
   }

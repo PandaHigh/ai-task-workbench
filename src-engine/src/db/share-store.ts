@@ -1,59 +1,8 @@
 import fs from "fs";
 import path from "path";
-import os from "os";
 import { randomUUID } from "crypto";
 import type { ShareToken } from "@ai-workbench/shared";
-
-function getDataDir(): string {
-  const platform = os.platform();
-  let baseDir: string;
-  switch (platform) {
-    case "darwin":
-      baseDir = path.join(os.homedir(), "Library", "Application Support");
-      break;
-    case "linux":
-      baseDir = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-      break;
-    case "win32":
-      baseDir = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-      break;
-    default:
-      baseDir = os.homedir();
-  }
-  return path.join(baseDir, "ai-task-workbench");
-}
-
-function ensureDir(dir: string): void {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function readJsonFile<T>(filePath: string, fallback: T): T {
-  try {
-    if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
-    }
-  } catch (err) {
-    console.error(`[share-store] Failed to read ${filePath}: ${err instanceof Error ? err.message : err}`);
-  }
-  return fallback;
-}
-
-function writeJsonFile(filePath: string, data: unknown): void {
-  ensureDir(path.dirname(filePath));
-  const content = JSON.stringify(data, null, 2);
-  const tmpPath = filePath + ".tmp";
-  const fd = fs.openSync(tmpPath, "w");
-  try {
-    fs.writeFileSync(fd, content, "utf-8");
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  if (process.platform === "win32" && fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-  fs.renameSync(tmpPath, filePath);
-}
+import { getDataDir, ensureDir, readJsonFile, writeJsonFile } from "./store-utils.js";
 
 export class ShareStore {
   private filePath: string;

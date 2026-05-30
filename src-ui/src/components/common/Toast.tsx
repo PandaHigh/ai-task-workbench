@@ -84,9 +84,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
 
+  const MAX_TOASTS = 5;
   const addToast = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, type, message }]);
+    setToasts((prev) => {
+      const next = [...prev, { id, type, message }];
+      return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next;
+    });
   }, []);
 
   const success = useCallback((msg: string) => addToast("success", msg), [addToast]);

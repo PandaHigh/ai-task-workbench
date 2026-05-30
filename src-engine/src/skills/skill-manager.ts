@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { IncomingMessage, ServerResponse } from "http";
 import { SkillStore, type SkillMeta } from "../db/skill-store.js";
+import { errorToMessage } from "../lib/error-utils.js";
 
 export type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 
@@ -20,7 +21,7 @@ function parseSkillFrontmatter(skillMdPath: string): { name: string; description
       name: nameMatch[1].trim(),
       description: descMatch ? descMatch[1].trim() : "",
     };
-  } catch {
+  } catch (err) { console.warn("[skill] Parse SKILL.md failed:", errorToMessage(err));
     return null;
   }
 }

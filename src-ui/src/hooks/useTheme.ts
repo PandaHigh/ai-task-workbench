@@ -23,7 +23,12 @@ export function useTheme() {
   }, [theme]);
 
   const toggle = useCallback(() => {
+    const html = document.documentElement;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      html.classList.add("theme-transitioning");
+    }
     setThemeState((t) => (t === "light" ? "dark" : "light"));
+    setTimeout(() => html.classList.remove("theme-transitioning"), 350);
   }, []);
 
   return { theme, toggle };

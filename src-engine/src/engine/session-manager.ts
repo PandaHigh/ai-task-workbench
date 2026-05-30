@@ -2,6 +2,7 @@ import crypto from "crypto";
 import type { ClientSession, ActivityEvent, RunPermission, UserRole } from "@ai-workbench/shared";
 import { roleToPermissions } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
+import { errorToMessage } from "../lib/error-utils.js";
 
 const DEFAULT_OWNER = "default-owner";
 const DEFAULT_OWNER_NAME = "Owner";
@@ -95,7 +96,7 @@ export class SessionManager {
   getActivities(runId: string, limit?: number): ActivityEvent[] {
     try {
       return this.store.getActivities(runId, limit);
-    } catch {
+    } catch (err) { console.warn("[session] Failed to get activities:", errorToMessage(err));
       return [];
     }
   }
@@ -126,7 +127,7 @@ export class SessionManager {
       const all = this.store.getComments(runId);
       if (taskId) return all.filter((c) => c.taskId === taskId);
       return all;
-    } catch {
+    } catch (err) { console.warn("[session] Failed to get comments:", errorToMessage(err));
       return [];
     }
   }

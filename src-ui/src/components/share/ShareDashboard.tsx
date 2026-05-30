@@ -23,6 +23,8 @@ export function ShareDashboard() {
   const toast = useToast();
   const [tab, setTab] = useState<TabType>("logs");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
 
   const completedTasks = useMemo(() => tasks.filter(t => t.status === "completed"), [tasks]);
@@ -92,6 +94,8 @@ export function ShareDashboard() {
           <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
         </div>
         <div className="flex items-center gap-2">
+          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowQueue(true)}>☰ 任务</button>
+          <button className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} onClick={() => setShowSidebar(true)}>📊 统计</button>
           {isRunning ? (
             <span className="text-xs px-3 py-1.5 rounded font-semibold opacity-60 cursor-not-allowed" style={{ background: "var(--yellow)", color: "#fff" }}>暂停（只读）</span>
           ) : run?.status === "completed" ? (
@@ -110,7 +114,7 @@ export function ShareDashboard() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Task Queue */}
-        <div className="w-72 border-r flex flex-col shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+        <div className={`w-72 border-r flex flex-col shrink-0 max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`} style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
           <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
             <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务队列 ({queue.length})</h3>
           </div>
@@ -266,7 +270,7 @@ export function ShareDashboard() {
         </div>
 
         {/* Right: Stats */}
-        <div className="w-64 border-l p-4 overflow-y-auto shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
+        <div className={`w-64 border-l p-4 overflow-y-auto shrink-0 max-md:mobile-drawer max-md:mobile-drawer-right ${showSidebar ? "" : "max-md:drawer-closed"}`} style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
           <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>运行统计</h3>
           <div className="space-y-3 text-xs">
             {/* Budget */}
@@ -333,6 +337,15 @@ export function ShareDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Mobile drawer backdrop */}
+      {(showQueue || showSidebar) && (
+        <div
+          className="fixed inset-0 md:hidden"
+          style={{ background: "rgba(0,0,0,0.5)", zIndex: 49 }}
+          onClick={() => { setShowQueue(false); setShowSidebar(false); }}
+        />
+      )}
 
       {/* Add Task Modal */}
       {showAddModal && (

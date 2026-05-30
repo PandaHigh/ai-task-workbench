@@ -9,6 +9,10 @@ import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
 import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
 
+import { errorToMessage } from "../lib/error-utils.js";
+import { extractJson } from "../lib/json-extract.js";
+import { serializeGoalState } from "../lib/goal-utils.js";
+
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
 const DEFAULT_MAX_BUDGET_USD = 50;
@@ -81,7 +85,7 @@ export class Executor {
         }
       }
     } catch (err) {
-      console.warn("[executor] failed to load config from store, using defaults:", err instanceof Error ? err.message : err);
+      console.warn("[executor] failed to load config from store, using defaults:", errorToMessage(err));
     }
   }
 
@@ -105,7 +109,7 @@ export class Executor {
       run.goalLastEvalReason = "";
       run.goalEvidence = [];
       this.store.saveRun(run);
-      this.broadcast("goal.updated", { runId: run.id, goal: this.serializeGoalState(run) });
+      this.broadcast("goal.updated", { runId: run.id, goal: serializeGoalState(run) });
     }
 
     try {
@@ -144,11 +148,11 @@ export class Executor {
         }
       }
     } catch (err) {
-      const msg = this.errorToMessage(err);
+      const msg = errorToMessage(err);
       this.log(run.id, "engine", "error", `Execution failed: ${msg}`);
       run.status = "failed";
       this.store.saveRun(run);
-      this.broadcast("run.status", { runId: run.id, status: "failed", error: msg });
+      this.broadcast("run.status", { runId: run.id, status: "failed", reason: msg });
     }
   }
 
@@ -176,7 +180,7 @@ export class Executor {
     try {
       evaluation = await this.evaluateGoal(run);
     } catch (err) {
-      const msg = this.errorToMessage(err);
+      const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Goal evaluation failed: ${msg}. Cooling down and retrying next cycle.`);
       try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during goal evaluation cooldown"); return false; }
       return true;
@@ -246,7 +250,7 @@ export class Executor {
     try {
       smartTasks = await this.generateSmartTasks(run, evaluation);
     } catch (err) {
-      const msg = this.errorToMessage(err);
+      const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Smart task generation failed: ${msg}. Retrying next cycle.`);
       try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during smart task cooldown"); return false; }
       return true;
@@ -280,7 +284,7 @@ export class Executor {
       const report = await this.generateReport(run);
       run.finalReport = report;
     } catch (reportErr) {
-      console.warn("[executor] report generation failed:", reportErr instanceof Error ? reportErr.message : reportErr);
+      console.warn("[executor] report generation failed:", errorToMessage(reportErr));
       run.finalReport = partialReport || "Run completed (report generation failed)";
     }
     run.status = "completed";
@@ -334,7 +338,14 @@ export class Executor {
       this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
 
       // Use TaskPipeline for structured execution
-      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), run.workingDir);
+      const pipelineConfig = {
+        maxFixIterations: (this.store.getConfig("maxFixIterations") as number) || undefined,
+        plannerMaxTurns: (this.store.getConfig("plannerMaxTurns") as number) || undefined,
+        developerMaxTurns: (this.store.getConfig("developerMaxTurns") as number) || undefined,
+        testerMaxTurns: (this.store.getConfig("testerMaxTurns") as number) || undefined,
+        reviewerMaxTurns: (this.store.getConfig("reviewerMaxTurns") as number) || undefined,
+      };
+      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), run.workingDir, pipelineConfig);
       const pipelineResult: PipelineResult = await pipeline.run(task, context, abortController.signal);
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
@@ -369,7 +380,7 @@ export class Executor {
         try {
           score = await this.scoreTask(task, pipelineResult.finalOutput, run);
         } catch (scoringErr) {
-          const scoringMsg = this.errorToMessage(scoringErr);
+          const scoringMsg = errorToMessage(scoringErr);
           this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`, task.id);
           score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
         }
@@ -447,7 +458,7 @@ export class Executor {
           this.log(run.id, "git", "warn", "Reverted last commit (quality below threshold)", task.id);
         } catch (revertErr) {
           revertSucceeded = false;
-          this.log(run.id, "git", "error", `Revert failed: ${this.errorToMessage(revertErr)}`, task.id);
+          this.log(run.id, "git", "error", `Revert failed: ${errorToMessage(revertErr)}`, task.id);
         }
         this.store.appendLesson(run.id, {
           runId: run.id, taskId: task.id, category: "failure",
@@ -460,7 +471,7 @@ export class Executor {
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus, reason: failReason });
       }
     } catch (err) {
-      const msg = this.errorToMessage(err);
+      const msg = errorToMessage(err);
       const currentTask = this.store.getTask(run.id, task.id);
       const currentRetries = currentTask?.retryCount ?? 0;
       const maxRetries = this.config.maxAutoRetries;
@@ -489,11 +500,11 @@ export class Executor {
         try {
           await gitManager.checkoutClean();
         } catch (cleanupErr) {
-          this.log(run.id, "git", "warn", `Working dir cleanup failed: ${this.errorToMessage(cleanupErr)}`, task.id);
+          this.log(run.id, "git", "warn", `Working dir cleanup failed: ${errorToMessage(cleanupErr)}`, task.id);
         }
         this.log(run.id, "engine", "error", `Task failed permanently: ${msg}`, task.id);
         this.store.updateTask(run.id, task.id, { status: "failed", errorMessage: msg, completedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", error: msg });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: msg });
       }
     } finally {
       this.abortControllers.delete(task.id);
@@ -557,7 +568,7 @@ Respond ONLY with valid JSON:
     );
 
     try {
-      const parsed = JSON.parse(this.extractJson(result.result));
+      const parsed = JSON.parse(extractJson(result.result));
 
       // Update unified goal state
       run.goalEvaluationCycles = evaluationCycles;
@@ -583,7 +594,7 @@ Respond ONLY with valid JSON:
       }
 
       this.store.saveRun(run);
-      this.broadcast("goal.updated", { runId: run.id, goal: this.serializeGoalState(run) });
+      this.broadcast("goal.updated", { runId: run.id, goal: serializeGoalState(run) });
 
       return {
         isComplete: parsed.isComplete ?? false,
@@ -593,7 +604,7 @@ Respond ONLY with valid JSON:
         overallProgress: parsed.overallProgress ?? 0,
       } as GoalEvaluation;
     } catch (parseErr) {
-      console.warn("[executor] failed to parse goal evaluation result:", parseErr instanceof Error ? parseErr.message : parseErr);
+      console.warn("[executor] failed to parse goal evaluation result:", errorToMessage(parseErr));
       run.goalEvaluationCycles = evaluationCycles;
       run.goalLastEvalReason = "Evaluation parse failed";
       this.store.saveRun(run);
@@ -607,11 +618,11 @@ Respond ONLY with valid JSON:
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 5, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     try {
-      const parsed = JSON.parse(this.extractJson(scoreResult.result));
+      const parsed = JSON.parse(extractJson(scoreResult.result));
       const overall = (parsed.goalAlignment || 0) + (parsed.correctness || 0) + (parsed.completeness || 0) + (parsed.quality || 0);
       return { ...parsed, overall, passed: overall >= this.config.qualityThreshold } as ScoreDetails;
     } catch (scoreErr) {
-      console.warn("[executor] failed to parse score result:", scoreErr instanceof Error ? scoreErr.message : scoreErr);
+      console.warn("[executor] failed to parse score result:", errorToMessage(scoreErr));
       return { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: "Failed to parse score" };
     }
   }
@@ -624,9 +635,9 @@ Respond ONLY with valid JSON:
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     try {
-      return JSON.parse(this.extractJson(result.result));
+      return JSON.parse(extractJson(result.result));
     } catch (genErr) {
-      console.warn("[executor] failed to parse smart task generation result:", genErr instanceof Error ? genErr.message : genErr);
+      console.warn("[executor] failed to parse smart task generation result:", errorToMessage(genErr));
       return [{ content: `Work on: ${evaluation.remainingGoals[0] || "project goals"}`, priority: 5, reasoning: "Fallback task" }];
     }
   }
@@ -642,63 +653,14 @@ Respond ONLY with valid JSON:
     return result.result;
   }
 
-  private extractJson(text: string): string {
-    let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
-
-    try { JSON.parse(cleaned); return cleaned; } catch (jsonErr) { console.warn(`[executor] Text is not pure JSON, attempting bracket extraction: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`); }
-
-    const findBalanced = (open: string, close: string): string | null => {
-      const startIdx = cleaned.indexOf(open);
-      if (startIdx === -1) return null;
-      let depth = 0;
-      let inString = false;
-      let escape = false;
-      for (let i = startIdx; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (escape) { escape = false; continue; }
-        if (ch === "\\") { escape = true; continue; }
-        if (ch === '"') { inString = !inString; continue; }
-        if (inString) continue;
-        if (ch === open) depth++;
-        if (ch === close) depth--;
-        if (depth === 0) {
-          const candidate = cleaned.substring(startIdx, i + 1);
-          try { JSON.parse(candidate); return candidate; } catch (bracketErr) { console.warn(`[executor] Balanced bracket extraction produced invalid JSON: ${bracketErr instanceof Error ? bracketErr.message : String(bracketErr)}`); return null; }
-        }
-      }
-      return null;
-    };
-
-    return findBalanced("{", "}") || findBalanced("[", "]") || cleaned;
-  }
-
   private log(runId: string, source: string, level: string, message: string, taskId?: string): void {
     const entry = { timestamp: Date.now(), level, source, message, taskId: taskId || "", runId };
     this.store.appendLog(runId, entry);
     this.broadcast("log.entry", entry);
   }
 
-  private errorToMessage(err: unknown): string {
-    if (err instanceof Error) {
-      return err.message;
-    }
-    return String(err);
-  }
-
   private broadcast(method: string, params: Record<string, unknown>): void {
     this.notify(method, params);
-  }
-
-  private serializeGoalState(run: ExecutionRun): Record<string, unknown> {
-    return {
-      status: run.goalStatus ?? "unmet",
-      tokensUsed: run.goalTokensUsed ?? 0,
-      budgetTokens: run.goalBudgetTokens ?? 500_000,
-      timeElapsedMs: run.goalTimeElapsedMs ?? 0,
-      evaluationCycles: run.goalEvaluationCycles ?? 0,
-      lastEvaluationReason: run.goalLastEvalReason ?? "",
-      evidence: run.goalEvidence ?? [],
-    };
   }
 
   cancelTask(taskId: string, runId: string): void {
@@ -754,7 +716,7 @@ Respond ONLY with valid JSON:
 
       return decision;
     } catch (err) {
-      this.log(run.id, "engine", "warn", `Approval wait interrupted: ${this.errorToMessage(err)}`);
+      this.log(run.id, "engine", "warn", `Approval wait interrupted: ${errorToMessage(err)}`);
       return null;
     } finally {
       this.approvalGate = null;
@@ -840,7 +802,7 @@ Return ONLY the JSON object.`;
       this.broadcast("features.generated", { runId: run.id, total: features.length });
       this.log(run.id, "engine", "info", `Generated ${features.length} features for tracking`);
     } catch (err) {
-      this.log(run.id, "engine", "warn", `Feature generation failed (non-fatal): ${this.errorToMessage(err)}`);
+      this.log(run.id, "engine", "warn", `Feature generation failed (non-fatal): ${errorToMessage(err)}`);
     }
   }
 
@@ -911,7 +873,7 @@ Return a JSON object with "results" array containing { id, passes } for each fea
         this.log(run.id, "engine", "info", `Features verified: +${passed} passed (${totalPassed}/${run.features.length} total)`);
       }
     } catch (err) {
-      this.log(run.id, "engine", "warn", `Feature verification failed (non-fatal): ${this.errorToMessage(err)}`);
+      this.log(run.id, "engine", "warn", `Feature verification failed (non-fatal): ${errorToMessage(err)}`);
     }
   }
 }

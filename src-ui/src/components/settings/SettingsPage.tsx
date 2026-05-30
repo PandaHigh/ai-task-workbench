@@ -196,7 +196,7 @@ export function SettingsPage() {
         <button onClick={handleSave} disabled={!isDirty || !!qtError || !!dtError}
           className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40"
           style={{ background: "var(--blue)", color: "#fff" }}>
-          {saved ? "已保存" : isDirty ? "保存设置" : "未修改"}
+          {saved ? <span style={{ color: "var(--green)" }}>✓ 已保存</span> : isDirty ? "保存设置" : "未修改"}
         </button>
 
         {/* Skills Management */}
