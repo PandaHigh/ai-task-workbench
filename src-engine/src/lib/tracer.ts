@@ -6,10 +6,15 @@ export type { TraceSpan };
 export class Tracer {
   private spans: Map<string, TraceSpan> = new Map();
   private notify: (method: string, params: Record<string, unknown>) => void;
+  private persist: (spans: TraceSpan[]) => void;
   private activeTraceId: string | null = null;
 
-  constructor(notify: (method: string, params: Record<string, unknown>) => void) {
+  constructor(
+    notify: (method: string, params: Record<string, unknown>) => void,
+    persist?: (spans: TraceSpan[]) => void,
+  ) {
     this.notify = notify;
+    this.persist = persist ?? (() => {});
   }
 
   /** Start a new trace (one per task execution) */
@@ -32,6 +37,7 @@ export class Tracer {
     };
     this.spans.set(spanId, span);
     this.notify("trace.span", { ...span, event: "start" });
+    this.persistSpans();
     return spanId;
   }
 
@@ -46,6 +52,7 @@ export class Tracer {
       span.attributes = { ...span.attributes, ...attributes };
     }
     this.notify("trace.span", { ...span, event: "end" });
+    this.persistSpans();
   }
 
   /** Add attributes to a running span */
@@ -70,7 +77,6 @@ export class Tracer {
   /** End the current trace, clean up */
   endTrace(): TraceSpan[] {
     const spans = this.getTrace();
-    // End any still-running spans
     for (const span of spans) {
       if (span.status === "running") {
         this.endSpan(span.spanId, "error", { reason: "trace_ended" });
@@ -83,5 +89,10 @@ export class Tracer {
   /** Get current trace ID */
   get traceId(): string | null {
     return this.activeTraceId;
+  }
+
+  private persistSpans(): void {
+    const allSpans = [...this.spans.values()];
+    this.persist(allSpans);
   }
 }

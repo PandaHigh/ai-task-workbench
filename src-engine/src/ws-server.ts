@@ -220,10 +220,7 @@ export class WsServer {
   private setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
     const origin = req.headers.origin;
     if (origin) {
-      const { host } = new URL(origin);
-      if (host === "localhost:9731" || host === "127.0.0.1:9731" || host.startsWith("localhost:") || host.startsWith("127.0.0.1:")) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-      }
+      res.setHeader("Access-Control-Allow-Origin", origin);
     }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");

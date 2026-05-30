@@ -63,7 +63,9 @@ export class Executor {
     this.ccClient = new CCClient();
     this.store = new Store();
     this.skillManager = new SkillManager(new SkillStore(), () => {});
-    this.tracer = new Tracer(notify);
+    this.tracer = new Tracer(notify, (spans) => {
+      this.store.syncTraces(this.runId, spans);
+    });
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
       maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,

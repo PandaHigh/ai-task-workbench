@@ -249,6 +249,19 @@ export class Store {
     writeJsonFile(file, trimmed);
   }
 
+  /** Upsert spans by spanId — used for real-time trace persistence */
+  syncTraces(runId: string, spans: TraceSpan[]): void {
+    const file = path.join(this.runDir(runId), "traces.json");
+    const existing = readJsonFile<TraceSpan[]>(file, []);
+    const index = new Map(existing.map((s) => [s.spanId, s]));
+    for (const span of spans) {
+      index.set(span.spanId, span);
+    }
+    const merged = [...index.values()];
+    const trimmed = merged.length > MAX_TRACE_ENTRIES ? merged.slice(-MAX_TRACE_ENTRIES) : merged;
+    writeJsonFile(file, trimmed);
+  }
+
   getTraces(runId: string, limit?: number): TraceSpan[] {
     const file = path.join(this.runDir(runId), "traces.json");
     const traces = readJsonFile<TraceSpan[]>(file, []);
