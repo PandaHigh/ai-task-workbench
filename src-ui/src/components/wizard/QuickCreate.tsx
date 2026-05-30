@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEngine } from "../../hooks/useEngine";
 import { useTaskStore } from "../../stores/task-store";
@@ -9,9 +9,18 @@ import { pageEnterStyle } from "../../hooks/useAnimations";
 import type { ExecutionRun } from "@ai-workbench/shared";
 import { open } from "@tauri-apps/plugin-dialog";
 
+interface UserTpl {
+  id: string;
+  name: string;
+  content: string;
+  priority: number;
+  timeoutMinutes: number;
+  isBuiltIn: boolean;
+}
+
 export function QuickCreate() {
   const navigate = useNavigate();
-  const { call } = useEngine();
+  const { connected, call } = useEngine();
   const addTask = useTaskStore((s) => s.addTask);
   const toast = useToast();
   const { getLastDir, saveDir } = usePersistedDir();
@@ -19,11 +28,26 @@ export function QuickCreate() {
   const [workingDir, setWorkingDir] = useState(getLastDir);
   const [content, setContent] = useState("");
   const [goalsText, setGoalsText] = useState("");
+  const [priority, setPriority] = useState(5);
+  const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [userTemplates, setUserTemplates] = useState<UserTpl[]>([]);
   const [creating, setCreating] = useState(false);
   const [dirError, setDirError] = useState("");
   const [contentError, setContentError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
+
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await call("template.list", {}) as UserTpl[] | null) ?? [];
+        if (!cancelled) setUserTemplates(list);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [connected]);
 
   const validateDir = (value: string) => {
     if (!value.trim()) { setDirError("目录路径不能为空"); return false; }
@@ -48,10 +72,18 @@ export function QuickCreate() {
     setShowDirInput(true);
   };
 
-  const applyTemplate = useCallback((t: TaskTemplate) => {
+  const applyBuiltInTemplate = useCallback((t: TaskTemplate) => {
     setSelectedTemplate(t.id);
     setContent(t.content);
     setGoalsText(t.goals.join(", "));
+    setContentError("");
+  }, []);
+
+  const applyUserTemplate = useCallback((t: UserTpl) => {
+    setSelectedTemplate(t.id);
+    setContent(t.content);
+    setPriority(t.priority);
+    setTimeoutMinutes(t.timeoutMinutes);
     setContentError("");
   }, []);
 
@@ -79,8 +111,8 @@ export function QuickCreate() {
         tasks: [{
           content: content.trim(),
           type: "user_defined",
-          priority: 1,
-          timeoutMinutes: 60,
+          priority,
+          timeoutMinutes,
         }],
       })) as ExecutionRun;
 
@@ -150,7 +182,7 @@ export function QuickCreate() {
             {BUILT_IN_TEMPLATES.map((t) => (
               <button
                 key={t.id}
-                onClick={() => applyTemplate(t)}
+                onClick={() => applyBuiltInTemplate(t)}
                 className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
                 style={{
                   background: selectedTemplate === t.id ? "rgba(77, 107, 254, 0.15)" : "var(--bg-tertiary)",
@@ -160,6 +192,20 @@ export function QuickCreate() {
               >
                 <span>{t.icon}</span>
                 <span>{t.label}</span>
+              </button>
+            ))}
+            {userTemplates.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => applyUserTemplate(t)}
+                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
+                style={{
+                  background: selectedTemplate === t.id ? "rgba(77, 107, 254, 0.15)" : "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: selectedTemplate === t.id ? "1px solid var(--blue)" : "1px solid var(--border)",
+                }}
+              >
+                <span>{t.name}</span>
               </button>
             ))}
           </div>
@@ -196,6 +242,38 @@ export function QuickCreate() {
             className="w-full px-3 py-2 rounded text-xs outline-none"
             style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
           />
+        </div>
+
+        {/* Priority & Timeout */}
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-6 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold" style={{ color: "var(--text-secondary)" }}>优先级</span>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+                className="px-2 py-1 rounded text-xs outline-none"
+                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              >
+                {Array.from({ length: 10 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>P{i + 1}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold" style={{ color: "var(--text-secondary)" }}>超时</span>
+              <select
+                value={timeoutMinutes}
+                onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
+                className="px-2 py-1 rounded text-xs outline-none"
+                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              >
+                {[15, 30, 60, 90, 120, 180].map((v) => (
+                  <option key={v} value={v}>{v}分钟</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Actions */}

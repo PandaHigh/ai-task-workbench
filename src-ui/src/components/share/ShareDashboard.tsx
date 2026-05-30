@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useToast } from "../common/Toast";
+import { TaskCreateForm } from "../common/TaskCreateForm";
 
 type TabType = "logs" | "commits" | "lessons" | "report";
 
@@ -27,7 +28,6 @@ export function ShareDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [newTaskText, setNewTaskText] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   // Permission: default to "collaborate" for now — the token itself doesn't carry permission info yet
@@ -57,18 +57,6 @@ export function ShareDashboard() {
   const handleRetry = async (taskId: string) => {
     if (!token || !canEdit) return;
     try { await call("task.retry", { taskId }); refresh(); } catch (err) { toast.error(`重试失败: ${err instanceof Error ? err.message : "未知错误"}`); }
-  };
-
-  const handleAddTask = async () => {
-    if (!newTaskText.trim() || !token || !canEdit) return;
-    try {
-      await call("task.create", { content: newTaskText.trim(), type: "user_defined", priority: 1, timeoutMinutes: 60 });
-      setNewTaskText("");
-      setShowAddModal(false);
-      refresh();
-    } catch (err) {
-      toast.error(`添加失败: ${err instanceof Error ? err.message : "未知错误"}`);
-    }
   };
 
   if (loading) {
@@ -418,24 +406,19 @@ export function ShareDashboard() {
             borderRadius: "12px", animation: "slideUp 0.2s ease-out",
           }} onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold mb-3">新增任务</h3>
-            <textarea value={newTaskText} onChange={e => setNewTaskText(e.target.value)}
-              placeholder="描述任务内容..." rows={4}
-              className="w-full px-3 py-2 rounded-lg text-xs outline-none resize-none mb-3"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "2px solid var(--blue)" }}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (newTaskText.trim()) { handleAddTask(); }
+            <TaskCreateForm
+              onSubmit={async ({ content, priority, timeoutMinutes }) => {
+                try {
+                  await call("task.create", { content, type: "user_defined", priority, timeoutMinutes });
+                  setShowAddModal(false);
+                  refresh();
+                } catch (err) {
+                  toast.error(`添加失败: ${err instanceof Error ? err.message : "未知错误"}`);
                 }
-                if (e.key === "Escape") { setShowAddModal(false); }
               }}
+              onCancel={() => setShowAddModal(false)}
+              submitLabel="确认添加"
             />
-            <p className="text-[11px] mb-3" style={{ color: "var(--text-secondary)" }}>Ctrl+Enter 快速提交</p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowAddModal(false)} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>取消</button>
-              <button onClick={handleAddTask} disabled={!newTaskText.trim()} className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#fff" }}>确认添加</button>
-            </div>
           </div>
         </div>
       )}

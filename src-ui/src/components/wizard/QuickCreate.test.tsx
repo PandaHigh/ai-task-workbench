@@ -58,6 +58,10 @@ function renderQuickCreate() {
 describe("QuickCreate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCall.mockImplementation((method: string) => {
+      if (method === "template.list") return Promise.resolve([]);
+      return Promise.resolve(undefined);
+    });
   });
 
   it("should render form fields", () => {
@@ -105,7 +109,11 @@ describe("QuickCreate", () => {
   it("should create task successfully", async () => {
     const user = userEvent.setup();
     const run = makeRun();
-    mockCall.mockResolvedValueOnce(run);
+    mockCall.mockImplementation((method: string) => {
+      if (method === "template.list") return Promise.resolve([]);
+      if (method === "run.create") return Promise.resolve(run);
+      return Promise.resolve(undefined);
+    });
 
     renderQuickCreate();
 
@@ -130,8 +138,12 @@ describe("QuickCreate", () => {
   it("should create and start task", async () => {
     const user = userEvent.setup();
     const run = makeRun();
-    mockCall.mockResolvedValueOnce(run);
-    mockCall.mockResolvedValueOnce(undefined);
+    mockCall.mockImplementation((method: string) => {
+      if (method === "template.list") return Promise.resolve([]);
+      if (method === "run.create") return Promise.resolve(run);
+      if (method === "task.start") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
 
     renderQuickCreate();
 
@@ -148,7 +160,11 @@ describe("QuickCreate", () => {
 
   it("should handle creation failure gracefully", async () => {
     const user = userEvent.setup();
-    mockCall.mockRejectedValueOnce(new Error("Engine error"));
+    mockCall.mockImplementation((method: string) => {
+      if (method === "template.list") return Promise.resolve([]);
+      if (method === "run.create") return Promise.reject(new Error("Engine error"));
+      return Promise.resolve(undefined);
+    });
 
     renderQuickCreate();
 

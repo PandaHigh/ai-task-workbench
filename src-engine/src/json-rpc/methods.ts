@@ -3,6 +3,7 @@ import { Store } from "../db/store.js";
 import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
 import { SkillStore } from "../db/skill-store.js";
+import { TemplateStore } from "../db/template-store.js";
 import { SkillManager } from "../skills/skill-manager.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/executor.js";
@@ -24,10 +25,11 @@ const store = new Store();
 const shareStore = new ShareStore();
 const subscriptionStore = new SubscriptionStore();
 const skillStore = new SkillStore();
+const templateStore = new TemplateStore();
 const queueManager = new QueueManager();
 let skillManager: SkillManager;
 
-export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager };
+export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager, templateStore };
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
 const pluginRegistry = new PluginRegistry(getDataDir());
@@ -543,6 +545,61 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     store.updateTask(runId, taskId, { timeoutMinutes: minutes });
     return { taskId, timeoutMinutes: minutes };
+  },
+
+  "task.update": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const task = store.getTask(runId, taskId);
+    if (!task) throw new RpcValidationError(`Task not found: ${taskId}`);
+    if (!["pending", "queued"].includes(task.status)) {
+      throw new RpcValidationError(`Cannot edit task with status: ${task.status}`);
+    }
+    const updates: Partial<import("@ai-workbench/shared").TaskDefinition> = {};
+    if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
+    if (typeof params.priority === "number") updates.priority = params.priority;
+    if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
+    if (Object.keys(updates).length === 0) throw new RpcValidationError("No valid fields to update");
+    store.updateTask(runId, taskId, updates);
+    if (updates.priority !== undefined) {
+      notify("queue.updated", { runId, queue: queueManager.peekNext(runId) });
+    }
+    return store.getTask(runId, taskId);
+  },
+
+  "template.create": async (params) => {
+    const name = requireNonEmptyString(params, "name");
+    const content = requireNonEmptyString(params, "content");
+    return templateStore.create({
+      name,
+      content,
+      priority: typeof params.priority === "number" ? params.priority : undefined,
+      timeoutMinutes: typeof params.timeoutMinutes === "number" ? params.timeoutMinutes : undefined,
+    });
+  },
+
+  "template.list": async () => {
+    return templateStore.list();
+  },
+
+  "template.update": async (params) => {
+    const id = requireString(params, "id");
+    const updates: Record<string, unknown> = {};
+    if (typeof params.name === "string") updates.name = params.name;
+    if (typeof params.content === "string") updates.content = params.content;
+    if (typeof params.priority === "number") updates.priority = params.priority;
+    if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
+    const result = templateStore.update(id, updates);
+    if (!result) throw new RpcValidationError("Template not found");
+    return result;
+  },
+
+  "template.delete": async (params) => {
+    const id = requireString(params, "id");
+    const deleted = templateStore.delete(id);
+    if (!deleted) throw new RpcValidationError("Template not found");
+    return { deleted: true };
   },
 
   "queue.list": async (params) => {

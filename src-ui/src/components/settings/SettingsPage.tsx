@@ -219,6 +219,12 @@ export function SettingsPage() {
           <ProfileManager />
         </div>
 
+        {/* Task Templates */}
+        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>任务模板</h3>
+          <TemplateSection />
+        </div>
+
         {/* Advanced settings */}
         <div className="mt-4">
           <button
@@ -282,6 +288,102 @@ export function SettingsPage() {
         )}
       </div>
       )}
+    </div>
+  );
+}
+
+interface UserTpl {
+  id: string;
+  name: string;
+  content: string;
+  priority: number;
+  timeoutMinutes: number;
+  isBuiltIn: boolean;
+  createdAt: number;
+}
+
+function TemplateSection() {
+  const { call } = useEngine();
+  const toast = useToast();
+  const [templates, setTemplates] = useState<UserTpl[]>([]);
+  const [newName, setNewName] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editContent, setEditContent] = useState("");
+
+  const loadTemplates = useCallback(async () => {
+    try { setTemplates(((await call("template.list", {})) as UserTpl[] | null) ?? []); } catch { /* ignore */ }
+  }, [call]);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !newContent.trim()) return;
+    try {
+      await call("template.create", { name: newName.trim(), content: newContent.trim() });
+      setNewName("");
+      setNewContent("");
+      loadTemplates();
+      toast.success("模板已创建");
+    } catch (err) { toast.error(`创建失败: ${err instanceof Error ? err.message : err}`); }
+  };
+
+  const handleDelete = async (id: string) => {
+    try { await call("template.delete", { id }); loadTemplates(); toast.success("已删除"); } catch (err) { toast.error(`删除失败: ${err instanceof Error ? err.message : err}`); }
+  };
+
+  const handleUpdate = async (id: string) => {
+    try {
+      await call("template.update", { id, name: editName.trim(), content: editContent.trim() });
+      setEditingId(null);
+      loadTemplates();
+      toast.success("已更新");
+    } catch (err) { toast.error(`更新失败: ${err instanceof Error ? err.message : err}`); }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Template list */}
+      {templates.length === 0 && <p className="text-xs text-center py-2" style={{ color: "var(--text-secondary)" }}>暂无自定义模板</p>}
+      {templates.map((tpl) => (
+        <div key={tpl.id} className="px-3 py-2.5 rounded-lg text-xs" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+          {editingId === tpl.id ? (
+            <div className="space-y-2">
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-2 py-1.5 rounded text-xs outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+              <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={2} className="w-full px-2 py-1.5 rounded text-xs outline-none resize-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>取消</button>
+                <button onClick={() => handleUpdate(tpl.id)} className="px-2 py-1 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>保存</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>{tpl.name}</span>
+                  {tpl.isBuiltIn && <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(125,133,144,0.15)", color: "var(--text-secondary)" }}>内置</span>}
+                </div>
+                <p className="truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{tpl.content}</p>
+              </div>
+              {!tpl.isBuiltIn && (
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => { setEditingId(tpl.id); setEditName(tpl.name); setEditContent(tpl.content); }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--blue)", color: "#fff" }}>编辑</button>
+                  <button onClick={() => handleDelete(tpl.id)} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--red)", color: "#fff" }}>删除</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Create new */}
+      <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+        <h4 className="text-[10px] font-bold" style={{ color: "var(--text-secondary)" }}>创建模板</h4>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="模板名称" className="w-full px-2 py-1.5 rounded text-xs outline-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+        <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} placeholder="任务描述模板..." rows={2} className="w-full px-2 py-1.5 rounded text-xs outline-none resize-none" style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }} />
+        <button onClick={handleCreate} disabled={!newName.trim() || !newContent.trim()} className="w-full px-3 py-2 rounded text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#fff" }}>创建</button>
+      </div>
     </div>
   );
 }

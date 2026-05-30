@@ -27,6 +27,7 @@ import { LogSearchBar } from "./LogSearchBar";
 import { AddTaskModal } from "./AddTaskModal";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import { SharePanel } from "../share/SharePanel";
+import { TaskCreateForm } from "../common/TaskCreateForm";
 
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
 
@@ -96,6 +97,7 @@ export function EvolutionDashboard() {
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
   const [stopTarget, setStopTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<TaskDefinition | null>(null);
   const [filteredLogs, setFilteredLogs] = useState<typeof logs>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -275,12 +277,12 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async (text?: string, priority?: number) => {
+  const handleAddTask = async (text?: string, priority?: number, timeoutMinutes?: number) => {
     const content = (text ?? newTaskText).trim();
     const prio = priority ?? newTaskPriority;
     if (!runId || !content) return;
     try {
-      await call("task.create", { runId, content, type: "user_defined", priority: prio });
+      await call("task.create", { runId, content, type: "user_defined", priority: prio, timeoutMinutes });
       setNewTaskText("");
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
@@ -443,6 +445,13 @@ export function EvolutionDashboard() {
                         color: task.type === "user_defined" ? "#fff" : "var(--text-secondary)",
                       }}>{i + 1}</span>
                       <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditTarget(task); }}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
+                        style={{ color: "var(--blue)", border: "1px solid transparent" }}
+                        aria-label="编辑任务"
+                        title="编辑任务"
+                      >编辑</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id, task.content); }}
                         className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
@@ -964,11 +973,12 @@ export function EvolutionDashboard() {
       <AddTaskModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSubmit={(text, priority) => {
-          handleAddTask(text, priority);
+        onSubmit={(text, priority, timeoutMinutes) => {
+          handleAddTask(text, priority, timeoutMinutes);
           setShowAddModal(false);
         }}
         defaultPriority={newTaskPriority}
+        call={call}
       />
 
       <ConfirmDialog
@@ -990,6 +1000,41 @@ export function EvolutionDashboard() {
         onConfirm={handleStop}
         onCancel={() => setStopTarget(null)}
       />
+
+      {/* Edit Task Modal */}
+      {editTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setEditTarget(null)}
+        >
+          <div
+            className="p-6 w-full max-w-md"
+            style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "12px", animation: "slideUp 0.2s ease-out" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold mb-3">编辑任务</h3>
+            <TaskCreateForm
+              initialContent={editTarget.content}
+              defaultPriority={editTarget.priority}
+              defaultTimeout={editTarget.timeoutMinutes}
+              submitLabel="保存"
+              onCancel={() => setEditTarget(null)}
+              onSubmit={async ({ content, priority, timeoutMinutes }) => {
+                try {
+                  await call("task.update", { runId: editTarget.runId, taskId: editTarget.id, content, priority, timeoutMinutes });
+                  const qRes = await call("queue.list", { runId: editTarget.runId });
+                  setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
+                  toast.success("任务已更新");
+                  setEditTarget(null);
+                } catch (err) {
+                  toast.error(`更新失败: ${err instanceof Error ? err.message : err}`);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <SharePanel
         open={showSharePanel}

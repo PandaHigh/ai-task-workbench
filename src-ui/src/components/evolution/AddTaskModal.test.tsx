@@ -47,17 +47,11 @@ describe("AddTaskModal", () => {
     expect(screen.getByText("确认添加")).not.toBeDisabled();
   });
 
-  it("should call onSubmit with text and priority", () => {
-    render(<AddTaskModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} defaultPriority={3} />);
+  it("should call onSubmit with text, priority, and timeout", () => {
+    render(<AddTaskModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} defaultPriority={3} defaultTimeout={120} />);
     const textarea = screen.getByPlaceholderText("描述你的任务...");
     fireEvent.change(textarea, { target: { value: "Fix the bug" } });
     fireEvent.click(screen.getByText("确认添加"));
-    expect(mockOnSubmit).toHaveBeenCalledWith("Fix the bug", 3);
-  });
-
-  it("should show 10 priority buttons", () => {
-    render(<AddTaskModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} />);
-    const buttons = screen.getAllByRole("button").filter((b) => /^\d+$/.test(b.textContent || ""));
-    expect(buttons).toHaveLength(10);
+    expect(mockOnSubmit).toHaveBeenCalledWith("Fix the bug", 3, 120);
   });
 });

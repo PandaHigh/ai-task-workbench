@@ -41,6 +41,15 @@ describe("RPC Methods", () => {
       };
     });
 
+    vi.doMock("../../src-engine/src/db/template-store.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src-engine/src/db/template-store.js")>();
+      return {
+        TemplateStore: vi.fn(function (this: unknown) {
+          return new actual.TemplateStore(testDir);
+        }),
+      };
+    });
+
     vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
       CCClient: vi.fn(() => ({
         executeTask: vi.fn(async () => ({
@@ -710,6 +719,99 @@ describe("RPC Methods", () => {
           .rejects.toThrow("invalid path characters");
       });
     }
+  });
+
+  describe("task.update", () => {
+    it("should update task content", async () => {
+      const run = await createRun();
+      const task = await methodHandlers["task.create"]({ runId: run.id, content: "original" }) as Record<string, unknown>;
+      const updated = await methodHandlers["task.update"]({ runId: run.id, taskId: task.id, content: "updated content" }) as Record<string, unknown>;
+      expect(updated.content).toBe("updated content");
+    });
+
+    it("should update task priority", async () => {
+      const run = await createRun();
+      const task = await methodHandlers["task.create"]({ runId: run.id, content: "test" }) as Record<string, unknown>;
+      const updated = await methodHandlers["task.update"]({ runId: run.id, taskId: task.id, priority: 8 }) as Record<string, unknown>;
+      expect(updated.priority).toBe(8);
+    });
+
+    it("should update task timeoutMinutes", async () => {
+      const run = await createRun();
+      const task = await methodHandlers["task.create"]({ runId: run.id, content: "test" }) as Record<string, unknown>;
+      const updated = await methodHandlers["task.update"]({ runId: run.id, taskId: task.id, timeoutMinutes: 120 }) as Record<string, unknown>;
+      expect(updated.timeoutMinutes).toBe(120);
+    });
+
+    it("should reject update for non-editable status", async () => {
+      const run = await createRun();
+      const task = await methodHandlers["task.create"]({ runId: run.id, content: "test" }) as Record<string, unknown>;
+      const { store } = await import("../../src-engine/src/json-rpc/methods.js");
+      store.updateTask(run.id, task.id as string, { status: "running" });
+      await expect(
+        methodHandlers["task.update"]({ runId: run.id, taskId: task.id, content: "nope" }),
+      ).rejects.toThrow("Cannot edit task");
+    });
+
+    it("should reject unknown task", async () => {
+      const run = await createRun();
+      await expect(
+        methodHandlers["task.update"]({ runId: run.id, taskId: "nonexistent", content: "x" }),
+      ).rejects.toThrow("Task not found");
+    });
+
+    it("should reject update with no valid fields", async () => {
+      const run = await createRun();
+      const task = await methodHandlers["task.create"]({ runId: run.id, content: "test" }) as Record<string, unknown>;
+      await expect(
+        methodHandlers["task.update"]({ runId: run.id, taskId: task.id }),
+      ).rejects.toThrow("No valid fields to update");
+    });
+  });
+
+  describe("template CRUD", () => {
+    it("should create and list templates", async () => {
+      await methodHandlers["template.create"]({ name: "My Template", content: "Do something", priority: 3 });
+      const list = await methodHandlers["template.list"]({}) as Array<Record<string, unknown>>;
+      expect(list).toHaveLength(1);
+      expect(list[0].name).toBe("My Template");
+      expect(list[0].priority).toBe(3);
+      expect(list[0].isBuiltIn).toBe(false);
+    });
+
+    it("should use defaults when priority/timeout not specified", async () => {
+      await methodHandlers["template.create"]({ name: "Defaults", content: "test" });
+      const list = await methodHandlers["template.list"]({}) as Array<Record<string, unknown>>;
+      expect(list[0].priority).toBe(5);
+      expect(list[0].timeoutMinutes).toBe(60);
+    });
+
+    it("should update template", async () => {
+      const tpl = await methodHandlers["template.create"]({ name: "Original", content: "content" }) as Record<string, unknown>;
+      const updated = await methodHandlers["template.update"]({ id: tpl.id, name: "Updated", priority: 7 }) as Record<string, unknown>;
+      expect(updated.name).toBe("Updated");
+      expect(updated.priority).toBe(7);
+    });
+
+    it("should delete template", async () => {
+      const tpl = await methodHandlers["template.create"]({ name: "ToDelete", content: "x" }) as Record<string, unknown>;
+      const result = await methodHandlers["template.delete"]({ id: tpl.id });
+      expect(result).toEqual({ deleted: true });
+      const list = await methodHandlers["template.list"]({}) as Array<unknown>;
+      expect(list).toHaveLength(0);
+    });
+
+    it("should reject deleting unknown template", async () => {
+      await expect(
+        methodHandlers["template.delete"]({ id: "nonexistent" }),
+      ).rejects.toThrow("Template not found");
+    });
+
+    it("should reject updating unknown template", async () => {
+      await expect(
+        methodHandlers["template.update"]({ id: "nonexistent", name: "x" }),
+      ).rejects.toThrow("Template not found");
+    });
   });
 
 });
