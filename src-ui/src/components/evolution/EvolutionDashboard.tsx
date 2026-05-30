@@ -17,9 +17,10 @@ import { FeatureBoard } from "./FeatureBoard";
 import { PresencePanel } from "./PresencePanel";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { TaskComments } from "./TaskComments";
+import { TraceTimeline } from "./TraceTimeline";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 
-type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "report";
+type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "report";
 
 const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(77, 107, 254,0.15)" },
@@ -526,7 +527,7 @@ export function EvolutionDashboard() {
               <div className="flex">
               {(simpleMode
                 ? (["activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
               ).map((t) => (
                 <button key={t} onClick={() => handleTabChange(t)} className="text-sm px-4 py-2 rounded-md transition-all" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
@@ -535,7 +536,7 @@ export function EvolutionDashboard() {
                   fontWeight: tab === t ? 600 : 400,
                   cursor: "pointer",
                 }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
-                  {t === "logs" ? `记录 (${logs.length})` : t === "commits" ? `保存 (${commits.length})` : t === "lessons" ? `经验 (${lessons.length})` : t === "features" ? `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "动态" : "报告"}
+                  {t === "logs" ? `记录 (${logs.length})` : t === "commits" ? `保存 (${commits.length})` : t === "lessons" ? `经验 (${lessons.length})` : t === "features" ? `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})` : t === "activity" ? "动态" : t === "trace" ? "追踪" : "报告"}
                 </button>
               ))}
               </div>
@@ -654,6 +655,11 @@ export function EvolutionDashboard() {
               {/* Activity Tab */}
               {tab === "activity" && (
                 <ActivityTimeline runId={runId ?? ""} />
+              )}
+
+              {/* Trace Tab */}
+              {tab === "trace" && (
+                <TraceTab runId={runId ?? ""} call={call} />
               )}
 
               {/* Report Tab — rendered as markdown */}
@@ -1027,6 +1033,25 @@ function levelColor(level: string): string {
     case "info": return "var(--blue)";
     default: return "var(--text-secondary)";
   }
+}
+
+function TraceTab({ runId, call }: { runId: string; call: (method: string, params?: Record<string, unknown>) => Promise<unknown> }) {
+  const [spans, setSpans] = useState<import("@ai-workbench/shared").TraceSpan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!runId) return;
+    setLoading(true);
+    call("trace.list", { runId, limit: 200 })
+      .then((data) => { setSpans(data as import("@ai-workbench/shared").TraceSpan[]); })
+      .catch((err) => { console.warn("Failed to load traces:", err); })
+      .finally(() => setLoading(false));
+  }, [runId, call]);
+
+  if (loading) return <div className="p-4"><Skeleton /></div>;
+  if (spans.length === 0) return <EmptyState title="暂无 Trace 数据" description="任务执行后将显示 Agent 执行时间线" />;
+
+  return <TraceTimeline spans={spans} />;
 }
 
 function ReportTab({ content }: { content: string }) {

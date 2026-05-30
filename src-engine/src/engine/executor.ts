@@ -12,6 +12,7 @@ import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
 import { errorToMessage } from "../lib/error-utils.js";
 import { extractJson } from "../lib/json-extract.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
+import { Tracer } from "../lib/tracer.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
@@ -51,6 +52,7 @@ export class Executor {
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
+  private tracer: Tracer;
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -68,6 +70,7 @@ export class Executor {
     this.ccClient = new CCClient();
     this.store = new Store();
     this.skillManager = new SkillManager(new SkillStore(), () => {});
+    this.tracer = new Tracer(notify);
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
       maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,
@@ -337,6 +340,10 @@ export class Executor {
 
       this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
 
+      // Start trace for this task
+      this.tracer.startTrace();
+      const taskSpanId = this.tracer.startSpan("task.execute", undefined, { taskId: task.id, content: task.content.substring(0, 100) });
+
       // Use TaskPipeline for structured execution
       const pipelineConfig = {
         maxFixIterations: (this.store.getConfig("maxFixIterations") as number) || undefined,
@@ -350,6 +357,13 @@ export class Executor {
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
+
+      // End trace and persist
+      this.tracer.endSpan(taskSpanId, "ok", { costUsd: pipelineResult.totalCostUsd, durationMs: pipelineResult.durationMs });
+      const traceSpans = this.tracer.endTrace();
+      if (traceSpans.length > 0) {
+        this.store.appendTrace(run.id, traceSpans);
+      }
 
       this.store.updateTask(run.id, task.id, {
         status: "scoring",
@@ -472,6 +486,13 @@ export class Executor {
       }
     } catch (err) {
       const msg = errorToMessage(err);
+      // End trace on error
+      try {
+        const traceSpans = this.tracer.endTrace();
+        if (traceSpans.length > 0) {
+          this.store.appendTrace(run.id, traceSpans);
+        }
+      } catch { /* trace cleanup failure is non-critical */ }
       const currentTask = this.store.getTask(run.id, task.id);
       const currentRetries = currentTask?.retryCount ?? 0;
       const maxRetries = this.config.maxAutoRetries;

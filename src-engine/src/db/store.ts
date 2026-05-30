@@ -8,11 +8,13 @@ import type {
   LessonLearned,
   ScoreDetails,
   ApprovalRequest,
+  TraceSpan,
 } from "@ai-workbench/shared";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile, cleanupTmpFiles } from "./store-utils.js";
 
 const MAX_LOG_ENTRIES = 1000;
 const MAX_HISTORY_ENTRIES = 500;
+const MAX_TRACE_ENTRIES = 500;
 
 export class Store {
   private dataDir: string;
@@ -229,6 +231,22 @@ export class Store {
   getComments(runId: string): import("@ai-workbench/shared").TaskComment[] {
     const file = path.join(this.runDir(runId), "comments.json");
     return readJsonFile(file, []);
+  }
+
+  // ---- Traces ----
+
+  appendTrace(runId: string, spans: TraceSpan[]): void {
+    const file = path.join(this.runDir(runId), "traces.json");
+    const existing = readJsonFile<TraceSpan[]>(file, []);
+    existing.push(...spans);
+    const trimmed = existing.length > MAX_TRACE_ENTRIES ? existing.slice(-MAX_TRACE_ENTRIES) : existing;
+    writeJsonFile(file, trimmed);
+  }
+
+  getTraces(runId: string, limit?: number): TraceSpan[] {
+    const file = path.join(this.runDir(runId), "traces.json");
+    const traces = readJsonFile<TraceSpan[]>(file, []);
+    return limit ? traces.slice(-limit) : traces;
   }
 
   // ---- Final Report ----

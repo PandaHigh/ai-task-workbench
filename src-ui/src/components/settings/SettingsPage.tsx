@@ -4,6 +4,7 @@ import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
 import { pageEnterStyle } from "../../hooks/useAnimations";
 import { SkillsManager } from "./SkillsManager";
+import { PluginManager } from "./PluginManager";
 
 interface OrigValues {
   qualityThreshold: number;
@@ -203,6 +204,12 @@ export function SettingsPage() {
         <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
           <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>Skills 管理</h3>
           <SkillsManager />
+        </div>
+
+        {/* Plugin Management */}
+        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>MCP 插件管理</h3>
+          <PluginManager />
         </div>
 
         {/* Advanced settings */}

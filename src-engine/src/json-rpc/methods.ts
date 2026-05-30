@@ -13,6 +13,10 @@ import { resolve, normalize } from "path";
 import { homedir, tmpdir } from "os";
 import { errorToMessage } from "../lib/error-utils.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
+import { BUILT_IN_ROLES, DEFAULT_CREW_CONFIG, type CrewMode } from "../engine/agents/agent-role.js";
+import { PluginRegistry, type McpServerConfig } from "../plugins/plugin-registry.js";
+import { McpManager } from "../plugins/mcp-manager.js";
+import { getDataDir } from "../db/store-utils.js";
 
 const PORT = 9731;
 
@@ -26,6 +30,8 @@ let skillManager: SkillManager;
 export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager };
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
+const pluginRegistry = new PluginRegistry(getDataDir());
+const mcpManager = new McpManager();
 
 export { sessionManager };
 
@@ -139,6 +145,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "developerMaxTurns",
   "testerMaxTurns",
   "reviewerMaxTurns",
+  "crewMode",
+  "adaptiveEnabled",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -847,5 +855,102 @@ export const methodHandlers: Record<string, MethodHandler> = {
       notify("skill.removed", { name });
     }
     return { ok: removed };
+  },
+
+  // ─── Crew / Agent roles ────────────────────────────────────────────────
+
+  "crew.list": async () => {
+    return Object.values(BUILT_IN_ROLES).map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      tools: r.tools,
+      maxTurns: r.maxTurns,
+    }));
+  },
+
+  "crew.configure": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const mode = (params.mode as CrewMode) || undefined;
+    const maxFixIterations = typeof params.maxFixIterations === "number" ? params.maxFixIterations : undefined;
+    if (mode && !["sequential", "fixloop", "parallel", "adaptive"].includes(mode)) {
+      throw new RpcValidationError("mode must be sequential, fixloop, parallel, or adaptive");
+    }
+    if (mode) store.setConfig(`${runId}:crewMode`, mode);
+    if (maxFixIterations) store.setConfig(`${runId}:maxFixIterations`, maxFixIterations);
+    return { runId, mode: mode || store.getConfig(`${runId}:crewMode`) || DEFAULT_CREW_CONFIG.mode, saved: true };
+  },
+
+  // ─── Traces ────────────────────────────────────────────────────────────
+
+  "trace.list": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const limit = typeof params.limit === "number" ? params.limit : 100;
+    return store.getTraces(runId, limit);
+  },
+
+  // ─── Plugin / MCP Server ───────────────────────────────────────────────
+
+  "plugin.list": async () => {
+    return pluginRegistry.list();
+  },
+
+  "plugin.install": async (params) => {
+    const name = requireNonEmptyString(params, "name");
+    const command = requireNonEmptyString(params, "command");
+    const args = Array.isArray(params.args) ? params.args.map(String) : [];
+    const env = params.env as Record<string, string> | undefined;
+    const config: McpServerConfig = { name, command, args, env };
+    const entry = pluginRegistry.register(config);
+    notify("plugin.updated", { plugin: entry });
+    return entry;
+  },
+
+  "plugin.remove": async (params) => {
+    const id = requireString(params, "id");
+    const entry = pluginRegistry.get(id);
+    if (!entry) throw new RpcValidationError(`Plugin not found: ${id}`);
+    if (mcpManager.isRunning(entry.name)) {
+      await mcpManager.stopServer(entry.name);
+    }
+    const removed = pluginRegistry.unregister(id);
+    notify("plugin.updated", { removed: id });
+    return { ok: removed };
+  },
+
+  "plugin.toggle": async (params) => {
+    const id = requireString(params, "id");
+    const entry = pluginRegistry.get(id);
+    if (!entry) throw new RpcValidationError(`Plugin not found: ${id}`);
+    const enabled = !entry.enabled;
+    pluginRegistry.setEnabled(id, enabled);
+    if (enabled) {
+      try {
+        await mcpManager.startServer(entry.name, entry.config);
+        pluginRegistry.setStatus(id, "running");
+      } catch (err) {
+        pluginRegistry.setStatus(id, "error", errorToMessage(err));
+      }
+    } else {
+      await mcpManager.stopServer(entry.name);
+      pluginRegistry.setStatus(id, "stopped");
+    }
+    const updated = pluginRegistry.get(id);
+    notify("plugin.updated", { plugin: updated });
+    return updated;
+  },
+
+  // ─── Adaptive config ────────────────────────────────────────────────────
+
+  "config.adaptive": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const enabled = params.enabled as boolean | undefined;
+    if (enabled !== undefined) {
+      store.setConfig("adaptiveEnabled", enabled);
+    }
+    return { adaptiveEnabled: store.getConfig("adaptiveEnabled") ?? false };
   },
 };

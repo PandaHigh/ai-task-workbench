@@ -34,6 +34,29 @@ export const RPC_ERRORS = {
   INTERNAL_ERROR: { code: -32603, message: "Internal error" },
 } as const;
 
+// ─── Tracing types ──────────────────────────────────────────────────────────
+
+export interface TraceSpan {
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string;
+  operation: string;
+  status: "running" | "ok" | "error";
+  startTime: number;
+  endTime?: number;
+  durationMs?: number;
+  attributes: Record<string, unknown>;
+}
+
+export interface AgentDecision {
+  traceId: string;
+  spanId: string;
+  agentRole: string;
+  decision: string;
+  reasoning: string;
+  files?: string[];
+}
+
 export type EngineMethod =
   | "task.create"
   | "task.start"
@@ -76,7 +99,15 @@ export type EngineMethod =
   | "comment.create"
   | "comment.list"
   | "skill.list"
-  | "skill.delete";
+  | "skill.delete"
+  | "crew.list"
+  | "crew.configure"
+  | "trace.list"
+  | "plugin.list"
+  | "plugin.install"
+  | "plugin.remove"
+  | "plugin.toggle"
+  | "config.adaptive";
 
 export type EngineNotification =
   | "task.progress"
@@ -97,4 +128,7 @@ export type EngineNotification =
   | "activity.created"
   | "comment.created"
   | "skill.added"
-  | "skill.removed";
+  | "skill.removed"
+  | "trace.span"
+  | "agent.decision"
+  | "plugin.updated";
