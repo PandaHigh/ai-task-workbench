@@ -221,10 +221,10 @@ describe("EvolutionDashboard", () => {
     });
   });
 
-  it("运行中显示暂停按钮", async () => {
+  it("运行中显示停止按钮", async () => {
     setupEvolutionStore({ isRunning: true });
     renderEvolution();
-    expect(screen.getByText("⏸ 暂停")).toBeInTheDocument();
+    expect(screen.getByText("⏹ 停止")).toBeInTheDocument();
   });
 
   it("点击返回导航到首页", async () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useEngine } from "../../hooks/useEngine";
+import { useEvolutionStore } from "../../stores/evolution-store";
 import type { DetectedError } from "@ai-workbench/shared";
 
 const SEVERITY_CFG: Record<string, { color: string; label: string }> = {
@@ -23,7 +24,8 @@ interface ErrorStreamProps {
 
 export function ErrorStream({ runId }: ErrorStreamProps) {
   const { call } = useEngine();
-  const [errors, setErrors] = useState<DetectedError[]>([]);
+  const storeErrors = useEvolutionStore((s) => s.errors);
+  const setErrors = useEvolutionStore((s) => s.setErrors);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,22 +35,22 @@ export function ErrorStream({ runId }: ErrorStreamProps) {
       .then((data) => setErrors(data as DetectedError[]))
       .catch(() => setErrors([]))
       .finally(() => setLoading(false));
-  }, [runId, call]);
+  }, [runId, call, setErrors]);
 
   if (loading) {
     return <div className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>加载中...</div>;
   }
 
-  if (errors.length === 0) {
+  if (storeErrors.length === 0) {
     return <div className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>暂无错误记录</div>;
   }
 
   return (
     <div className="space-y-2">
       <div className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>
-        错误记录 ({errors.length})
+        错误记录 ({storeErrors.length})
       </div>
-      {errors.slice().reverse().map((error) => {
+      {storeErrors.slice().reverse().map((error) => {
         const cfg = SEVERITY_CFG[error.severity] ?? SEVERITY_CFG.info;
         return (
           <div

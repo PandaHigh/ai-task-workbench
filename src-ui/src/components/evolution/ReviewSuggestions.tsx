@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useEngine } from "../../hooks/useEngine";
+import { useEvolutionStore } from "../../stores/evolution-store";
 import type { ReviewSuggestion } from "@ai-workbench/shared";
 
 interface ReviewSuggestionsProps {
@@ -8,7 +9,8 @@ interface ReviewSuggestionsProps {
 
 export function ReviewSuggestions({ runId }: ReviewSuggestionsProps) {
   const { call } = useEngine();
-  const [suggestions, setSuggestions] = useState<ReviewSuggestion[]>([]);
+  const storeSuggestions = useEvolutionStore((s) => s.suggestions);
+  const setSuggestions = useEvolutionStore((s) => s.setSuggestions);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,22 +20,22 @@ export function ReviewSuggestions({ runId }: ReviewSuggestionsProps) {
       .then((data) => setSuggestions(data as ReviewSuggestion[]))
       .catch(() => setSuggestions([]))
       .finally(() => setLoading(false));
-  }, [runId, call]);
+  }, [runId, call, setSuggestions]);
 
   if (loading) {
     return <div className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>加载中...</div>;
   }
 
-  if (suggestions.length === 0) {
+  if (storeSuggestions.length === 0) {
     return <div className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>暂无审查建议</div>;
   }
 
   return (
     <div className="space-y-2">
       <div className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>
-        审查建议 ({suggestions.length})
+        审查建议 ({storeSuggestions.length})
       </div>
-      {suggestions.slice().reverse().map((suggestion) => (
+      {storeSuggestions.slice().reverse().map((suggestion) => (
         <div
           key={suggestion.id}
           className="p-3 rounded text-xs"

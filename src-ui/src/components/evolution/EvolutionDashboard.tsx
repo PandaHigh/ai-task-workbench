@@ -22,6 +22,10 @@ import { AgentProgressPanel } from "./AgentProgressPanel";
 import { ErrorStream } from "./ErrorStream";
 import { ReviewSuggestions } from "./ReviewSuggestions";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
+import { LogSearchBar } from "./LogSearchBar";
+import { AddTaskModal } from "./AddTaskModal";
+import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
 
@@ -89,6 +93,9 @@ export function EvolutionDashboard() {
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
   const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [stopTarget, setStopTarget] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [filteredLogs, setFilteredLogs] = useState<typeof logs>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -187,7 +194,7 @@ export function EvolutionDashboard() {
   // Periodically refresh all tasks (completed/failed), queue, and run data while running
   useEffect(() => {
     if (!runId || !connected) return;
-    const POLL_INTERVAL = connected ? 30_000 : 5_000;
+    const POLL_INTERVAL = connected ? 10_000 : 30_000;
     const interval = setInterval(async () => {
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
@@ -203,6 +210,8 @@ export function EvolutionDashboard() {
           useTaskStore.getState().updateTask(runId, freshRun);
           setRunning(freshRun.status === "running");
         }
+        try { setCommits((await call("run.commits", { runId })) as GitCommit[]); } catch { /* ignore */ }
+        try { setLessons((await call("run.lessons", { runId })) as LessonLearned[]); } catch { /* ignore */ }
       } catch { /* ignore */ }
     }, POLL_INTERVAL);
     return () => clearInterval(interval);
@@ -229,26 +238,33 @@ export function EvolutionDashboard() {
 
   const handleStart = async () => {
     if (!runId) return;
+    setActionLoading("start");
     try {
       await call("task.start", { runId });
       setRunning(true);
       toast.success("任务已开始");
     } catch (err) {
-      addLog({ id: Date.now(), timestamp: Date.now(), level: "error", source: "engine", message: `启动出错了: ${err}` });
+      addLog({ timestamp: Date.now(), level: "error", source: "engine", message: `启动出错了: ${err}` });
       toast.error(`启动出错了: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handlePause = async () => {
+  const handleStop = async () => {
     if (!runId) return;
+    setActionLoading("stop");
     try {
       await call("run.stop", { runId });
       setRunning(false);
-      addLog({ id: Date.now(), timestamp: Date.now(), level: "info", source: "engine", message: "执行已暂停" });
-      toast.info("执行已暂停");
+      addLog({ timestamp: Date.now(), level: "info", source: "engine", message: "执行已停止" });
+      toast.info("执行已停止");
     } catch (err) {
-      console.warn("Pause failed:", err instanceof Error ? err.message : err);
-      toast.error("暂停出错了");
+      console.warn("Stop failed:", err instanceof Error ? err.message : err);
+      toast.error("停止出错了");
+    } finally {
+      setActionLoading(null);
+      setStopTarget(null);
     }
   };
 
@@ -270,10 +286,12 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async () => {
-    if (!runId || !newTaskText.trim()) return;
+  const handleAddTask = async (text?: string, priority?: number) => {
+    const content = (text ?? newTaskText).trim();
+    const prio = priority ?? newTaskPriority;
+    if (!runId || !content) return;
     try {
-      await call("task.create", { runId, content: newTaskText.trim(), type: "user_defined", priority: newTaskPriority });
+      await call("task.create", { runId, content, type: "user_defined", priority: prio });
       setNewTaskText("");
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
@@ -319,6 +337,9 @@ export function EvolutionDashboard() {
   const budgetUsed = run?.totalCostUsd ?? 0;
   const budgetMax = 50;
   const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
+  const runningElapsed = useElapsedTimer(runningTask?.startedAt);
+  const displayLogs = filteredLogs.length > 0 ? filteredLogs : logs;
+  const handleFilteredLogsChange = useCallback((filtered: typeof logs) => setFilteredLogs(filtered), []);
 
   return (
     <>
@@ -362,6 +383,7 @@ export function EvolutionDashboard() {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Task Queue - desktop: always visible sidebar, mobile: drawer */}
+          <DashboardErrorBoundary name="任务队列">
           <div
             className={`w-72 border-r flex flex-col min-h-0 overflow-hidden max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`}
             style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
@@ -460,6 +482,7 @@ export function EvolutionDashboard() {
                   </div>
                   <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
                     <span style={{ color: "var(--blue)" }}>工作中</span>
+                    {runningElapsed && <span>{runningElapsed}</span>}
                     <span>{runningTask.type === "user_defined" ? "用户" : "AI"}</span>
                     {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
                   </div>
@@ -529,6 +552,8 @@ export function EvolutionDashboard() {
               </button>
             </div>
           </div>
+          </DashboardErrorBoundary>
+          <DashboardErrorBoundary name="内容区">
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
             <div className="px-4 py-2 border-b relative flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
@@ -575,6 +600,9 @@ export function EvolutionDashboard() {
                   />
                 ) : (
                   <div className="space-y-0.5">
+                    <div className="mb-2">
+                      <LogSearchBar logs={logs} onFilteredChange={handleFilteredLogsChange} />
+                    </div>
                     {activeTaskId && (
                       <div className="mb-3">
                         <div className="flex items-center gap-2 mb-2">
@@ -584,7 +612,7 @@ export function EvolutionDashboard() {
                         <StreamingOutput taskId={activeTaskId} />
                       </div>
                     )}
-                    {logs.map((log) => (
+                    {displayLogs.map((log) => (
                       <div key={log.id} className="terminal-line terminal-line-enter">
                         <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
                         <span style={{ color: levelColor(log.level) }}>[{log.level.toUpperCase()}]</span>{" "}
@@ -688,10 +716,12 @@ export function EvolutionDashboard() {
 
             </div>
           </div>
+          </DashboardErrorBoundary>
         </div>
       </div>
 
       {/* Right sidebar - desktop: always visible, mobile: drawer */}
+      <DashboardErrorBoundary name="操作面板">
       <div
         className={`glass-sidebar w-64 border-l flex flex-col max-md:mobile-drawer max-md:mobile-drawer-right ${showPanel ? "" : "max-md:drawer-closed"}`}
         style={{ borderColor: "var(--border)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
@@ -704,17 +734,17 @@ export function EvolutionDashboard() {
           {/* Agent Progress */}
           <AgentProgressPanel />
 
-          {/* Start / Pause */}
+          {/* Start / Stop */}
           <div className="flex gap-2">
             {!isRunning ? (
-              <button onClick={handleStart} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>{run?.status === "completed" ? "▶ 继续" : "▶ 开始"}</button>
+              <button onClick={handleStart} disabled={actionLoading === "start"} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: actionLoading === "start" ? "var(--bg-tertiary)" : "var(--green)", color: actionLoading === "start" ? "var(--text-secondary)" : "#fff", opacity: actionLoading === "start" ? 0.7 : 1 }}>{actionLoading === "start" ? "启动中..." : run?.status === "completed" ? "▶ 继续" : "▶ 开始"}</button>
             ) : (
-              <button onClick={handlePause} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: "var(--yellow)", color: "#fff" }}>⏸ 暂停</button>
+              <button onClick={() => setStopTarget(runId ?? "")} disabled={actionLoading === "stop"} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: actionLoading === "stop" ? "var(--bg-tertiary)" : "var(--red)", color: actionLoading === "stop" ? "var(--text-secondary)" : "#fff", opacity: actionLoading === "stop" ? 0.7 : 1 }}>{actionLoading === "stop" ? "停止中..." : "⏹ 停止"}</button>
             )}
           </div>
 
           {/* Budget progress */}
-          {run && budgetUsed > 0 && (
+          {run && (isRunning || budgetUsed > 0) && (
             <div>
               <div className="flex justify-between text-xs mb-1">
                 <span style={{ color: "var(--text-secondary)" }}>费用</span>
@@ -916,8 +946,23 @@ export function EvolutionDashboard() {
               )}
             </div>
           )}
+
+          {/* Mobile share button */}
+          {runId && (
+            <div className="border-t pt-3 md:hidden" style={{ borderColor: "var(--border)" }}>
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="w-full text-xs px-3 py-2 rounded font-semibold"
+                style={{ background: sharing ? "var(--bg-tertiary)" : "var(--blue)", color: sharing ? "var(--text-secondary)" : "#fff", opacity: sharing ? 0.7 : 1 }}
+              >
+                {sharing ? "分享中..." : "分享"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
+      </DashboardErrorBoundary>
 
       {/* Mobile drawer backdrop */}
       {(showQueue || showPanel) && (
@@ -929,109 +974,15 @@ export function EvolutionDashboard() {
       )}
 
       {/* Add Task Modal */}
-      {showAddModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="添加任务"
-          style={{
-            position: "fixed", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)",
-            zIndex: 50,
-          }}
-          onClick={() => setShowAddModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--bg-secondary)", border: "1px solid var(--border)",
-              borderRadius: "12px", padding: "24px", minWidth: "340px", maxWidth: "480px", width: "90%",
-              animation: "slideUp 0.2s ease-out",
-            }}
-          >
-            <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-              添加任务
-            </h3>
-            <textarea
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              placeholder="描述你的任务..."
-              rows={4}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (newTaskText.trim()) { handleAddTask(); setShowAddModal(false); }
-                }
-                if (e.key === "Escape") { setShowAddModal(false); }
-              }}
-              style={{
-                width: "100%", padding: "12px 14px", borderRadius: "8px",
-                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                border: "2px solid var(--blue)", outline: "none",
-                fontSize: "14px", lineHeight: 1.6, resize: "none",
-                boxSizing: "border-box",
-              }}
-            />
-            <p style={{ margin: "6px 0 0", fontSize: "11px", color: "var(--text-secondary)" }}>
-              Ctrl+Enter 快速保存
-            </p>
-            <div style={{ marginTop: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                <span style={{ fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>优先级</span>
-                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                  {newTaskPriority <= 2 ? "高" : newTaskPriority <= 5 ? "中" : "低"}（数值越小越优先）
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: "4px" }}>
-                {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setNewTaskPriority(p)}
-                    style={{
-                      width: "30px", height: "26px", borderRadius: "4px",
-                      border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600,
-                      background: p === newTaskPriority
-                        ? (p <= 2 ? "var(--red)" : p <= 5 ? "var(--blue)" : "var(--text-secondary)")
-                        : "var(--bg-tertiary)",
-                      color: p === newTaskPriority ? "#fff" : "var(--text-secondary)",
-                      opacity: p === newTaskPriority ? 1 : 0.7,
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
-              <button
-                onClick={() => setShowAddModal(false)}
-                style={{
-                  padding: "8px 16px", background: "transparent",
-                  border: "1px solid var(--border)", borderRadius: "8px",
-                  color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px",
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={() => { if (newTaskText.trim()) { handleAddTask(); setShowAddModal(false); } }}
-                disabled={!newTaskText.trim()}
-                style={{
-                  padding: "8px 20px", background: "var(--green)",
-                  border: "none", borderRadius: "8px",
-                  color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 600,
-                  opacity: newTaskText.trim() ? 1 : 0.4,
-                }}
-              >
-                确认添加
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddTaskModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={(text, priority) => {
+          handleAddTask(text, priority);
+          setShowAddModal(false);
+        }}
+        defaultPriority={newTaskPriority}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -1041,6 +992,16 @@ export function EvolutionDashboard() {
         variant="danger"
         onConfirm={confirmDeleteTask}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={stopTarget !== null}
+        title="停止执行"
+        message="停止执行？当前进度已保存，可随时继续。"
+        confirmLabel="停止"
+        variant="danger"
+        onConfirm={handleStop}
+        onCancel={() => setStopTarget(null)}
       />
     </div>
     </>

@@ -3,7 +3,7 @@ import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
-import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress, DetectedError } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -32,7 +32,6 @@ export function useNotifications() {
             setActiveTask(null);
           }
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: status === "failed" ? "error" : status === "reverted" ? "warn" : "info",
             source: "engine",
@@ -43,7 +42,6 @@ export function useNotifications() {
         case "task.progress": {
           const { taskId, content } = params as { taskId: string; content: string };
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "info",
             source: "cc",
@@ -54,7 +52,6 @@ export function useNotifications() {
         case "task.scored": {
           const { taskId, score } = params as { taskId: string; score: { overall: number; passed: boolean; reasoning?: string } };
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: score.passed ? "info" : "warn",
             source: "scorer",
@@ -65,7 +62,6 @@ export function useNotifications() {
         case "git.commit": {
           const { hash, message } = params as { hash: string; message: string };
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "info",
             source: "git",
@@ -81,7 +77,7 @@ export function useNotifications() {
         }
         case "log.entry": {
           const entry = params as { level: string; source: string; message: string };
-          addLog({ id: Date.now(), timestamp: Date.now(), ...entry });
+          addLog({ timestamp: Date.now(), ...entry });
           break;
         }
         case "goal.updated": {
@@ -131,7 +127,6 @@ export function useNotifications() {
             autoAction: "approve",
           } as ApprovalRequest);
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "warn",
             source: "engine",
@@ -144,7 +139,6 @@ export function useNotifications() {
           const { removeApproval } = useApprovalStore.getState();
           removeApproval(approvalId);
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "info",
             source: "engine",
@@ -160,7 +154,6 @@ export function useNotifications() {
         }
         case "features.generated": {
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "info",
             source: "engine",
@@ -171,7 +164,6 @@ export function useNotifications() {
         case "features.updated": {
           const { passed, total } = params as { passed: number; total: number };
           addLog({
-            id: Date.now(),
             timestamp: Date.now(),
             level: "info",
             source: "engine",
@@ -182,7 +174,7 @@ export function useNotifications() {
         case "presence.joined": {
           const { displayName } = params as { displayName: string };
           addLog({
-            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(), level: "info", source: "engine",
             message: `${displayName} 已连接`,
           });
           break;
@@ -190,33 +182,44 @@ export function useNotifications() {
         case "presence.left": {
           const { displayName } = params as { displayName: string };
           addLog({
-            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(), level: "info", source: "engine",
             message: `${displayName} 已断开`,
           });
           break;
         }
         case "activity.created": {
-          // Activity events are loaded on-demand via RPC
           break;
         }
         case "comment.created": {
           const { userId, taskId } = params as { userId: string; taskId: string };
           addLog({
-            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(), level: "info", source: "engine",
             message: `${userId} 评论了任务 ${taskId.substring(0, 6)}`,
           });
           break;
         }
         case "agent.progress": {
-          const progress = params as AgentProgress;
+          const progress = params as unknown as AgentProgress;
           const { updateAgentProgress } = useEvolutionStore.getState();
           updateAgentProgress(progress.role, progress);
           break;
         }
         case "error.detected": {
-          const error = params as { message: string; severity: string; category: string; fixTaskId?: string };
+          const error = params as { id?: string; message: string; severity: string; category: string; file?: string; line?: number; fixTaskId?: string; timestamp?: number };
+          const { addError } = useEvolutionStore.getState();
+          addError({
+            id: error.id || `err-${Date.now()}`,
+            message: error.message,
+            severity: error.severity as "critical" | "warning" | "info",
+            category: error.category as DetectedError["category"],
+            file: error.file,
+            line: error.line,
+            fixTaskId: error.fixTaskId,
+            timestamp: error.timestamp || Date.now(),
+            runId: "",
+          });
           addLog({
-            id: Date.now(), timestamp: Date.now(),
+            timestamp: Date.now(),
             level: error.severity === "critical" ? "error" : "warn",
             source: "engine",
             message: `检测到错误: ${error.message.substring(0, 100)}${error.fixTaskId ? " (已创建修复任务)" : ""}`,
@@ -224,9 +227,26 @@ export function useNotifications() {
           break;
         }
         case "review.suggestion": {
-          const suggestion = params as { summary: string; score: number };
+          const suggestion = params as { id?: string; summary: string; score: number; issues?: Array<{ severity: string; description: string; file?: string; line?: number; suggestion?: string }>; status?: string; timestamp?: number; runId?: string; taskId?: string };
+          const { addSuggestion } = useEvolutionStore.getState();
+          addSuggestion({
+            id: suggestion.id || `rev-${Date.now()}`,
+            summary: suggestion.summary,
+            score: suggestion.score,
+            issues: (suggestion.issues || []).map((i) => ({
+              severity: i.severity as "critical" | "major" | "minor",
+              file: i.file || "",
+              line: i.line,
+              description: i.description,
+              suggestion: i.suggestion || "",
+            })),
+            status: (suggestion.status || "pending") as "pending" | "dismissed" | "fix_created",
+            createdAt: suggestion.timestamp || Date.now(),
+            runId: suggestion.runId || "",
+            taskId: suggestion.taskId || "",
+          });
           addLog({
-            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(), level: "info", source: "engine",
             message: `后台审查完成: ${suggestion.summary} (评分: ${(suggestion.score * 100).toFixed(0)}%)`,
           });
           break;
@@ -234,7 +254,7 @@ export function useNotifications() {
         case "task.autoFix": {
           const { originalError } = params as { taskId: string; originalError: string };
           addLog({
-            id: Date.now(), timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(), level: "info", source: "engine",
             message: `自动修复任务已创建: ${originalError}`,
           });
           break;
