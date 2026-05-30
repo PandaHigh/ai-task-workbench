@@ -25,6 +25,7 @@ export class WsServer {
   private store: Store;
   private shareStore: ShareStore;
   private queueManager: QueueManager;
+  shutdownCallback?: () => void;
 
   constructor(deps: {
     store: Store;
@@ -192,6 +193,15 @@ export class WsServer {
     if (url === "/api/skills/upload" && method === "POST") {
       this.setCorsHeaders(req, res);
       skillManager.handleUpload(req, res);
+      return;
+    }
+
+    // Graceful shutdown endpoint (for Windows Tauri close)
+    if (url === "/api/shutdown" && method === "POST") {
+      this.setCorsHeaders(req, res);
+      this.sendJson(res, 200, { status: "shutting_down" });
+      res.end();
+      this.shutdownCallback?.();
       return;
     }
 

@@ -49,7 +49,7 @@ export class WorktreeManager {
       .split("\n")
       .filter((line) => line.startsWith("worktree "))
       .map((line) => line.replace("worktree ", ""))
-      .filter((path) => path !== baseDir);
+      .filter((p) => path.resolve(p) !== path.resolve(baseDir));
   }
 
   async cleanupAll(baseDir: string): Promise<void> {

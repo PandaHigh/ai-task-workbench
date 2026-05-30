@@ -64,12 +64,16 @@ fn find_engine_dir_handle(app: &AppHandle) -> std::path::PathBuf {
 fn find_node() -> String {
     #[cfg(target_os = "windows")]
     {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            let node_path = std::path::PathBuf::from(appdata).join("fnm").join("node-versions");
-            if node_path.exists() {
-                if let Ok(entries) = std::fs::read_dir(&node_path) {
+        let appdata = std::env::var("APPDATA").unwrap_or_default();
+        let local_appdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+
+        // fnm (Fast Node Manager): %LOCALAPPDATA%\fnm_multishells\<ver>\node.exe
+        if !local_appdata.is_empty() {
+            let fnm_dir = std::path::PathBuf::from(&local_appdata).join("fnm_multishells");
+            if fnm_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&fnm_dir) {
                     for entry in entries.flatten() {
-                        let node_exe = entry.path().join("installation").join("node.exe");
+                        let node_exe = entry.path().join("node.exe");
                         if node_exe.exists() {
                             println!("[sidecar] Found node via fnm at {:?}", node_exe);
                             return node_exe.to_string_lossy().to_string();
@@ -78,17 +82,60 @@ fn find_node() -> String {
                 }
             }
         }
-        // Check common locations
-        let candidates = vec![
-            "C:\\Program Files\\nodejs\\node.exe",
-            "C:\\nodejs\\node.exe",
+
+        // nvm-windows: %APPDATA%\nvm\v<ver>\node.exe
+        if !appdata.is_empty() {
+            let nvm_dir = std::path::PathBuf::from(&appdata).join("nvm");
+            if nvm_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
+                    let mut latest: Option<(String, std::path::PathBuf)> = None;
+                    for entry in entries.flatten() {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if name.starts_with('v') {
+                            let node_exe = entry.path().join("node.exe");
+                            if node_exe.exists() {
+                                if latest.as_ref().map_or(true, |(n, _)| name > *n) {
+                                    latest = Some((name, node_exe));
+                                }
+                            }
+                        }
+                    }
+                    if let Some((_, path)) = latest {
+                        println!("[sidecar] Found node via nvm-windows at {:?}", path);
+                        return path.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+
+        // Volta: %LOCALAPPDATA%\Volta\tools\image\node\<ver>\bin\node.exe
+        if !local_appdata.is_empty() {
+            let volta_dir = std::path::PathBuf::from(&local_appdata).join("Volta").join("tools").join("image").join("node");
+            if volta_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&volta_dir) {
+                    for entry in entries.flatten() {
+                        let node_exe = entry.path().join("bin").join("node.exe");
+                        if node_exe.exists() {
+                            println!("[sidecar] Found node via volta at {:?}", node_exe);
+                            return node_exe.to_string_lossy().to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Hardcoded common paths
+        let candidates: Vec<String> = vec![
+            "C:\\Program Files\\nodejs\\node.exe".to_string(),
+            "C:\\nodejs\\node.exe".to_string(),
         ];
         for path in &candidates {
             if std::path::Path::new(path).exists() {
                 println!("[sidecar] Found node at {}", path);
-                return path.to_string();
+                return path.clone();
             }
         }
+
         // Fallback to `where`
         if let Ok(output) = std::process::Command::new("where").arg("node.exe").output() {
             if output.status.success() {

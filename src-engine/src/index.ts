@@ -16,24 +16,6 @@ async function main() {
 
   setNotifyFn(notify);
 
-  skillManager.initBuiltinSkills();
-
-  wsServer.start();
-
-  // Resume remote subscription WebSocket connections
-  for (const sub of subscriptionStore.list()) {
-    try {
-      connectRemoteWS(sub.runId, sub.remoteUrl, sub.remoteToken, notify);
-    } catch (err) {
-      console.warn(`[engine] Failed to resume remote WS for ${sub.runId}:`, err instanceof Error ? err.message : err);
-    }
-  }
-
-  const recovery = recoverStaleRuns();
-  if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
-    console.log(`[engine] Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset} tasks reset to pending`);
-  }
-
   const gracefulShutdown = async () => {
     if (isShuttingDown) {
       console.warn("\nForce exit (second signal)");
@@ -58,9 +40,30 @@ async function main() {
     process.exit(shutdownOk ? 0 : 1);
   };
 
+  // Register shutdown callback for HTTP-triggered graceful shutdown (Windows Tauri close)
+  wsServer.shutdownCallback = () => { gracefulShutdown(); };
+
+  skillManager.initBuiltinSkills();
+
+  wsServer.start();
+
+  // Resume remote subscription WebSocket connections
+  for (const sub of subscriptionStore.list()) {
+    try {
+      connectRemoteWS(sub.runId, sub.remoteUrl, sub.remoteToken, notify);
+    } catch (err) {
+      console.warn(`[engine] Failed to resume remote WS for ${sub.runId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  const recovery = recoverStaleRuns();
+  if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
+    console.log(`[engine] Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset > 0 ? recovery.tasksReset : 0} tasks reset to pending`);
+  }
+
   process.on("SIGINT", gracefulShutdown);
   // SIGTERM is not supported on Windows; the Tauri sidecar uses TerminateProcess (hard kill).
-  // On Windows, we handle cleanup via process exit hooks instead.
+  // On Windows, we handle cleanup via HTTP /api/shutdown endpoint instead.
   if (!isWin) {
     process.on("SIGTERM", gracefulShutdown);
   }
