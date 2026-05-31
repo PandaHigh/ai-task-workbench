@@ -27,6 +27,7 @@ async function main() {
 
     await killAllActiveProcesses();
     await mcpManager.stopAll();
+    store.flush();
     for (const sub of subscriptionStore.list()) {
       disconnectRemoteWS(sub.runId);
     }

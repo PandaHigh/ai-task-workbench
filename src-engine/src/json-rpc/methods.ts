@@ -1117,4 +1117,11 @@ export const methodHandlers: Record<string, MethodHandler> = {
     validateRunId(runId);
     return store.getDetectedErrors(runId, params.taskId as string | undefined);
   },
+
+  // ─── Metrics ────────────────────────────────────────────────────────────
+
+  "metrics.snapshot": async () => {
+    const { metrics } = await import("../lib/metrics.js");
+    return metrics.snapshot();
+  },
 };

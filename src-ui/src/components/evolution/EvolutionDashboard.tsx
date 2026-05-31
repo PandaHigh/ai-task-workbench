@@ -1,58 +1,36 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEvolutionStore } from "../../stores/evolution-store";
 import { useTaskStore } from "../../stores/task-store";
-import { RobotMascot } from "../dashboard/RobotMascot";
 import { useEngine } from "../../hooks/useEngine";
-import { ENGINE_HTTP_URL } from "../../lib/platform";
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { TaskDefinition, GitCommit, LessonLearned, ExecutionRun } from "@ai-workbench/shared";
 import { EmptyState } from "../common/EmptyState";
 import { Skeleton } from "../common/Skeleton";
 import { useToast } from "../common/Toast";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
-import { marked } from "marked";
 import { ApprovalPanel } from "./ApprovalPanel";
-import { StreamingOutput } from "./StreamingOutput";
 import { FeatureBoard } from "./FeatureBoard";
 import { PresencePanel } from "./PresencePanel";
 import { ActivityTimeline } from "./ActivityTimeline";
-import { TaskComments } from "./TaskComments";
 import { TraceTimeline } from "./TraceTimeline";
 import { AgentProgressPanel } from "./AgentProgressPanel";
 import { ErrorStream } from "./ErrorStream";
 import { ReviewSuggestions } from "./ReviewSuggestions";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
-import { LogSearchBar } from "./LogSearchBar";
 import { AddTaskModal } from "./AddTaskModal";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import { SharePanel } from "../share/SharePanel";
 import { TaskCreateForm } from "../common/TaskCreateForm";
+import { RunHeader } from "./RunHeader";
+import { TaskQueue } from "./TaskQueue";
+import { BudgetDisplay } from "./BudgetDisplay";
+import { GoalPanel } from "./GoalPanel";
+import { LogPanel } from "./LogPanel";
+import { ReportTab } from "./ReportTab";
 
 type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
-
-const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(77, 107, 254,0.15)" },
-  paused: { label: "已暂停", color: "var(--yellow)", bg: "rgba(234,179,8,0.15)" },
-  achieved: { label: "已达成", color: "var(--green)", bg: "rgba(16, 185, 129,0.15)" },
-  unmet: { label: "进行中", color: "var(--red)", bg: "rgba(239, 68, 68,0.15)" },
-  budget_exhausted: { label: "预算已用完", color: "var(--red)", bg: "rgba(239, 68, 68,0.15)" },
-};
-
-function formatGoalDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
-
-function formatGoalTokens(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 0 : 1)}K`;
-  return `${(n / 1_000_000).toFixed(1)}M`;
-}
 
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
@@ -81,8 +59,6 @@ export function EvolutionDashboard() {
   const [tab, setTab] = useState<TabType>("activity");
   const [simpleMode, setSimpleMode] = useState(() => localStorage.getItem("ui-mode") !== "detailed");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const showLoading = loading || !connected;
   const [showQueue, setShowQueue] = useState(false);
@@ -97,13 +73,12 @@ export function EvolutionDashboard() {
   const [stopTarget, setStopTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<TaskDefinition | null>(null);
-  const [filteredLogs, setFilteredLogs] = useState<typeof logs>([]);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [budgetMax, setBudgetMax] = useState(50000);
   const toast = useToast();
 
   const handleShare = () => setShowSharePanel(true);
 
-  // Load data on mount — only reset when runId changes
+  // Load data on mount -- only reset when runId changes
   const prevRunIdRef = useRef(runId);
   useEffect(() => {
     if (!runId || !connected) return;
@@ -116,7 +91,6 @@ export function EvolutionDashboard() {
     }
 
     const load = async () => {
-      // Load run itself (needed when page is refreshed directly — taskStore is empty)
       if (!storeRun) {
         try {
           const allRuns = (await call("run.list")) as ExecutionRun[];
@@ -175,13 +149,14 @@ export function EvolutionDashboard() {
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setRunningTask(allTasks.find((t) => t.status === "running") || null);
       } catch { /* ignore */ }
+      try { const v = await call("config.get", { key: "maxBudgetUsd" }); if (typeof v === "number" && v > 0) setBudgetMax(v); } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
     };
     load();
     return () => { cancelled = true; };
   }, [runId, connected]);
 
-  // Periodically refresh all tasks (completed/failed), queue, and run data while running
+  // Periodically refresh all tasks, queue, and run data while running
   useEffect(() => {
     if (!runId || !connected) return;
     const POLL_INTERVAL = connected ? 10_000 : 30_000;
@@ -206,11 +181,6 @@ export function EvolutionDashboard() {
     }, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [runId, call, connected]);
-
-  // Auto-scroll logs
-  useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
 
   const refreshTabData = useCallback(async (t: TabType) => {
     if (!runId) return;
@@ -320,13 +290,10 @@ export function EvolutionDashboard() {
     setShowPanel(false);
   };
 
-  const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "—";
+  const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "--";
   const budgetUsed = run?.totalCostUsd ?? 0;
-  const budgetMax = 50;
   const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
   const runningElapsed = useElapsedTimer(runningTask?.startedAt);
-  const displayLogs = filteredLogs.length > 0 ? filteredLogs : logs;
-  const handleFilteredLogsChange = useCallback((filtered: typeof logs) => setFilteredLogs(filtered), []);
 
   return (
     <>
@@ -334,227 +301,44 @@ export function EvolutionDashboard() {
     <div className="flex-1 flex overflow-hidden" style={pageEnterStyle()}>
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div
-          className="px-6 py-3 border-b flex items-center justify-between max-md:px-3"
-          style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => { reset(); navigate("/"); }} className="text-xs px-2 py-1 rounded hover:opacity-80 shrink-0" style={{ color: "var(--text-secondary)" }} aria-label="返回">←</button>
-            <h2 className="text-sm font-bold truncate">任务详情</h2>
-            <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{runId?.substring(0, 8)}</span>
-            {run && <span className="text-xs px-2 py-0.5 rounded hidden md:inline" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{run.workingDir.split("/").pop()}</span>}
-            <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>{elapsed}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Download ZIP button */}
-            <button
-              onClick={() => window.open(`${ENGINE_HTTP_URL}/api/runs/${runId}/download`)}
-              className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-              title="下载工作目录 ZIP"
-            >
-              下载
-            </button>
-            {/* Share button */}
-            <button
-              onClick={handleShare}
-              className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-              style={{ background: "var(--blue)", color: "#fff" }}
-            >
-              分享
-            </button>
-            {/* Mobile drawer toggles */}
-            <button onClick={() => { setShowQueue(true); setShowPanel(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开任务队列">☰ 待办</button>
-            <button onClick={() => { setShowPanel(true); setShowQueue(false); }} className="md:hidden text-xs px-2 py-1 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }} aria-label="打开操作">⚙ 操作</button>
-            <RobotMascot mood={isRunning ? "working" : run?.status === "completed" ? "celebrating" : "idle"} size={32} />
-            <span className="status-badge hidden md:inline" style={{
-              background: isRunning ? "rgba(77, 107, 254, 0.15)" : run?.status === "completed" ? "rgba(16, 185, 129, 0.15)" : "rgba(125, 133, 144, 0.15)",
-              color: isRunning ? "var(--blue)" : run?.status === "completed" ? "var(--green)" : "var(--text-secondary)",
-            }}>
-              {isRunning ? "工作中" : run?.status === "completed" ? "已完成" : run?.status === "failed" ? "出错了" : "准备中"}
-            </span>
-          </div>
-        </div>
+        <RunHeader
+          runId={runId}
+          run={run}
+          elapsed={elapsed}
+          isRunning={isRunning}
+          onBack={() => { reset(); navigate("/"); }}
+          onShare={handleShare}
+          onShowQueue={() => { setShowQueue(true); setShowPanel(false); }}
+          onShowPanel={() => { setShowPanel(true); setShowQueue(false); }}
+        />
 
         <div className="flex-1 flex overflow-hidden">
           {/* Task Queue - desktop: always visible sidebar, mobile: drawer */}
           <DashboardErrorBoundary name="任务队列">
-          <div
-            className={`w-72 border-r flex flex-col min-h-0 overflow-hidden max-md:mobile-drawer max-md:mobile-drawer-left ${showQueue ? "" : "max-md:drawer-closed"}`}
-            style={{ borderColor: "var(--border)", animation: "fadeIn 0.4s ease-out" }}
-          >
-            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-              <h3 className="text-sm font-bold" style={{ color: "var(--text-secondary)" }}>待办 ({queue.length})</h3>
-              {queue.length > 0 && (
-                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}></span>
-              )}
-              <button onClick={() => setShowQueue(false)} className="md:hidden text-xs ml-2" style={{ color: "var(--text-secondary)" }} aria-label="关闭队列">✕</button>
-            </div>
-            {/* Add task input removed — now in modal */}
-            <div role="listbox" aria-label="任务队列，可通过拖拽或 Ctrl+上下箭头排序" className="flex-1 overflow-y-auto p-2 space-y-1" onKeyDown={(e) => {
-              if (focusIdx === null || queue.length === 0) return;
-              if (e.key === "ArrowUp" && e.ctrlKey && focusIdx > 0) {
-                e.preventDefault();
-                moveTask(focusIdx, focusIdx - 1);
-                setFocusIdx(focusIdx - 1);
-              } else if (e.key === "ArrowDown" && e.ctrlKey && focusIdx < queue.length - 1) {
-                e.preventDefault();
-                moveTask(focusIdx, focusIdx + 1);
-                setFocusIdx(focusIdx + 1);
-              }
-            }}>
-              {showLoading ? (
-                <div className="space-y-2 p-2">
-                  {Array.from({ length: 4 }, (_, i) => (
-                    <Skeleton key={i} variant="card" height={56} />
-                  ))}
-                </div>
-              ) : queue.length === 0 ? (
-                <EmptyState
-                  title="没有待办任务"
-                  description={!isRunning ? "点击开始" : undefined}
-                  action={!isRunning ? { label: run?.status === "completed" ? "继续" : "开始", onClick: handleStart } : undefined}
-                  variant="queue"
-                />
-              ) : (
-                queue.map((task, i) => (
-                  <div
-                    key={task.id}
-                    role="option"
-                    aria-grabbed={dragIdx === i ? "true" : "false"}
-                    aria-selected={focusIdx === i ? "true" : "false"}
-                    aria-roledescription="可拖拽任务项，Ctrl+上下箭头可调整顺序"
-                    aria-label={`任务 ${i + 1}: ${task.content}，优先级 P${task.priority}`}
-                    tabIndex={0}
-                    draggable
-                    onDragStart={() => setDragIdx(i)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => { if (dragIdx !== null && dragIdx !== i) moveTask(dragIdx, i); setDragIdx(null); }}
-                    onDragEnd={() => setDragIdx(null)}
-                    onFocus={() => setFocusIdx(i)}
-                    className="group px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
-                    style={{
-                      background: task.id === activeTaskId ? "rgba(77, 107, 254, 0.1)" : dragIdx === i ? "rgba(77, 107, 254, 0.05)" : "var(--bg-tertiary)",
-                      border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
-                      opacity: dragIdx !== null && dragIdx !== i ? 0.7 : dragIdx === i ? 1 : undefined,
-                      transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
-                      boxShadow: dragIdx === i ? "0 4px 16px rgba(0,0,0,0.4)" : undefined,
-                      transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
-                      ...staggerItemStyle(i, 40, "staggerFadeIn", 0.3),
-                    }}
-                    onClick={() => setActiveTask(task.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0" style={{
-                        background: task.type === "user_defined" ? "var(--purple)" : "var(--bg-secondary)",
-                        color: task.type === "user_defined" ? "#fff" : "var(--text-secondary)",
-                      }}>{i + 1}</span>
-                      <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditTarget(task); }}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ color: "var(--blue)", border: "1px solid transparent" }}
-                        aria-label="编辑任务"
-                        title="编辑任务"
-                      >编辑</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id, task.content); }}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ color: "var(--red)", border: "1px solid transparent" }}
-                        aria-label="删除任务"
-                        title="删除任务"
-                      >移除</button>
-                    </div>
-                    <div className="mt-1 flex gap-2" style={{ color: "var(--text-secondary)" }}>
-                      <span>{task.type === "user_defined" ? "用户" : "AI"}</span>
-                      {!simpleMode && <span>P{task.priority}</span>}
-                      {!simpleMode && <span>{task.timeoutMinutes}min</span>}
-                    </div>
-                  </div>
-                ))
-              )}
-
-            {/* Running task indicator */}
-            {runningTask && (
-              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
-                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}>
-                  <div className="flex items-center gap-2">
-                    <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>●</span>
-                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{runningTask.content}</span>
-                  </div>
-                  <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                    <span style={{ color: "var(--blue)" }}>工作中</span>
-                    {runningElapsed && <span>{runningElapsed}</span>}
-                    <span>{runningTask.type === "user_defined" ? "用户" : "AI"}</span>
-                    {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
-                  </div>
-                </div>
-                {runId && (
-                  <div className="mt-1.5 px-1">
-                    <TaskComments runId={runId} taskId={runningTask.id} />
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Completed tasks */}
-            {completedTasks.length > 0 && (
-              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--green)" }}>已完成 ({completedTasks.length})</h4>
-                <div className="space-y-1">
-                  {completedTasks.map((t) => (
-                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.15)" }}>
-                      <div className="flex items-start gap-2">
-                        <span className="shrink-0 text-[10px] mt-0.5" style={{ color: "var(--green)" }}>✓</span>
-                        <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{t.content}</span>
-                      </div>
-                      <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                        <span>{t.type === "user_defined" ? "用户" : "AI"}</span>
-                        {t.completedAt && <span>{new Date(t.completedAt).toLocaleTimeString()}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Failed tasks with retry */}
-            {failedTasks.length > 0 && (
-              <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--red)" }}>出错了 ({failedTasks.length})</h4>
-                <div className="space-y-1">
-                  {failedTasks.map((t) => (
-                    <div key={t.id} className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
-                        <div className="flex gap-1">
-                          <button onClick={() => handleRetry(t.id)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>再试一次</button>
-                          <button onClick={() => handleDeleteTask(t.id, t.content)} className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--red)", color: "#fff" }}>移除</button>
-                        </div>
-                      </div>
-                      {t.errorMessage && <p className="mt-0.5 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>{t.errorMessage}</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            </div>
-            {/* Add task button — always pinned at bottom */}
-            <div className="shrink-0 px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="w-full px-4 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-                style={{
-                  background: "var(--green)",
-                  color: "#fff",
-                  height: "29px",
-                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                }}
-              >
-                + 添加任务
-              </button>
-            </div>
-          </div>
+            <TaskQueue
+              queue={queue}
+              activeTaskId={activeTaskId}
+              runningTask={runningTask}
+              completedTasks={completedTasks}
+              failedTasks={failedTasks}
+              runningElapsed={runningElapsed}
+              simpleMode={simpleMode}
+              showLoading={showLoading}
+              isRunning={isRunning}
+              runId={runId}
+              showQueue={showQueue}
+              runStatus={run?.status}
+              onStart={handleStart}
+              onSetActiveTask={setActiveTask}
+              onMoveTask={moveTask}
+              onDeleteTask={handleDeleteTask}
+              onEditTask={setEditTarget}
+              onRetry={handleRetry}
+              onShowAddModal={() => setShowAddModal(true)}
+              onCloseQueue={() => setShowQueue(false)}
+            />
           </DashboardErrorBoundary>
+
           <DashboardErrorBoundary name="内容区">
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
@@ -594,37 +378,7 @@ export function EvolutionDashboard() {
               ) : <>
               {/* Logs Tab */}
               {tab === "logs" && (
-                logs.length === 0 && !activeTaskId ? (
-                  <EmptyState
-                    title="等待任务执行"
-                    description="启动后日志将实时显示在这里"
-                    variant="logs"
-                  />
-                ) : (
-                  <div className="space-y-0.5">
-                    <div className="mb-2">
-                      <LogSearchBar logs={logs} onFilteredChange={handleFilteredLogsChange} />
-                    </div>
-                    {activeTaskId && (
-                      <div className="mb-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                          <span className="text-blue-400 font-mono text-xs font-bold">实时输出</span>
-                        </div>
-                        <StreamingOutput taskId={activeTaskId} />
-                      </div>
-                    )}
-                    {displayLogs.map((log) => (
-                      <div key={log.id} className="terminal-line terminal-line-enter">
-                        <span style={{ color: "var(--text-secondary)" }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{" "}
-                        <span style={{ color: levelColor(log.level) }}>[{log.level.toUpperCase()}]</span>{" "}
-                        <span style={{ color: "var(--text-secondary)" }}>[{log.source}]</span>{" "}
-                        <span style={{ color: "var(--text-primary)" }}>{log.message}</span>
-                      </div>
-                    ))}
-                    <div ref={logsEndRef} />
-                  </div>
-                )
+                <LogPanel logs={logs} activeTaskId={activeTaskId} />
               )}
 
               {/* Commits Tab */}
@@ -636,7 +390,7 @@ export function EvolutionDashboard() {
                     {commits.map((c, i) => (
                       <div key={i} className="glass-card-sm px-3 py-2" style={{ ...staggerItemStyle(i, 50, "slideUp", 0.3) }}>
                         <div className="flex items-center gap-2 mb-1">
-                          <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "—"}</span>
+                          <span style={{ color: "var(--blue)" }}>{c.hash?.substring(0, 7) || "--"}</span>
                           {c.isAiCommit && (
                             <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--green)" }}>#AI</span>
                           )}
@@ -710,7 +464,7 @@ export function EvolutionDashboard() {
                 <ReviewSuggestions runId={runId ?? ""} />
               )}
 
-              {/* Report Tab — rendered as markdown */}
+              {/* Report Tab -- rendered as markdown */}
               {tab === "report" && run?.finalReport && (
                 <ReportTab content={run.finalReport} />
               )}
@@ -730,7 +484,7 @@ export function EvolutionDashboard() {
       >
         <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
           <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>操作</h3>
-          <button onClick={() => setShowPanel(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }} aria-label="关闭面板">✕</button>
+          <button onClick={() => setShowPanel(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }} aria-label="关闭面板">&#10005;</button>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {/* Agent Progress */}
@@ -746,19 +500,13 @@ export function EvolutionDashboard() {
           </div>
 
           {/* Budget progress */}
-          {run && (isRunning || budgetUsed > 0) && (
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span style={{ color: "var(--text-secondary)" }}>费用</span>
-                <span style={{ color: budgetPct > 80 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
-              </div>
-              <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
-                <div className="h-full rounded transition-all" style={{
-                  width: `${budgetPct}%`,
-                  background: budgetPct > 80 ? "var(--red)" : budgetPct > 50 ? "var(--yellow)" : "var(--green)",
-                }} />
-              </div>
-            </div>
+          {run && (
+            <BudgetDisplay
+              budgetUsed={budgetUsed}
+              budgetMax={budgetMax}
+              budgetPct={budgetPct}
+              isRunning={isRunning}
+            />
           )}
 
           {/* Timeout - hidden in simple mode unless advanced */}
@@ -797,149 +545,21 @@ export function EvolutionDashboard() {
                 </div>
               </div>
 
-              {/* Goals */}
-              <EditableList
-                title="目标"
-                items={run.goals}
-                dotColor="var(--green)"
-                onSave={(items) => call("run.update", { runId, goals: items })}
+              {/* Goals & Termination Conditions */}
+              <GoalPanel
+                run={run}
+                simpleMode={simpleMode}
+                showAdvancedPanel={showAdvancedPanel}
+                onToggleAdvanced={() => setShowAdvancedPanel(!showAdvancedPanel)}
+                onSaveGoals={(items) => call("run.update", { runId, goals: items })}
+                onSaveTerminationConditions={(items) => call("run.update", { runId, terminationConditions: items })}
+                onClearGoal={(id) => call("run.clearGoal", { runId: id }).then(() => {
+                  useTaskStore.getState().updateTask(id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
+                }).catch(() => {})}
+                onPauseGoal={(id) => call("run.pauseGoal", { runId: id }).catch(() => {})}
+                onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch(() => {})}
+                presenceSlot={<PresencePanel />}
               />
-
-              {/* Termination Conditions */}
-              <EditableList
-                title="完成标准"
-                items={run.terminationConditions}
-                dotColor="var(--yellow)"
-                onSave={(items) => call("run.update", { runId, terminationConditions: items })}
-              />
-
-              {/* Online Users - advanced only */}
-              {!simpleMode && (
-              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
-                <PresencePanel />
-              </div>
-              )}
-
-              {/* Advanced options toggle */}
-              {simpleMode && (
-              <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
-                <button
-                  onClick={() => setShowAdvancedPanel(!showAdvancedPanel)}
-                  className="text-xs underline"
-                  style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
-                >
-                  {showAdvancedPanel ? "收起高级选项" : "高级选项"}
-                </button>
-              </div>
-              )}
-
-              {/* Goal State Panel */}
-              {run.goalStatus && run.goalStatus !== "unmet" && (
-                <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>进度</h4>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: GOAL_STATUS_LABELS[run.goalStatus]?.bg ?? "var(--bg-secondary)",
-                        color: GOAL_STATUS_LABELS[run.goalStatus]?.color ?? "var(--text-secondary)",
-                      }}
-                    >
-                      {GOAL_STATUS_LABELS[run.goalStatus]?.label ?? run.goalStatus}
-                    </span>
-                  </div>
-
-                  {(run.goalEvaluationCycles ?? 0) > 0 && (
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span style={{ color: "var(--text-secondary)" }}>评估次数</span>
-                        <span>{run.goalEvaluationCycles}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span style={{ color: "var(--text-secondary)" }}>用时</span>
-                        <span>{formatGoalDuration(run.goalTimeElapsedMs ?? 0)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {run.goalBudgetTokens && (
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span style={{ color: "var(--text-secondary)" }}>AI 用量</span>
-                        <span>{formatGoalTokens(run.goalTokensUsed ?? 0)} / {formatGoalTokens(run.goalBudgetTokens)}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(((run.goalTokensUsed ?? 0) / run.goalBudgetTokens) * 100, 100)}%`,
-                            background: (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.8 ? "var(--red)"
-                              : (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.5 ? "var(--yellow)"
-                              : "var(--green)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {run.goalLastEvalReason && (
-                    <div className="text-xs p-2 rounded" style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}>
-                      {run.goalLastEvalReason}
-                    </div>
-                  )}
-
-                  {run.goalEvidence && run.goalEvidence.length > 0 && (
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {run.goalEvidence.slice(-8).map((e, i) => (
-                        <p key={i} className="text-xs flex items-start gap-1">
-                          <span style={{ color: "var(--blue)" }}>•</span>
-                          <span style={{ color: "var(--text-secondary)" }}>{e}</span>
-                        </p>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    {run.goalStatus === "pursuing" && (
-                      <>
-                        <button
-                          className="text-xs px-2 py-1 rounded transition-colors"
-                          style={{ background: "var(--bg-primary)", color: "var(--yellow)", border: "1px solid var(--border)" }}
-                          onClick={() => call("run.pauseGoal", { runId: run.id }).catch(() => {})}
-                        >暂停</button>
-                        <button
-                          className="text-xs px-2 py-1 rounded transition-colors"
-                          style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
-                          onClick={() => call("run.clearGoal", { runId: run.id }).then(() => {
-                            useTaskStore.getState().updateTask(run.id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
-                          }).catch(() => {})}
-                        >清除</button>
-                      </>
-                    )}
-                    {run.goalStatus === "paused" && (
-                      <>
-                        <button
-                          className="text-xs px-2 py-1 rounded transition-colors"
-                          style={{ background: "var(--bg-primary)", color: "var(--green)", border: "1px solid var(--border)" }}
-                          onClick={() => call("run.resumeGoal", { runId: run.id }).catch(() => {})}
-                        >恢复</button>
-                        <button
-                          className="text-xs px-2 py-1 rounded transition-colors"
-                          style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
-                          onClick={() => call("run.clearGoal", { runId: run.id }).then(() => {
-                            useTaskStore.getState().updateTask(run.id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
-                          }).catch(() => {})}
-                        >清除</button>
-                      </>
-                    )}
-                    {(run.goalStatus === "achieved" || run.goalStatus === "budget_exhausted") && (
-                      <span className="text-xs" style={{ color: run.goalStatus === "achieved" ? "var(--green)" : "var(--red)" }}>
-                        {run.goalStatus === "achieved" ? "已达成" : "预算已用完"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1045,79 +665,6 @@ export function EvolutionDashboard() {
   );
 }
 
-function levelColor(level: string): string {
-  switch (level) {
-    case "error": return "var(--red)";
-    case "warn": return "var(--yellow)";
-    case "info": return "var(--blue)";
-    default: return "var(--text-secondary)";
-  }
-}
-
-function EditableList({ title, items, dotColor, onSave }: {
-  title: string;
-  items: string[];
-  dotColor: string;
-  onSave: (items: string[]) => Promise<unknown>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<string[]>([]);
-
-  const startEdit = () => { setDraft([...items]); setEditing(true); };
-  const addItem = () => setDraft([...draft, ""]);
-  const removeItem = (i: number) => setDraft(draft.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, v: string) => { const d = [...draft]; d[i] = v; setDraft(d); };
-
-  const save = async () => {
-    const filtered = draft.map((s) => s.trim()).filter(Boolean);
-    if (filtered.length === 0) return;
-    await onSave(filtered);
-    setEditing(false);
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>{title}</h4>
-        {!editing && (
-          <button
-            onClick={startEdit}
-            className="text-[10px] px-1.5 py-0.5 rounded"
-            style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
-          >编辑</button>
-        )}
-      </div>
-      {!editing ? (
-        items.map((g, i) => (
-          <p key={i} className="text-xs mb-1 flex items-start gap-1">
-            <span style={{ color: dotColor }}>•</span>
-            <span style={{ color: "var(--text-primary)" }}>{g}</span>
-          </p>
-        ))
-      ) : (
-        <div className="space-y-1 mb-1">
-          {draft.map((item, i) => (
-            <div key={i} className="flex gap-1">
-              <input
-                value={item}
-                onChange={(e) => updateItem(i, e.target.value)}
-                className="flex-1 text-xs px-1.5 py-1 rounded font-mono"
-                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", outline: "none" }}
-              />
-              <button onClick={() => removeItem(i)} className="text-xs px-1" style={{ color: "var(--red)", background: "none", border: "none", cursor: "pointer" }}>×</button>
-            </div>
-          ))}
-          <div className="flex gap-1 mt-1">
-            <button onClick={addItem} className="text-[10px] px-2 py-0.5 rounded" style={{ color: dotColor, background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>+ 添加</button>
-            <button onClick={save} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--green)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>保存</button>
-            <button onClick={() => setEditing(false)} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>取消</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function TraceTab({ runId, call }: { runId: string; call: (method: string, params?: Record<string, unknown>) => Promise<unknown> }) {
   const [spans, setSpans] = useState<import("@ai-workbench/shared").TraceSpan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1135,16 +682,4 @@ function TraceTab({ runId, call }: { runId: string; call: (method: string, param
   if (spans.length === 0) return <EmptyState title="暂无 Trace 数据" description="任务执行后将显示 Agent 执行时间线" />;
 
   return <TraceTimeline spans={spans} />;
-}
-
-function ReportTab({ content }: { content: string }) {
-  const html = useMemo(() => marked.parse(content, { async: false }) as string, [content]);
-
-  return (
-    <div
-      className="markdown-body text-sm leading-relaxed"
-      style={{ color: "var(--text-primary)", animation: "fadeIn 0.3s ease-out" }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
 }

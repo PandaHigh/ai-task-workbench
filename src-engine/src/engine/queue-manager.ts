@@ -1,5 +1,7 @@
 import type { TaskDefinition, CreateTaskParams } from "@ai-workbench/shared";
 import crypto from "crypto";
+import path from "path";
+import { readJsonFile, writeJsonFile, ensureDir } from "../db/store-utils";
 
 interface QueueEntry {
   task: TaskDefinition;
@@ -8,6 +10,11 @@ interface QueueEntry {
 
 export class QueueManager {
   private queues: Map<string, QueueEntry[]> = new Map();
+  private dataDir: string | undefined;
+
+  constructor(dataDir?: string) {
+    this.dataDir = dataDir;
+  }
 
   enqueue(runId: string, params: CreateTaskParams): TaskDefinition {
     for (const existing of this.queues.get(runId) || []) {
@@ -44,13 +51,16 @@ export class QueueManager {
 
     queue.forEach((entry, i) => { entry.position = i; });
 
+    this.persistQueue(runId);
     return task;
   }
 
   dequeue(runId: string): TaskDefinition | null {
     const queue = this.queues.get(runId);
     if (!queue || queue.length === 0) return null;
-    return queue.shift()!.task;
+    const task = queue.shift()!.task;
+    this.persistQueue(runId);
+    return task;
   }
 
   dequeueForRole(runId: string, roleId: string): TaskDefinition | null {
@@ -60,17 +70,23 @@ export class QueueManager {
     // Prefer tasks explicitly assigned to this role
     const roleIdx = queue.findIndex((e) => e.task.assignedRoleId === roleId);
     if (roleIdx !== -1) {
-      return queue.splice(roleIdx, 1)[0].task;
+      const task = queue.splice(roleIdx, 1)[0].task;
+      this.persistQueue(runId);
+      return task;
     }
 
     // Fall back to unassigned tasks
     const unassignedIdx = queue.findIndex((e) => !e.task.assignedRoleId);
     if (unassignedIdx !== -1) {
-      return queue.splice(unassignedIdx, 1)[0].task;
+      const task = queue.splice(unassignedIdx, 1)[0].task;
+      this.persistQueue(runId);
+      return task;
     }
 
     // Last resort: take any task
-    return queue.shift()!.task;
+    const task = queue.shift()!.task;
+    this.persistQueue(runId);
+    return task;
   }
 
   peekNext(runId: string, count: number): TaskDefinition[] {
@@ -110,6 +126,7 @@ export class QueueManager {
     }
 
     this.queues.set(runId, reordered);
+    this.persistQueue(runId);
   }
 
   remove(runId: string, taskId: string): boolean {
@@ -121,11 +138,13 @@ export class QueueManager {
 
     queue.splice(index, 1);
     queue.forEach((entry, i) => { entry.position = i; });
+    this.persistQueue(runId);
     return true;
   }
 
   clear(runId: string): void {
     this.queues.delete(runId);
+    this.persistQueue(runId);
   }
 
   /** Restore an existing task into the queue (preserves original id/createdAt) */
@@ -139,6 +158,16 @@ export class QueueManager {
       return a.task.priority - b.task.priority;
     });
     queue.forEach((entry, i) => { entry.position = i; });
+    this.persistQueue(runId);
+  }
+
+  /** Load persisted queue for a run from disk if not already in memory */
+  loadPersistedQueue(runId: string): void {
+    if (this.queues.has(runId)) return;
+    const loaded = this.loadQueue(runId);
+    if (loaded.length > 0) {
+      this.queues.set(runId, loaded);
+    }
   }
 
   private getOrCreateQueue(runId: string): QueueEntry[] {
@@ -148,5 +177,33 @@ export class QueueManager {
       this.queues.set(runId, queue);
     }
     return queue;
+  }
+
+  private persistQueue(runId: string): void {
+    if (!this.dataDir) return;
+    try {
+      const dir = path.join(this.dataDir, "runs", runId);
+      ensureDir(dir);
+      const filePath = path.join(dir, "queue.json");
+      const queue = this.queues.get(runId);
+      if (!queue || queue.length === 0) {
+        // Write empty array to indicate a cleared queue
+        writeJsonFile(filePath, []);
+      } else {
+        writeJsonFile(filePath, queue);
+      }
+    } catch {
+      // Persistence failure should not interrupt queue operations
+    }
+  }
+
+  private loadQueue(runId: string): QueueEntry[] {
+    if (!this.dataDir) return [];
+    try {
+      const filePath = path.join(this.dataDir, "runs", runId, "queue.json");
+      return readJsonFile<QueueEntry[]>(filePath, [], "queue");
+    } catch {
+      return [];
+    }
   }
 }

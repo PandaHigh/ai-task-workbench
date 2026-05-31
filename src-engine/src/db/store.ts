@@ -24,12 +24,54 @@ const MAX_ERROR_ENTRIES = 500;
 export class Store {
   private dataDir: string;
   private runsDir: string;
+  private pendingWrites = new Map<string, { data: unknown; timer: ReturnType<typeof setTimeout> }>();
+  private runIndex: Map<string, ExecutionRun> | null = null;
+  private noDebounce: boolean;
 
-  constructor(customDataDir?: string) {
+  constructor(customDataDir?: string, options?: { noDebounce?: boolean }) {
     this.dataDir = customDataDir || getDataDir();
     this.runsDir = path.join(this.dataDir, "runs");
+    this.noDebounce = options?.noDebounce ?? process.env.NODE_ENV === "test";
     ensureDir(this.runsDir);
     cleanupTmpFiles(this.runsDir);
+  }
+
+  /** Debounce writes to the same file, merging rapid successive writes. */
+  private debouncedWrite(filePath: string, data: unknown, delayMs = 5): void {
+    if (this.noDebounce) {
+      writeJsonFile(filePath, data);
+      return;
+    }
+    const existing = this.pendingWrites.get(filePath);
+    if (existing) clearTimeout(existing.timer);
+    const timer = setTimeout(() => {
+      this.pendingWrites.delete(filePath);
+      writeJsonFile(filePath, data);
+    }, delayMs);
+    this.pendingWrites.set(filePath, { data, timer });
+  }
+
+  /** Flush all pending writes immediately. Call during graceful shutdown. */
+  flush(): void {
+    for (const [filePath, { data, timer }] of this.pendingWrites) {
+      clearTimeout(timer);
+      writeJsonFile(filePath, data);
+    }
+    this.pendingWrites.clear();
+  }
+
+  /** Build (or return cached) run index for O(1) lookups by id. */
+  private getRunIndex(): Map<string, ExecutionRun> {
+    if (!this.runIndex) {
+      const runs = this.listRuns();
+      this.runIndex = new Map(runs.map((r) => [r.id, r]));
+    }
+    return this.runIndex;
+  }
+
+  /** Invalidate the run index cache — call after mutations. */
+  private invalidateRunIndex(): void {
+    this.runIndex = null;
   }
 
   // ---- Execution Runs ----
@@ -40,7 +82,7 @@ export class Store {
   }
 
   getRun(runId: string): ExecutionRun | undefined {
-    return this.listRuns().find((r) => r.id === runId);
+    return this.getRunIndex().get(runId);
   }
 
   saveRun(run: ExecutionRun): void {
@@ -52,14 +94,30 @@ export class Store {
       runs.push(run);
     }
     writeJsonFile(path.join(this.runsDir, "index.json"), runs);
+    this.invalidateRunIndex();
   }
 
   deleteRun(runId: string): void {
     const runs = this.listRuns().filter((r) => r.id !== runId);
     writeJsonFile(path.join(this.runsDir, "index.json"), runs);
+    this.invalidateRunIndex();
     const runDir = path.join(this.runsDir, runId);
     if (!fs.existsSync(runDir)) return;
     fs.rmSync(runDir, { recursive: true });
+  }
+
+  listRunsPaginated(options: { page?: number; pageSize?: number; status?: string }): { runs: ExecutionRun[]; total: number; page: number; pageSize: number } {
+    const all = this.listRuns();
+    const filtered = options.status ? all.filter((r) => r.status === options.status) : all;
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 20;
+    const start = (page - 1) * pageSize;
+    return {
+      runs: filtered.slice(start, start + pageSize),
+      total: filtered.length,
+      page,
+      pageSize,
+    };
   }
 
   // ---- Tasks ----
@@ -73,6 +131,20 @@ export class Store {
   listTasks(runId: string): TaskDefinition[] {
     const file = path.join(this.runDir(runId), "tasks.json");
     return readJsonFile<TaskDefinition[]>(file, []);
+  }
+
+  listTasksPaginated(runId: string, options: { page?: number; pageSize?: number; status?: string }): { tasks: TaskDefinition[]; total: number; page: number; pageSize: number } {
+    const all = this.listTasks(runId);
+    const filtered = options.status ? all.filter((t) => t.status === options.status) : all;
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 50;
+    const start = (page - 1) * pageSize;
+    return {
+      tasks: filtered.slice(start, start + pageSize),
+      total: filtered.length,
+      page,
+      pageSize,
+    };
   }
 
   getTask(runId: string, taskId: string): TaskDefinition | undefined {
@@ -128,7 +200,7 @@ export class Store {
     logs.push({ ...log, id: logs.length + 1 } as TaskLog);
     // Keep last MAX_LOG_ENTRIES logs in file
     const trimmed = logs.length > MAX_LOG_ENTRIES ? logs.slice(-MAX_LOG_ENTRIES) : logs;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getLogs(runId: string, taskId?: string, limit?: number): TaskLog[] {
@@ -150,7 +222,7 @@ export class Store {
     const commits = readJsonFile<GitCommit[]>(file, []);
     commits.push({ ...commit, id: commits.length + 1 } as GitCommit);
     const trimmed = commits.length > MAX_HISTORY_ENTRIES ? commits.slice(-MAX_HISTORY_ENTRIES) : commits;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getCommits(runId: string, limit?: number): GitCommit[] {
@@ -166,7 +238,7 @@ export class Store {
     const lessons = readJsonFile<LessonLearned[]>(file, []);
     lessons.push({ ...lesson, id: lessons.length + 1 } as LessonLearned);
     const trimmed = lessons.length > MAX_HISTORY_ENTRIES ? lessons.slice(-MAX_HISTORY_ENTRIES) : lessons;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getLessons(runId: string, category?: string): LessonLearned[] {
@@ -185,7 +257,7 @@ export class Store {
     const scores = readJsonFile<Array<{ taskId: string; score: ScoreDetails; timestamp: number }>>(file, []);
     scores.push({ taskId, score, timestamp: Date.now() });
     const trimmed = scores.length > MAX_HISTORY_ENTRIES ? scores.slice(-MAX_HISTORY_ENTRIES) : scores;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getScores(runId: string): Array<{ taskId: string; score: ScoreDetails; timestamp: number }> {
@@ -215,7 +287,7 @@ export class Store {
     const activities = readJsonFile<import("@ai-workbench/shared").ActivityEvent[]>(file, []);
     activities.push(event);
     const trimmed = activities.length > MAX_HISTORY_ENTRIES ? activities.slice(-MAX_HISTORY_ENTRIES) : activities;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getActivities(runId: string, limit?: number): import("@ai-workbench/shared").ActivityEvent[] {
@@ -231,7 +303,7 @@ export class Store {
     const comments = readJsonFile<import("@ai-workbench/shared").TaskComment[]>(file, []);
     comments.push(comment);
     const trimmed = comments.length > MAX_HISTORY_ENTRIES ? comments.slice(-MAX_HISTORY_ENTRIES) : comments;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getComments(runId: string): import("@ai-workbench/shared").TaskComment[] {
@@ -246,7 +318,7 @@ export class Store {
     const existing = readJsonFile<TraceSpan[]>(file, []);
     existing.push(...spans);
     const trimmed = existing.length > MAX_TRACE_ENTRIES ? existing.slice(-MAX_TRACE_ENTRIES) : existing;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   /** Upsert spans by spanId — used for real-time trace persistence */
@@ -363,7 +435,7 @@ export class Store {
     const suggestions = readJsonFile<ReviewSuggestion[]>(file, []);
     suggestions.push(suggestion);
     const trimmed = suggestions.length > MAX_SUGGESTION_ENTRIES ? suggestions.slice(-MAX_SUGGESTION_ENTRIES) : suggestions;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getSuggestions(runId: string, taskId?: string): ReviewSuggestion[] {
@@ -379,7 +451,7 @@ export class Store {
     const errors = readJsonFile<DetectedError[]>(file, []);
     errors.push(error);
     const trimmed = errors.length > MAX_ERROR_ENTRIES ? errors.slice(-MAX_ERROR_ENTRIES) : errors;
-    writeJsonFile(file, trimmed);
+    this.debouncedWrite(file, trimmed);
   }
 
   getDetectedErrors(runId: string, taskId?: string): DetectedError[] {

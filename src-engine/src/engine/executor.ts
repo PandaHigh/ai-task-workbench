@@ -17,7 +17,7 @@ import { AdaptiveConfig } from "./adaptive-config.js";
 import type { OrchestratorProfile } from "@ai-workbench/shared";
 
 import { errorToMessage } from "../lib/error-utils.js";
-import { classifyError, getRetryStrategy, TaskError, type ErrorCategory } from "../lib/error-types.js";
+import { classifyError, getRetryStrategy, TaskError } from "../lib/error-types.js";
 import { extractJson } from "../lib/json-extract.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
 import { Tracer } from "../lib/tracer.js";
@@ -779,11 +779,12 @@ Respond ONLY with valid JSON:
     this.stopController?.abort();
     this.approvalGate?.abort();
     this.approvalGate = null;
-    for (const [id, controller] of this.abortControllers) {
+    const controllers = new Map(this.abortControllers);
+    this.abortControllers.clear();
+    for (const [id, controller] of controllers) {
       controller.abort();
       this.store.updateTask(this.runId, id, { status: "cancelled", completedAt: Date.now() });
     }
-    this.abortControllers.clear();
   }
 
   // ─── Approval integration ──────────────────────────────────────────────
