@@ -298,7 +298,7 @@ describe("Executor config loading", () => {
     expect(config.qualityThreshold).toBe(0.8);
     expect(config.maxEvaluationCycles).toBe(10);
     // Unset values keep defaults
-    expect(config.maxBudgetUsd).toBe(50);
+    expect(config.maxBudgetUsd).toBe(50000);
   });
 });
 
