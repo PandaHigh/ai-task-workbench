@@ -1265,4 +1265,41 @@ export const methodHandlers: Record<string, MethodHandler> = {
     await gm.ensureInit();
     return gm.getCurrentBranch();
   },
+
+  // ─── Snapshots ───────────────────────────────────────────────────────────
+
+  "snapshot.create": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const type = params.type === "post" ? "post" as const : "pre" as const;
+    const { SnapshotManager } = await import("../lib/snapshot.js");
+    const { getDataDir } = await import("../db/store-utils.js");
+    const sm = new SnapshotManager(getDataDir());
+    return sm.create(runId, taskId, type, workingDir);
+  },
+
+  "snapshot.list": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const { SnapshotManager } = await import("../lib/snapshot.js");
+    const { getDataDir } = await import("../db/store-utils.js");
+    const sm = new SnapshotManager(getDataDir());
+    return sm.listSnapshots(runId);
+  },
+
+  "snapshot.restore": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const snapshotId = requireString(params, "snapshotId");
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { SnapshotManager } = await import("../lib/snapshot.js");
+    const { getDataDir } = await import("../db/store-utils.js");
+    const sm = new SnapshotManager(getDataDir());
+    await sm.restore(runId, snapshotId, workingDir);
+    return { restored: true };
+  },
 };
