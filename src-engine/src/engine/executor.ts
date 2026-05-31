@@ -154,6 +154,22 @@ export class Executor {
 
         // Single-task mode (maxConcurrentTasks = 1) — original sequential logic
         if (this.config.maxConcurrentTasks <= 1) {
+          // Autonomy gate: supervised mode requires approval before each task
+          if (run.autonomyLevel === "supervised") {
+            this.log(run.id, "engine", "info", `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`);
+            const decision = await this.checkApproval(
+              "risky_commit", run, task,
+              `Supervised mode: approve execution of "${task.content.substring(0, 80)}"?`,
+              { taskContent: task.content },
+            );
+            if (!decision || decision.action === "reject") {
+              this.log(run.id, "engine", "info", "Task rejected by human in supervised mode");
+              this.store.updateTask(run.id, task.id, { status: "cancelled", completedAt: Date.now() });
+              this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "cancelled", reason: "Rejected in supervised mode" });
+              continue;
+            }
+          }
+
           this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
           this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
           this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });

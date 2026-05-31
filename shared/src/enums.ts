@@ -44,3 +44,5 @@ export type TaskPhase = "planner" | "developer" | "tester" | "reviewer";
 // ─── Multi-user collaboration ──────────────────────────────────────────
 
 export type UserRole = "owner" | "collaborator" | "viewer";
+
+export type AutonomyLevel = "supervised" | "assisted" | "autonomous";

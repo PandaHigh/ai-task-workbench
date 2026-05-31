@@ -6,6 +6,7 @@ import type {
   GoalStatus,
   CheckpointType,
   ApprovalStatus,
+  AutonomyLevel,
   TaskPhase,
   UserRole,
 } from "./enums.js";
@@ -69,6 +70,7 @@ export interface ExecutionRun {
 
   // Approval system
   approvalTimeoutMs?: number;
+  autonomyLevel?: AutonomyLevel;
 
   // Feature tracking
   features?: FeatureItem[];

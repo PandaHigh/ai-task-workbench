@@ -151,6 +151,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "maxTurns",
   "maxAutoRetries",
   "maxConcurrentTasks",
+  "autonomyLevel",
   "defaultModel",
   "publicUrl",
   "defaultTimeout",
