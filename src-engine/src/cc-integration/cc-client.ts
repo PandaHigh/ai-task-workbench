@@ -46,11 +46,27 @@ export async function killAllActiveProcesses(): Promise<void> {
   activePids.clear();
 }
 
+// Environment variables to forward to Claude CLI child process
+const FORWARD_ENV_PREFIXES = [
+  "ANTHROPIC_",   // ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, etc.
+  "CLAUDE_",      // CLAUDE_API_KEY, CLAUDE_CODE_USE_BEDROCK, etc.
+  "AWS_",         // AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION (for Bedrock)
+  "GOOGLE_",      // GOOGLE_CLOUD_PROJECT, etc. (for Vertex)
+  "OPENAI_",      // OPENAI_API_KEY, OPENAI_BASE_URL (if using OpenAI-compatible)
+];
+
 function buildSafeEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key of SAFE_ENV_KEYS) {
     const val = process.env[key];
     if (val !== undefined) env[key] = val;
+  }
+  // Forward LLM/API-related environment variables
+  for (const [key, val] of Object.entries(process.env)) {
+    if (val === undefined) continue;
+    if (FORWARD_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      env[key] = val;
+    }
   }
   if (!env.HOME) env.HOME = homedir();
   if (!env.PATH) env.PATH = isWin ? process.env.SYSTEMROOT ? `${process.env.SYSTEMROOT}\\System32` : "C:\\Windows\\System32" : "/usr/bin:/bin";

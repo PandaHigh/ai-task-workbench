@@ -60,8 +60,9 @@ export class Executor {
     private notify: NotifyFn,
     private runId: string,
   ) {
-    this.ccClient = new CCClient();
-    this.store = new Store();
+    const store = new Store();
+    this.store = store;
+    this.ccClient = new CCClient((store.getConfig("claudePath") as string) || undefined);
     this.skillManager = new SkillManager(new SkillStore(), () => {});
     this.tracer = new Tracer(notify, (spans) => {
       this.store.syncTraces(this.runId, spans);
