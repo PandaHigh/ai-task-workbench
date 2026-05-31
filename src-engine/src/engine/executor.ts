@@ -27,7 +27,7 @@ import { Tracer } from "../lib/tracer.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
-const DEFAULT_MAX_BUDGET_USD = 50000;
+const DEFAULT_MAX_BUDGET_USD = Infinity;
 const DEFAULT_STAGNATION_WINDOW = 5;
 const DEFAULT_MAX_TURNS = 50;
 const DEFAULT_MAX_AUTO_RETRIES = 3;
@@ -178,16 +178,6 @@ export class Executor {
 
           run.totalTasksCompleted++;
           this.store.saveRun(run);
-
-          // Post-task budget guard
-          const taskCost = this.recalculateCost(run.id);
-          if (taskCost > this.config.maxBudgetUsd) {
-            this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
-            this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
-            this.stop();
-            await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
-            break;
-          }
         } else {
           // Parallel mode — drain all ready tasks via ExecutionPool
           await this.runParallelTasks(run, task);
@@ -283,13 +273,6 @@ export class Executor {
     this.store.saveRun(run);
 
     this.cachedCost = null;
-    const totalCost = this.recalculateCost(run.id);
-    if (totalCost > this.config.maxBudgetUsd) {
-      this.log(run.id, "engine", "warn", `Budget exceeded after parallel batch: $${totalCost.toFixed(2)}. Stopping.`);
-      this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: totalCost, budget: this.config.maxBudgetUsd });
-      this.stop();
-      await this.finalize(run, `Budget exceeded ($${totalCost.toFixed(2)}).`);
-    }
   }
 
   private async handleEmptyQueue(run: ExecutionRun): Promise<boolean> {
@@ -304,13 +287,6 @@ export class Executor {
     }
 
     // Guard: budget exceeded
-    const currentCost = this.recalculateCost(run.id);
-    if (currentCost > this.config.maxBudgetUsd) {
-      this.log(run.id, "engine", "warn", `Budget exceeded: $${currentCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
-      await this.finalize(run, `Budget exceeded ($${currentCost.toFixed(2)}).`);
-      return false;
-    }
-
     // Evaluate goals (with individual error recovery)
     let evaluation: GoalEvaluation;
     try {
@@ -370,13 +346,6 @@ export class Executor {
     if (evaluation.isComplete) {
       this.log(run.id, "engine", "info", `Goals complete! Progress: ${(evaluation.overallProgress * 100).toFixed(0)}%`);
       await this.finalize(run);
-      return false;
-    }
-
-    // Check if unified goal state shows budget exhausted
-    if (run.goalStatus === "budget_exhausted") {
-      this.log(run.id, "engine", "warn", "Goal budget exhausted — wrapping up");
-      await this.finalize(run, `Goal budget exhausted. ${run.goalLastEvalReason || ""}`);
       return false;
     }
 
@@ -463,8 +432,7 @@ export class Executor {
 
   private loadProfile(): OrchestratorProfile | null {
     try {
-      const profileId = this.store.getConfig("activeProfile") as string | undefined;
-      if (!profileId) return null;
+      const profileId = (this.store.getConfig("activeProfile") as string | undefined) || "adaptive";
       const adaptive = new AdaptiveConfig({});
       const builtIn = adaptive.getBuiltInProfiles();
       return builtIn.find((p) => p.id === profileId) ?? this.store.listProfiles().find((p) => p.id === profileId) ?? null;
@@ -863,15 +831,10 @@ Respond ONLY with valid JSON:
         run.goalStatus = "achieved";
       }
 
-      // Token budget tracking (approximate from CC result)
-      if (result.totalCostUsd > 0 && run.goalBudgetTokens) {
-        // Rough estimate: ~$0.003 per 1K tokens
+      // Token tracking (approximate from CC result)
+      if (result.totalCostUsd > 0) {
         const estimatedTokens = Math.round((result.totalCostUsd / 0.003) * 1000);
         run.goalTokensUsed = (run.goalTokensUsed ?? 0) + estimatedTokens;
-        if (run.goalTokensUsed >= run.goalBudgetTokens) {
-          run.goalStatus = "budget_exhausted";
-          run.goalLastEvalReason = `Token budget exhausted: ${run.goalTokensUsed}/${run.goalBudgetTokens}`;
-        }
       }
 
       this.store.saveRun(run);

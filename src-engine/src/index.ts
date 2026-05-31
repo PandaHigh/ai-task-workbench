@@ -1,8 +1,9 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, subscriptionStore, queueManager, skillManager, mcpManager } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, subscriptionStore, queueManager, skillManager, mcpManager, pluginRegistry } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 import { connectRemoteWS, disconnectRemoteWS } from "./remote/remote-proxy.js";
 import { log } from "./lib/logger.js";
+import { resolvePlaywrightCli } from "./lib/playwright-mcp.js";
 import { platform } from "os";
 
 const isWin = platform() === "win32";
@@ -47,6 +48,15 @@ async function main() {
   wsServer.shutdownCallback = () => { gracefulShutdown(); };
 
   skillManager.initBuiltinSkills();
+
+  // Auto-register built-in Playwright MCP plugin if not already registered
+  const existing = pluginRegistry.list();
+  if (!existing.some((p) => p.name === "playwright")) {
+    const cli = resolvePlaywrightCli();
+    const config = cli ?? { command: "npx", args: ["@playwright/mcp@latest", "--headless"] };
+    pluginRegistry.register({ name: "playwright", ...config });
+    log.info("Auto-registered built-in Playwright MCP plugin");
+  }
 
   wsServer.start();
 

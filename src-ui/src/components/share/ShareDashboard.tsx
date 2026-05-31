@@ -43,7 +43,7 @@ export function ShareDashboard() {
     ? formatDuration((run.completedAt || Date.now()) - run.startedAt)
     : "未开始";
   const budgetUsed = run?.totalCostUsd ?? 0;
-  const budgetMax = 50000;
+  const budgetMax = Infinity;
 
   const handleRefresh = async () => {
     setRefreshing(true);

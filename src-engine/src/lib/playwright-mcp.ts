@@ -4,7 +4,7 @@ import os from "os";
 
 let configPath: string | null = null;
 
-function resolvePlaywrightCli(): { command: string; args: string[] } | null {
+export function resolvePlaywrightCli(): { command: string; args: string[] } | null {
   try {
     const pkgPath = require.resolve("@playwright/mcp/package.json");
     const cliPath = path.join(path.dirname(pkgPath), "cli.js");

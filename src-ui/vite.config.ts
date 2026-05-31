@@ -25,11 +25,19 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
+    allowedHosts: true,
     hmr: host
       ? { protocol: "ws", host, port: 1421 }
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],
+    },
+    proxy: {
+      "/api": "http://localhost:9731",
+      "/engine-ws": {
+        target: "ws://localhost:9731",
+        ws: true,
+      },
     },
   },
 }));

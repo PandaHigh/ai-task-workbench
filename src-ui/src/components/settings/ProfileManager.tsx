@@ -23,7 +23,7 @@ export function ProfileManager() {
       call("config.get", { key: "activeProfile" }),
     ]).then(([list, active]) => {
       setProfiles((list ?? []) as OrchestratorProfile[]);
-      setActiveId((active as string) ?? null);
+      setActiveId((active as string) ?? "adaptive");
     }).catch(() => {});
   }, [connected, call]);
 

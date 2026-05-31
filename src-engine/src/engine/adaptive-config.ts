@@ -23,6 +23,28 @@ export interface TaskHistoryEntry {
 
 const BUILT_IN_PROFILES: OrchestratorProfile[] = [
   {
+    id: "adaptive",
+    name: "自适应模式",
+    description: "根据任务复杂度和历史表现，自动选择最优执行策略。推荐大多数场景使用。",
+    isBuiltIn: true,
+    createdAt: 0,
+    updatedAt: 0,
+    config: {
+      mode: "adaptive",
+      maxFixIterations: 3,
+      qualityThreshold: 0.6,
+      timeoutMinutes: 30,
+      backgroundReview: false,
+      errorWatchEnabled: true,
+      agents: {
+        planner:   { maxTurns: 15, enabled: true },
+        developer: { maxTurns: 40, enabled: true },
+        tester:    { maxTurns: 25, enabled: true },
+        reviewer:  { maxTurns: 20, enabled: true },
+      },
+    },
+  },
+  {
     id: "conservative",
     name: "保守模式",
     description: "顺序执行，高质量阈值，最少重试。适合对质量要求极高的场景。",

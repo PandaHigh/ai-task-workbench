@@ -7,8 +7,12 @@ function detectEngineUrls(): { ws: string; http: string } {
   }
   const { protocol, hostname } = window.location;
   if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+    // Remote access: WebSocket and HTTP go through Vite proxy on same origin
     const wsProto = protocol === "https:" ? "wss:" : "ws:";
-    return { ws: `${wsProto}//${hostname}`, http: `${protocol}//${hostname}` };
+    return {
+      ws: `${wsProto}//${hostname}/engine-ws`,
+      http: `${protocol}//${hostname}`,
+    };
   }
   return { ws: "ws://localhost:9731", http: "http://localhost:9731" };
 }

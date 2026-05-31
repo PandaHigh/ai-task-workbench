@@ -74,7 +74,7 @@ export function EvolutionDashboard() {
   const [stopTarget, setStopTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<TaskDefinition | null>(null);
-  const [budgetMax, setBudgetMax] = useState(50000);
+  const [budgetMax, setBudgetMax] = useState(Infinity);
   const toast = useToast();
 
   const handleShare = () => setShowSharePanel(true);
