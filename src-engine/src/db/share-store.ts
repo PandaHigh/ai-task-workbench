@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import type { ShareToken } from "@ai-workbench/shared";

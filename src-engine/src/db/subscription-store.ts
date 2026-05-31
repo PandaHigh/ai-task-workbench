@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import type { Subscription } from "@ai-workbench/shared";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile } from "./store-utils.js";

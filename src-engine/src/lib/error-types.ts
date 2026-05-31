@@ -52,10 +52,6 @@ const TIMEOUT_PATTERNS = [
   /timed out/i, /timeout/i,
 ];
 
-const PIPELINE_PATTERNS = [
-  /^(planner|developer|tester|reviewer) phase failed/i,
-];
-
 const TASK_FAILURE_PATTERNS = [
   /exited with code/i,
   /sigterm/i, /sigkill/i,

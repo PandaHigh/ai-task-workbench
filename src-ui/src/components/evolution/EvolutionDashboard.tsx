@@ -163,7 +163,7 @@ export function EvolutionDashboard() {
     const interval = setInterval(async () => {
       // Skip polling if run is in a terminal state
       const currentRun = fetchedRun || useTaskStore.getState().tasks.find((t) => t.id === runId) as ExecutionRun | undefined;
-      if (currentRun?.status === "completed" || currentRun?.status === "failed" || currentRun?.status === "stopped") return;
+      if (currentRun?.status === "completed" || currentRun?.status === "failed" || currentRun?.status === "idle") return;
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));

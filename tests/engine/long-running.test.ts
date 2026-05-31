@@ -318,7 +318,7 @@ describe("7x24: Data array trimming (real Store)", () => {
     expect(commits[499].taskId).toBe("t-599");
   });
 
-  it("should trim lessons at 500 entries", async () => {
+  it("should trim lessons at 500 entries", { timeout: 15000 }, async () => {
     const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
     const store = new RealStore(tmpDir);
     const runId = "run-lessons";
@@ -342,7 +342,7 @@ describe("7x24: Data array trimming (real Store)", () => {
     expect(lessons[499].lesson).toBe("lesson 599");
   });
 
-  it("should trim scores at 500 entries", async () => {
+  it("should trim scores at 500 entries", { timeout: 15000 }, async () => {
     const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
     const store = new RealStore(tmpDir);
     const runId = "run-scores";

@@ -300,7 +300,7 @@ export class TaskPipeline {
       // Emit structured progress based on current phase
       const progress = this.parsePipelineProgress(message, taskId, allMessages.length);
       if (progress) {
-        this.notify("agent.progress", progress);
+        this.notify("agent.progress", progress as unknown as Record<string, unknown>);
       }
 
       if (message.type === "result" && message.subtype === "success") {

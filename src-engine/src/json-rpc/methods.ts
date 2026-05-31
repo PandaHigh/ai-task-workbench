@@ -152,6 +152,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "crewMode",
   "adaptiveEnabled",
   "activeProfile",
+  "branchStrategy",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -399,13 +400,14 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!store.getRun(runId)) {
       throw new RpcValidationError(`Run not found: ${runId}`);
     }
-    const { type, priority, timeoutMinutes, promptJson } = params as Record<string, unknown>;
+    const { type, priority, timeoutMinutes, promptJson, dependsOn } = params as Record<string, unknown>;
     const task = queueManager.enqueue(runId, {
       content,
       type: (type ?? "user_defined") as "user_defined" | "smart_task",
       ...(priority !== undefined && { priority: Number(priority) }),
       ...(timeoutMinutes !== undefined && { timeoutMinutes: Number(timeoutMinutes) }),
       ...(promptJson !== undefined && { promptJson: String(promptJson) }),
+      ...(Array.isArray(dependsOn) && { dependsOn: dependsOn.map(String) }),
     });
     store.saveTask(runId, task);
     sessionManager.recordActivity({ userId: "system", runId, action: "task.created", details: { taskId: task.id, content: content.substring(0, 80) } });

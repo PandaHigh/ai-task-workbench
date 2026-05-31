@@ -1,5 +1,4 @@
-import type { ReviewResult, ReviewSuggestion, TaskDefinition } from "@ai-workbench/shared";
-import type { CCClient } from "../../cc-integration/cc-client.js";
+import type { ReviewResult, ReviewSuggestion } from "@ai-workbench/shared";
 import type { AgentExecutor } from "./agent-executor.js";
 import { REVIEWER_ROLE } from "./agent-role.js";
 import { GitManager } from "../../git/git-manager.js";
@@ -29,7 +28,7 @@ export class BackgroundReviewer {
   async runBackgroundReview(params: BackgroundReviewParams): Promise<ReviewSuggestion | null> {
     const { runId, taskId, workingDir } = params;
     const branchName = `review-${taskId.slice(0, 8)}`;
-    const worktreeManager = new WorktreeManager(workingDir);
+    const worktreeManager = new WorktreeManager();
     let worktreePath: string | null = null;
 
     try {

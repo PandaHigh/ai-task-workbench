@@ -38,6 +38,7 @@ export class QueueManager {
       promptJson: params.promptJson ?? "",
       status: "pending",
       createdAt: Date.now(),
+      dependsOn: params.dependsOn,
     };
 
     const position = queue.length;
@@ -61,6 +62,25 @@ export class QueueManager {
     const task = queue.shift()!.task;
     this.persistQueue(runId);
     return task;
+  }
+
+  /**
+   * Dequeue a task whose dependencies are all satisfied.
+   * Accepts a set of completed task IDs to check against.
+   */
+  dequeueWithDeps(runId: string, completedTaskIds: Set<string>): TaskDefinition | null {
+    const queue = this.queues.get(runId);
+    if (!queue || queue.length === 0) return null;
+
+    const idx = queue.findIndex(entry => {
+      if (!entry.task.dependsOn || entry.task.dependsOn.length === 0) return true;
+      return entry.task.dependsOn.every(depId => completedTaskIds.has(depId));
+    });
+
+    if (idx === -1) return null;
+    const entry = queue.splice(idx, 1)[0];
+    this.persistQueue(runId);
+    return entry.task;
   }
 
   dequeueForRole(runId: string, roleId: string): TaskDefinition | null {

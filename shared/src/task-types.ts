@@ -35,6 +35,9 @@ export interface TaskDefinition {
   assignedRoleId?: string;
   pipelinePhases?: PhaseRecord[];
   pipelineIterations?: number;
+  dependsOn?: string[];
+  branchName?: string;
+  worktreePath?: string;
 }
 
 export interface ExecutionRun {
@@ -197,6 +200,7 @@ export interface CreateTaskParams {
   priority?: number;
   timeoutMinutes?: number;
   promptJson?: string;
+  dependsOn?: string[];
 }
 
 // ─── Goal types ──────────────────────────────────────────────────────────

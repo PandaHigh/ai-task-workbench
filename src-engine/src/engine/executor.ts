@@ -14,6 +14,7 @@ import { ErrorWatcher } from "./error-watcher.js";
 import { BackgroundReviewer } from "./agents/background-reviewer.js";
 import { AgentExecutor } from "./agents/agent-executor.js";
 import { AdaptiveConfig } from "./adaptive-config.js";
+import { BranchStrategy } from "../git/branch-strategy.js";
 import type { OrchestratorProfile } from "@ai-workbench/shared";
 
 import { errorToMessage } from "../lib/error-utils.js";
@@ -62,6 +63,7 @@ export class Executor {
     stagnationWindow: number;
     maxTurns: number;
     maxAutoRetries: number;
+    branchStrategy: "direct" | "feature-branch";
   };
 
   constructor(
@@ -83,9 +85,10 @@ export class Executor {
       stagnationWindow: DEFAULT_STAGNATION_WINDOW,
       maxTurns: DEFAULT_MAX_TURNS,
       maxAutoRetries: DEFAULT_MAX_AUTO_RETRIES,
+      branchStrategy: "direct",
     };
     try {
-      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries"] as const;
+      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries", "branchStrategy"] as const;
       for (const key of keys) {
         const val = this.store.getConfig(key) as number | undefined;
         if (val !== undefined && val !== null) {
@@ -129,8 +132,15 @@ export class Executor {
       }
 
       while (this.running) {
-        // Sequential mode (default)
-        const task = this.queueManager.dequeue(run.id);
+        // Maintain a set of completed task IDs for DAG-aware scheduling
+        const completedTaskIds = new Set<string>(
+          this.store.listTasks(run.id)
+            .filter(t => t.status === "completed")
+            .map(t => t.id)
+        );
+
+        // DAG-aware dequeue: skips tasks whose dependencies are not met
+        const task = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
 
         if (!task) {
           const shouldContinue = await this.handleEmptyQueue(run);
@@ -372,13 +382,28 @@ export class Executor {
     const abortController = new AbortController();
     this.abortControllers.set(task.id, abortController);
 
+    // Feature branch isolation
+    const useFeatureBranch = this.config.branchStrategy === "feature-branch";
+    let branchResult: { branchName: string; worktreePath: string } | null = null;
+
+    if (useFeatureBranch) {
+      try {
+        branchResult = await BranchStrategy.createTaskBranch(run.workingDir, task.id);
+        this.store.updateTask(run.id, task.id, { branchName: branchResult.branchName, worktreePath: branchResult.worktreePath });
+        this.log(run.id, "engine", "info", `Created feature branch: ${branchResult.branchName}`);
+      } catch (err) {
+        this.log(run.id, "engine", "warn", `Failed to create feature branch, falling back to direct: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
     try {
       await gitManager.ensureInit();
 
-      // Inject skills and generate CLAUDE.md
-      this.skillManager.prepareWorkingDir(run.workingDir);
+      // Inject skills and generate CLAUDE.md in the correct working directory
+      const pipelineWorkingDir = branchResult?.worktreePath || run.workingDir;
+      this.skillManager.prepareWorkingDir(pipelineWorkingDir);
       const context = await this.buildContext(task, run, gitManager);
-      generateClaudeMd(run.workingDir, context);
+      generateClaudeMd(pipelineWorkingDir, context);
 
       this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
 
@@ -400,7 +425,7 @@ export class Executor {
           ? (data: string) => this.errorWatcher.processStderr(data, run.id, task.id)
           : undefined,
       };
-      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), run.workingDir, pipelineConfig);
+      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), pipelineWorkingDir, pipelineConfig);
       const pipelineResult: PipelineResult = await pipeline.run(task, context, abortController.signal);
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
@@ -610,6 +635,25 @@ export class Executor {
     } finally {
       this.abortControllers.delete(task.id);
       this.cachedCost = null;
+
+      // Merge and clean up feature branch
+      if (useFeatureBranch && branchResult) {
+        try {
+          const mergeResult = await BranchStrategy.mergeBranch(
+            run.workingDir,
+            branchResult.branchName,
+          );
+          if (mergeResult.success) {
+            this.log(run.id, "engine", "info", `Merged feature branch: ${branchResult.branchName}`);
+          } else {
+            this.log(run.id, "engine", "warn", `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+          }
+        } catch (err) {
+          this.log(run.id, "engine", "error", `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`);
+        } finally {
+          await BranchStrategy.cleanupBranch(run.workingDir, branchResult.branchName, branchResult.worktreePath);
+        }
+      }
     }
   }
 

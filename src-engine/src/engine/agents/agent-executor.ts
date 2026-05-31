@@ -90,7 +90,7 @@ export class AgentExecutor {
       // Emit structured agent progress
       const progress = this.parseProgress(message, role, taskId, collectedMessages.length, ccOptions.maxTurns ?? role.maxTurns);
       if (progress) {
-        this.notify("agent.progress", progress);
+        this.notify("agent.progress", progress as unknown as Record<string, unknown>);
       }
 
       if (message.type === "result" && message.subtype === "success") {
