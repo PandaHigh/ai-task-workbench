@@ -30,8 +30,8 @@ test.describe("桌面端引擎集成", () => {
     await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
     await page.waitForTimeout(2000);
     // Config should be loaded from engine
-    await expect(page.getByText(/质量要求/)).toBeVisible();
-    await expect(page.getByText(/最长用时/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /质量要求/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /最长用时/ })).toBeVisible();
   });
 
   test("引擎 HTTP API 可访问", async ({ request }) => {
