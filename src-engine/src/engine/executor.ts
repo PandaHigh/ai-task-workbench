@@ -15,6 +15,8 @@ import { BackgroundReviewer } from "./agents/background-reviewer.js";
 import { AgentExecutor } from "./agents/agent-executor.js";
 import { AdaptiveConfig } from "./adaptive-config.js";
 import { BranchStrategy } from "../git/branch-strategy.js";
+import { DAGScheduler } from "./dag-scheduler.js";
+import { ExecutionPool } from "./execution-pool.js";
 import type { OrchestratorProfile } from "@ai-workbench/shared";
 
 import { errorToMessage } from "../lib/error-utils.js";
@@ -64,6 +66,7 @@ export class Executor {
     maxTurns: number;
     maxAutoRetries: number;
     branchStrategy: "direct" | "feature-branch";
+    maxConcurrentTasks: number;
   };
 
   constructor(
@@ -86,9 +89,10 @@ export class Executor {
       maxTurns: DEFAULT_MAX_TURNS,
       maxAutoRetries: DEFAULT_MAX_AUTO_RETRIES,
       branchStrategy: "direct",
+      maxConcurrentTasks: 1,
     };
     try {
-      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries", "branchStrategy"] as const;
+      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries", "branchStrategy", "maxConcurrentTasks"] as const;
       for (const key of keys) {
         const val = this.store.getConfig(key) as number | undefined;
         if (val !== undefined && val !== null) {
@@ -148,11 +152,30 @@ export class Executor {
           continue;
         }
 
-        this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
-        this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+        // Single-task mode (maxConcurrentTasks = 1) — original sequential logic
+        if (this.config.maxConcurrentTasks <= 1) {
+          this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
+          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
+          this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
 
-        await this.executeSingleTask(task, run);
+          await this.executeSingleTask(task, run);
+
+          run.totalTasksCompleted++;
+          this.store.saveRun(run);
+
+          // Post-task budget guard
+          const taskCost = this.recalculateCost(run.id);
+          if (taskCost > this.config.maxBudgetUsd) {
+            this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
+            this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
+            this.stop();
+            await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
+            break;
+          }
+        } else {
+          // Parallel mode — drain all ready tasks via ExecutionPool
+          await this.runParallelTasks(run, task);
+        }
 
         run.totalTasksCompleted++;
         this.store.saveRun(run);
@@ -173,6 +196,71 @@ export class Executor {
       run.status = "failed";
       this.store.saveRun(run);
       this.broadcast("run.status", { runId: run.id, status: "failed", reason: msg });
+    }
+  }
+
+  private async runParallelTasks(run: ExecutionRun, firstTask: TaskDefinition): Promise<void> {
+    const completedTaskIds = new Set<string>(
+      this.store.listTasks(run.id)
+        .filter(t => t.status === "completed")
+        .map(t => t.id)
+    );
+
+    // Gather all ready tasks
+    const readyTasks = [firstTask];
+    while (true) {
+      const next = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
+      if (!next) break;
+      readyTasks.push(next);
+      if (readyTasks.length >= this.config.maxConcurrentTasks) break;
+    }
+
+    if (readyTasks.length === 1) {
+      // Only one task ready — fall back to sequential
+      this.store.updateTask(run.id, firstTask.id, { status: "running", startedAt: Date.now() });
+      this.broadcast("task.status", { taskId: firstTask.id, runId: run.id, status: "running" });
+      this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+      await this.executeSingleTask(firstTask, run);
+      run.totalTasksCompleted++;
+      this.store.saveRun(run);
+      return;
+    }
+
+    // Build DAG scheduler for these tasks
+    const allTasks = this.store.listTasks(run.id);
+    const scheduler = new DAGScheduler(allTasks);
+    for (const id of completedTaskIds) scheduler.markCompleted(id);
+
+    this.log(run.id, "engine", "info", `Parallel execution: ${readyTasks.length} tasks with concurrency ${this.config.maxConcurrentTasks}`);
+
+    // Mark tasks as running
+    for (const t of readyTasks) {
+      this.store.updateTask(run.id, t.id, { status: "running", startedAt: Date.now() });
+      this.broadcast("task.status", { taskId: t.id, runId: run.id, status: "running" });
+    }
+    this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+
+    const pool = new ExecutionPool(
+      (task) => this.executeSingleTask(task, run),
+      this.config.maxConcurrentTasks,
+    );
+
+    const results = await pool.runAll(readyTasks, scheduler);
+
+    let completedCount = 0;
+    for (const r of results) {
+      if (r.success) completedCount++;
+    }
+    run.totalTasksCompleted += completedCount;
+    this.store.saveRun(run);
+
+    this.cachedCost = null;
+    const totalCost = this.recalculateCost(run.id);
+    if (totalCost > this.config.maxBudgetUsd) {
+      this.log(run.id, "engine", "warn", `Budget exceeded after parallel batch: $${totalCost.toFixed(2)}. Stopping.`);
+      this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: totalCost, budget: this.config.maxBudgetUsd });
+      this.stop();
+      await this.finalize(run, `Budget exceeded ($${totalCost.toFixed(2)}).`);
     }
   }
 
