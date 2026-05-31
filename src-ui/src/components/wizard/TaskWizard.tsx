@@ -76,12 +76,19 @@ export function TaskWizard() {
   const [creating, setCreating] = useState(false);
   const [autonomyLevel, setAutonomyLevel] = useState<"assisted" | "supervised" | "autonomous">("assisted");
   const [maxConcurrent, setMaxConcurrent] = useState(1);
+  const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [isStartingSession, setIsStartingSession] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
     return getLastDir();
   }, [getLastDir]);
+
+  useEffect(() => {
+    Promise.resolve(call("config.get", { key: "defaultTimeout" }))
+      .then((res) => { const v = (res as Record<string, unknown>)?.value; if (typeof v === "number") setTimeoutMinutes(v); })
+      .catch(() => {});
+  }, [call]);
 
   useEffect(() => {
     let idx = -1;
@@ -269,7 +276,7 @@ export function TaskWizard() {
           content,
           type: "user_defined",
           priority: 1,
-          timeoutMinutes: 60,
+          timeoutMinutes,
         }],
       })) as ExecutionRun;
 
@@ -664,6 +671,15 @@ export function TaskWizard() {
                 <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>并发任务数: {maxConcurrent}</label>
                 <input type="range" min="1" max="5" value={maxConcurrent}
                   onChange={(e) => setMaxConcurrent(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Timeout */}
+              <div>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>超时: {timeoutMinutes} 分钟</label>
+                <input type="range" min="5" max="180" step="5" value={timeoutMinutes}
+                  onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
                   className="w-full"
                 />
               </div>

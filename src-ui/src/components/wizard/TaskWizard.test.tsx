@@ -104,6 +104,7 @@ describe("TaskWizard", () => {
   describe("template jump in wizard mode", () => {
     it("should show template buttons on step 1", async () => {
       const user = userEvent.setup();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       renderWizard();
 
@@ -117,6 +118,7 @@ describe("TaskWizard", () => {
 
     it("should jump to step 2 when template selected", async () => {
       const user = userEvent.setup();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       renderWizard();
 
@@ -138,6 +140,7 @@ describe("TaskWizard", () => {
 
     it("should prefill template content in step 2", async () => {
       const user = userEvent.setup();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       renderWizard();
 
@@ -159,6 +162,7 @@ describe("TaskWizard", () => {
   describe("editable step 2", () => {
     it("should render editable fields", async () => {
       const user = userEvent.setup();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       renderWizard();
 
@@ -179,6 +183,7 @@ describe("TaskWizard", () => {
 
     it("should show create and create-and-start buttons", async () => {
       const user = userEvent.setup();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       renderWizard();
 
@@ -202,6 +207,7 @@ describe("TaskWizard", () => {
     it("should call run.create with edited fields on create", async () => {
       const user = userEvent.setup();
       const run = makeRun();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       mockCall.mockResolvedValueOnce(run);
 
@@ -232,6 +238,7 @@ describe("TaskWizard", () => {
     it("should call task.start after create when using create-and-start", async () => {
       const user = userEvent.setup();
       const run = makeRun();
+      mockCall.mockResolvedValueOnce({ value: 60 });
       mockCall.mockResolvedValueOnce({ sessionId: "sess-1" });
       mockCall.mockResolvedValueOnce(run);
       mockCall.mockResolvedValueOnce(undefined);

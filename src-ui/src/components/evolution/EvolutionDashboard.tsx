@@ -593,12 +593,14 @@ export function EvolutionDashboard() {
             </div>
           )}
 
-          {/* Git Remote Operations */}
+          {/* Git Remote Operations (collapsed by default) */}
           {run && showAdvancedPanel && (
-            <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-              <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>Git 远程操作</h4>
-              <GitRemotePanel workingDir={run.workingDir} />
-            </div>
+            <details className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <summary className="text-[10px] cursor-pointer select-none" style={{ color: "var(--text-muted)" }}>Git 远程操作</summary>
+              <div className="mt-2">
+                <GitRemotePanel workingDir={run.workingDir} />
+              </div>
+            </details>
           )}
 
           {/* Task Intervention & Snapshot */}

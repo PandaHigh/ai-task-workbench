@@ -469,8 +469,8 @@ export class Executor {
     const abortController = new AbortController();
     this.abortControllers.set(task.id, abortController);
 
-    // Feature branch isolation
-    const useFeatureBranch = this.config.branchStrategy === "feature-branch";
+    // Feature branch isolation (auto-enable when concurrency > 1)
+    const useFeatureBranch = this.config.branchStrategy === "feature-branch" || this.maxConcurrency > 1;
     let branchResult: { branchName: string; worktreePath: string } | null = null;
 
     if (useFeatureBranch) {

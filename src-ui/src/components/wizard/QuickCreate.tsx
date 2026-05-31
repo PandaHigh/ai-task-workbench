@@ -38,6 +38,10 @@ export function QuickCreate() {
         const list = (await call("template.list", {}) as UserTaskTemplate[] | null) ?? [];
         if (!cancelled) setUserTemplates(list);
       } catch { /* ignore */ }
+      try {
+        const res = await call("config.get", { key: "defaultTimeout" }) as Record<string, unknown>;
+        if (!cancelled && typeof res?.value === "number") setTimeoutMinutes(res.value);
+      } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, [connected]);

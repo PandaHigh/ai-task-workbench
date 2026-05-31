@@ -73,7 +73,7 @@ describe("SettingsPage", () => {
   it("显示超时设置", async () => {
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText(/每个任务最多运行 60 分钟/)).toBeInTheDocument();
+      expect(screen.getByText(/任务默认超时/)).toBeInTheDocument();
     });
   });
 

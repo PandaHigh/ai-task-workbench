@@ -143,9 +143,9 @@ export function SettingsPage() {
 
         {/* Quality threshold */}
         <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量要求</h3>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量要求（默认值）</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            AI 完成的任务需要达到这个质量分数。当前: {(qualityThreshold * 100).toFixed(0)}%
+            创建任务时的默认质量分数。当前: {(qualityThreshold * 100).toFixed(0)}%
           </p>
           <input type="range" min="0" max="100" value={qualityThreshold * 100}
             onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
@@ -170,9 +170,9 @@ export function SettingsPage() {
 
         {/* Default timeout */}
         <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>每个任务最长用时</h3>
+          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>任务默认超时</h3>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            每个任务最多运行 {defaultTimeout} 分钟
+            创建任务时的默认超时时间。当前: {defaultTimeout} 分钟
           </p>
           <input type="range" min="5" max="180" value={defaultTimeout}
             onChange={(e) => setDefaultTimeout(Number(e.target.value))}
