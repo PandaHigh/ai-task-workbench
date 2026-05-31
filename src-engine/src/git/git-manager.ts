@@ -117,4 +117,41 @@ export class GitManager {
     }
   }
 
+  // ─── Remote Operations ───────────────────────────────────────────────────
+
+  async push(remote: string = "origin", branch?: string): Promise<string> {
+    const args = branch ? [remote, branch] : [remote];
+    await this.git.push(...args);
+    return "Pushed";
+  }
+
+  async pull(remote: string = "origin", branch?: string): Promise<string> {
+    const args = [remote];
+    if (branch) args.push(branch);
+    await this.git.pull(...args);
+    return "Pulled";
+  }
+
+  async fetch(remote: string = "origin"): Promise<string> {
+    await this.git.fetch([remote]);
+    return "Fetched";
+  }
+
+  async addRemote(name: string, url: string): Promise<void> {
+    try {
+      await this.git.addRemote(name, url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("already exists")) throw err;
+    }
+  }
+
+  async listRemotes(): Promise<Array<{ name: string; refs: Record<string, string> }>> {
+    return this.git.getRemotes(true);
+  }
+
+  async getCurrentBranch(): Promise<string> {
+    const result = await this.git.revparse(["--abbrev-ref", "HEAD"]);
+    return result.trim();
+  }
 }

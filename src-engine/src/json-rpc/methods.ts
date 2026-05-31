@@ -1203,4 +1203,63 @@ export const methodHandlers: Record<string, MethodHandler> = {
     store.saveScheduledJob(job);
     return job;
   },
+
+  // ─── Git Remote Operations ──────────────────────────────────────────────
+
+  "git.push": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    return gm.push(params.remote as string | undefined, params.branch as string | undefined);
+  },
+
+  "git.pull": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    return gm.pull(params.remote as string | undefined, params.branch as string | undefined);
+  },
+
+  "git.fetch": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    return gm.fetch(params.remote as string | undefined);
+  },
+
+  "git.addRemote": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const name = requireString(params, "name");
+    const url = requireString(params, "url");
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    await gm.addRemote(name, url);
+    return { added: true };
+  },
+
+  "git.listRemotes": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    return gm.listRemotes();
+  },
+
+  "git.currentBranch": async (params) => {
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const { GitManager } = await import("../git/git-manager.js");
+    const gm = new GitManager({ workingDir });
+    await gm.ensureInit();
+    return gm.getCurrentBranch();
+  },
 };
