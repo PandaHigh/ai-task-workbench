@@ -345,6 +345,25 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { status: "stopped" };
   },
 
+  "run.update": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const run = store.getRun(runId);
+    if (!run) throw new RpcValidationError("Run not found");
+    if (Array.isArray(params.goals)) {
+      if (params.goals.length === 0) throw new RpcValidationError("goals must be non-empty");
+      run.goals = params.goals;
+    }
+    if (Array.isArray(params.terminationConditions)) {
+      if (params.terminationConditions.length === 0) throw new RpcValidationError("terminationConditions must be non-empty");
+      run.terminationConditions = params.terminationConditions;
+    }
+    store.saveRun(run);
+    const { workingDir: _, ...safeRun } = run;
+    notify("run.updated", { run: safeRun });
+    return safeRun;
+  },
+
   "run.delete": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);

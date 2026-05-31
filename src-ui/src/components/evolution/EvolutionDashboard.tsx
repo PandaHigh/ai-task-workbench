@@ -798,26 +798,20 @@ export function EvolutionDashboard() {
               </div>
 
               {/* Goals */}
-              <div>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>目标</h4>
-                {run.goals.map((g, i) => (
-                  <p key={i} className="text-xs mb-1 flex items-start gap-1">
-                    <span style={{ color: "var(--green)" }}>•</span>
-                    <span style={{ color: "var(--text-primary)" }}>{g}</span>
-                  </p>
-                ))}
-              </div>
+              <EditableList
+                title="目标"
+                items={run.goals}
+                dotColor="var(--green)"
+                onSave={(items) => call("run.update", { runId, goals: items })}
+              />
 
               {/* Termination Conditions */}
-              <div>
-                <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>完成标准</h4>
-                {run.terminationConditions.map((c, i) => (
-                  <p key={i} className="text-xs mb-1 flex items-start gap-1">
-                    <span style={{ color: "var(--yellow)" }}>•</span>
-                    <span style={{ color: "var(--text-primary)" }}>{c}</span>
-                  </p>
-                ))}
-              </div>
+              <EditableList
+                title="完成标准"
+                items={run.terminationConditions}
+                dotColor="var(--yellow)"
+                onSave={(items) => call("run.update", { runId, terminationConditions: items })}
+              />
 
               {/* Online Users - advanced only */}
               {!simpleMode && (
@@ -1058,6 +1052,70 @@ function levelColor(level: string): string {
     case "info": return "var(--blue)";
     default: return "var(--text-secondary)";
   }
+}
+
+function EditableList({ title, items, dotColor, onSave }: {
+  title: string;
+  items: string[];
+  dotColor: string;
+  onSave: (items: string[]) => Promise<unknown>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+
+  const startEdit = () => { setDraft([...items]); setEditing(true); };
+  const addItem = () => setDraft([...draft, ""]);
+  const removeItem = (i: number) => setDraft(draft.filter((_, idx) => idx !== i));
+  const updateItem = (i: number, v: string) => { const d = [...draft]; d[i] = v; setDraft(d); };
+
+  const save = async () => {
+    const filtered = draft.map((s) => s.trim()).filter(Boolean);
+    if (filtered.length === 0) return;
+    await onSave(filtered);
+    setEditing(false);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>{title}</h4>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="text-[10px] px-1.5 py-0.5 rounded"
+            style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
+          >编辑</button>
+        )}
+      </div>
+      {!editing ? (
+        items.map((g, i) => (
+          <p key={i} className="text-xs mb-1 flex items-start gap-1">
+            <span style={{ color: dotColor }}>•</span>
+            <span style={{ color: "var(--text-primary)" }}>{g}</span>
+          </p>
+        ))
+      ) : (
+        <div className="space-y-1 mb-1">
+          {draft.map((item, i) => (
+            <div key={i} className="flex gap-1">
+              <input
+                value={item}
+                onChange={(e) => updateItem(i, e.target.value)}
+                className="flex-1 text-xs px-1.5 py-1 rounded font-mono"
+                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", outline: "none" }}
+              />
+              <button onClick={() => removeItem(i)} className="text-xs px-1" style={{ color: "var(--red)", background: "none", border: "none", cursor: "pointer" }}>×</button>
+            </div>
+          ))}
+          <div className="flex gap-1 mt-1">
+            <button onClick={addItem} className="text-[10px] px-2 py-0.5 rounded" style={{ color: dotColor, background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>+ 添加</button>
+            <button onClick={save} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--green)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>保存</button>
+            <button onClick={() => setEditing(false)} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TraceTab({ runId, call }: { runId: string; call: (method: string, params?: Record<string, unknown>) => Promise<unknown> }) {
