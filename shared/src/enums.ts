@@ -7,7 +7,9 @@ export type TaskStatus =
   | "completed"
   | "reverted"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "paused"
+  | "skipped";
 
 export type RunStatus =
   | "idle"

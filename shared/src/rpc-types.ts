@@ -133,7 +133,9 @@ export type EngineMethod =
   | "git.currentBranch"
   | "snapshot.create"
   | "snapshot.list"
-  | "snapshot.restore";
+  | "snapshot.restore"
+  | "task.intervene"
+  | "task.inject";
 
 export type EngineNotification =
   | "task.progress"

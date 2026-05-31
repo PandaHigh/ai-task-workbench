@@ -1300,4 +1300,53 @@ export const methodHandlers: Record<string, MethodHandler> = {
     await sm.restore(runId, snapshotId, workingDir);
     return { restored: true };
   },
+
+  // ─── Real-time Intervention ──────────────────────────────────────────────
+
+  "task.intervene": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const action = requireString(params, "action");
+    if (!["pause", "cancel", "skip"].includes(action)) {
+      throw new RpcValidationError("action must be one of: pause, cancel, skip");
+    }
+    const task = store.getTask(runId, taskId);
+    if (!task) throw new RpcValidationError("Task not found");
+    const executor = activeExecutors.get(runId);
+    if (!executor) throw new RpcValidationError("No active executor for this run");
+
+    if (action === "cancel") {
+      executor.cancelTask(taskId, runId);
+      return { intervened: true, action: "cancelled" };
+    }
+    if (action === "pause") {
+      store.updateTask(runId, taskId, { status: "paused" });
+      notify("task.status", { taskId, runId, status: "paused" });
+      return { intervened: true, action: "paused" };
+    }
+    store.updateTask(runId, taskId, { status: "skipped", completedAt: Date.now() });
+    notify("task.status", { taskId, runId, status: "skipped" });
+    return { intervened: true, action: "skipped" };
+  },
+
+  "task.inject": async (params) => {
+    const runId = requireString(params, "runId");
+    validateRunId(runId);
+    const taskId = requireString(params, "taskId");
+    const instruction = requireNonEmptyString(params, "instruction");
+    const task = store.getTask(runId, taskId);
+    if (!task) throw new RpcValidationError("Task not found");
+
+    // Inject as a high-priority user task
+    const injectedTask = queueManager.enqueue(runId, {
+      content: `[Human injection for ${taskId.slice(0, 8)}] ${instruction}`,
+      type: "user_defined",
+      priority: 1,
+    });
+    store.saveTask(runId, injectedTask);
+    sessionManager.recordActivity({ userId: "system", runId, action: "task.injected", details: { targetTaskId: taskId, instruction: instruction.substring(0, 100) } });
+    notify("queue.updated", { runId, queue: queueManager.list(runId) });
+    return { injected: true, newTaskId: injectedTask.id };
+  },
 };
