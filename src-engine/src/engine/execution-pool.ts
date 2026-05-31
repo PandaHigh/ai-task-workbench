@@ -31,7 +31,7 @@ export class ExecutionPool {
   }
 
   async runAll(
-    tasks: TaskDefinition[],
+    _tasks: TaskDefinition[],
     scheduler: DAGScheduler,
     onTaskComplete?: (task: TaskDefinition) => void,
   ): Promise<PoolTaskResult[]> {

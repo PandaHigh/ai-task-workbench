@@ -95,4 +95,57 @@ describe("DAGScheduler", () => {
     expect(ready).toHaveLength(1);
     expect(ready[0].id).toBe("a");
   });
+
+  it("should skip tasks whose condition evaluates to false", () => {
+    const tasks = [
+      { ...makeTask("a"), condition: "lastScore >= 0.8" },
+      makeTask("b"),
+    ];
+    const dag = new DAGScheduler(tasks, { lastScore: 0.3 });
+    const ready = dag.getReadyTasks();
+    expect(ready).toHaveLength(1);
+    expect(ready[0].id).toBe("b");
+  });
+
+  it("should include tasks whose condition evaluates to true", () => {
+    const tasks = [
+      { ...makeTask("a"), condition: "lastScore >= 0.8" },
+      makeTask("b"),
+    ];
+    const dag = new DAGScheduler(tasks, { lastScore: 0.9 });
+    const ready = dag.getReadyTasks();
+    expect(ready).toHaveLength(2);
+  });
+
+  it("should skip tasks when condition evaluation fails", () => {
+    const tasks = [
+      { ...makeTask("a"), condition: "undefinedVar.property" },
+      makeTask("b"),
+    ];
+    const dag = new DAGScheduler(tasks);
+    const ready = dag.getReadyTasks();
+    expect(ready).toHaveLength(1);
+    expect(ready[0].id).toBe("b");
+  });
+
+  it("should support cycleCount in condition", () => {
+    const tasks = [
+      { ...makeTask("a"), condition: "cycleCount < 3" },
+    ];
+    const dag = new DAGScheduler(tasks, { cycleCount: 5 });
+    const ready = dag.getReadyTasks();
+    expect(ready).toHaveLength(0);
+  });
+
+  it("should update context and affect subsequent evaluations", () => {
+    const tasks = [
+      { ...makeTask("a"), condition: "completedCount >= 1" },
+      makeTask("b"),
+    ];
+    const dag = new DAGScheduler(tasks, { completedCount: 0 });
+    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["b"]);
+    dag.markCompleted("b");
+    dag.updateContext({ completedCount: 1 });
+    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["a"]);
+  });
 });

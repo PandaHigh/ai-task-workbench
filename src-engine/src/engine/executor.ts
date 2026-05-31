@@ -226,9 +226,15 @@ export class Executor {
       return;
     }
 
-    // Build DAG scheduler for these tasks
+    // Build DAG scheduler for these tasks with execution context
     const allTasks = this.store.listTasks(run.id);
-    const scheduler = new DAGScheduler(allTasks);
+    const scheduler = new DAGScheduler(allTasks, {
+      lastScore: 0,
+      lastStatus: "pending",
+      cycleCount: this.evaluationCycles,
+      completedCount: completedTaskIds.size,
+      failedCount: this.store.listTasks(run.id).filter(t => t.status === "failed" || t.status === "reverted").length,
+    });
     for (const id of completedTaskIds) scheduler.markCompleted(id);
 
     this.log(run.id, "engine", "info", `Parallel execution: ${readyTasks.length} tasks with concurrency ${this.config.maxConcurrentTasks}`);
@@ -245,7 +251,13 @@ export class Executor {
       this.config.maxConcurrentTasks,
     );
 
-    const results = await pool.runAll(readyTasks, scheduler);
+    const results = await pool.runAll(readyTasks, scheduler, (task) => {
+      const stored = this.store.getTask(run.id, task.id);
+      scheduler.updateContext({
+        lastScore: stored?.score ?? 0,
+        lastStatus: stored?.status ?? "completed",
+      });
+    });
 
     let completedCount = 0;
     for (const r of results) {

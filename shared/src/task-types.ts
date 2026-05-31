@@ -36,6 +36,7 @@ export interface TaskDefinition {
   pipelinePhases?: PhaseRecord[];
   pipelineIterations?: number;
   dependsOn?: string[];
+  condition?: string;
   branchName?: string;
   worktreePath?: string;
 }
@@ -201,6 +202,7 @@ export interface CreateTaskParams {
   timeoutMinutes?: number;
   promptJson?: string;
   dependsOn?: string[];
+  condition?: string;
 }
 
 // ─── Goal types ──────────────────────────────────────────────────────────
