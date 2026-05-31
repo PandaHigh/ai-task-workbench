@@ -120,7 +120,20 @@ export type EngineMethod =
   | "template.list"
   | "template.update"
   | "template.delete"
-  | "metrics.snapshot";
+  | "metrics.snapshot"
+  | "schedule.create"
+  | "schedule.list"
+  | "schedule.delete"
+  | "schedule.toggle"
+  | "git.push"
+  | "git.pull"
+  | "git.fetch"
+  | "git.addRemote"
+  | "git.listRemotes"
+  | "git.currentBranch"
+  | "snapshot.create"
+  | "snapshot.list"
+  | "snapshot.restore";
 
 export type EngineNotification =
   | "task.progress"
