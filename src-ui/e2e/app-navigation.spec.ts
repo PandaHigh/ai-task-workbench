@@ -29,7 +29,6 @@ test.describe("应用导航", () => {
 
   test("未连接引擎时侧边栏显示断开状态", async ({ page }) => {
     await page.goto("/#/");
-    // "AI 未连接" 同时出现在 sidebar 和主内容区，用 sidebar 内的定位
     const sidebarText = page.locator('[aria-label="主导航"] + div').getByText(/未连接|已就绪/);
     await expect(sidebarText).toBeVisible();
   });
@@ -55,5 +54,34 @@ test.describe("应用导航", () => {
   test("PandaAI 品牌标识可见", async ({ page }) => {
     await page.goto("/#/");
     await expect(page.getByText("PandaAI").first()).toBeVisible();
+  });
+
+  // --- 新增测试 ---
+
+  test("404 页面点击返回首页按钮正确导航", async ({ page }) => {
+    await page.goto("/#/nonexistent-page");
+    await expect(page.getByText("页面不存在")).toBeVisible();
+    await page.getByRole("button", { name: "返回首页" }).click();
+    await expect(page.getByRole("heading", { name: "我的任务" })).toBeVisible();
+  });
+
+  test("侧边栏有导航区域", async ({ page }) => {
+    await page.goto("/#/");
+    // Navigation area should be visible with key links
+    await expect(page.getByRole("button", { name: "首页" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "创建任务" })).toBeVisible();
+  });
+
+  test("直接访问 evolution 路由不崩溃", async ({ page }) => {
+    await page.goto("/#/evolution/test-run-id");
+    // Page should load without crash - verify something renders
+    await expect(page.locator("body")).toBeVisible();
+  });
+
+  test("侧边栏所有导航项可见", async ({ page }) => {
+    await page.goto("/#/");
+    await expect(page.getByRole("button", { name: "首页" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "创建任务" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "设置" }).first()).toBeVisible();
   });
 });

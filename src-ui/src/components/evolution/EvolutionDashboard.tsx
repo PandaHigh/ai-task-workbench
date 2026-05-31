@@ -29,8 +29,9 @@ import { BudgetDisplay } from "./BudgetDisplay";
 import { GoalPanel } from "./GoalPanel";
 import { LogPanel } from "./LogPanel";
 import { ReportTab } from "./ReportTab";
+import { ExecutionGraph } from "./ExecutionGraph";
 
-type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "report";
+type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "graph" | "report";
 
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
@@ -200,8 +201,8 @@ export function EvolutionDashboard() {
   };
 
   const allTabs: TabType[] = simpleMode
-    ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-    : (["logs" as const, "commits" as const, "lessons" as const, ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]);
+    ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, "graph" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+    : (["logs" as const, "commits" as const, "lessons" as const, ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, "graph" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]);
 
   const handleTabKeyDown = (e: React.KeyboardEvent) => {
     const idx = allTabs.indexOf(tab);
@@ -272,10 +273,10 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number) => {
+  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[]; condition?: string }) => {
     if (!runId || !text.trim()) return;
     try {
-      await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes });
+      await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes, ...extra });
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       toast.success("任务已添加到队列");
@@ -378,7 +379,7 @@ export function EvolutionDashboard() {
                   fontWeight: tab === t ? 600 : 400,
                   cursor: "pointer",
                 }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
-                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", errors: "错误", suggestions: "审查", report: "报告" }[t]}
+                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", errors: "错误", suggestions: "审查", graph: "流程图", report: "报告" }[t]}
                 </button>
               ))}
               </div>
@@ -487,6 +488,11 @@ export function EvolutionDashboard() {
                 <ReviewSuggestions runId={runId ?? ""} />
               )}
 
+              {/* DAG Graph Tab */}
+              {tab === "graph" && (
+                <ExecutionGraph tasks={queue} />
+              )}
+
               {/* Report Tab -- rendered as markdown */}
               {tab === "report" && run?.finalReport && (
                 <ReportTab content={run.finalReport} />
@@ -586,6 +592,43 @@ export function EvolutionDashboard() {
             </div>
           )}
 
+          {/* Task Intervention & Snapshot */}
+          {isRunning && activeTaskId && (
+            <div className="pt-2 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
+              <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务干预</h4>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={async () => {
+                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "pause" }); toast.success("已暂停任务"); }
+                  catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
+                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--yellow)", color: "#fff" }}>暂停</button>
+                <button onClick={async () => {
+                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "skip" }); toast.success("已跳过任务"); }
+                  catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
+                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--text-secondary)", color: "#fff" }}>跳过</button>
+                <button onClick={async () => {
+                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "cancel" }); toast.success("已取消任务"); }
+                  catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
+                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--red)", color: "#fff" }}>取消</button>
+              </div>
+              <h4 className="text-xs font-bold mt-2" style={{ color: "var(--text-secondary)" }}>快照</h4>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={async () => {
+                  try { await call("snapshot.create", { runId, type: "manual" }); toast.success("快照已创建"); }
+                  catch (err) { toast.error(`创建失败: ${err instanceof Error ? err.message : err}`); }
+                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--purple)", color: "#fff" }}>创建快照</button>
+                <button onClick={async () => {
+                  try {
+                    const list = await call("snapshot.list", { runId }) as Array<{ id: string; createdAt: number }>;
+                    if (list.length > 0) {
+                      await call("snapshot.restore", { runId, snapshotId: list[list.length - 1].id });
+                      toast.success("已恢复最新快照");
+                    } else { toast.info("暂无快照"); }
+                  } catch (err) { toast.error(`恢复失败: ${err instanceof Error ? err.message : err}`); }
+                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>恢复快照</button>
+              </div>
+            </div>
+          )}
+
           {/* Mobile share button */}
           {runId && (
             <div className="border-t pt-3 md:hidden" style={{ borderColor: "var(--border)" }}>
@@ -615,11 +658,12 @@ export function EvolutionDashboard() {
       <AddTaskModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSubmit={(text, priority, timeoutMinutes) => {
-          handleAddTask(text, priority, timeoutMinutes);
+        onSubmit={(text, priority, timeoutMinutes, extra) => {
+          handleAddTask(text, priority, timeoutMinutes, extra);
           setShowAddModal(false);
         }}
         call={call}
+        existingTaskIds={queue.map((t) => t.id)}
       />
 
       <ConfirmDialog

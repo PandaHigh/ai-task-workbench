@@ -46,4 +46,40 @@ test.describe("UI 响应性", () => {
     await cancelBtn.click();
     await expect(page.getByText(/粘贴.*链接/)).not.toBeVisible();
   });
+
+  // --- 新增响应式测试 ---
+
+  test("移动端汉堡菜单可打开侧边栏", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/#/");
+    // Click hamburger menu button
+    const menuBtn = page.locator("button").filter({ hasText: /☰|菜单|≡/ }).first();
+    if (await menuBtn.isVisible()) {
+      await menuBtn.click();
+    }
+    // Sidebar navigation items should appear
+    await expect(page.getByText("首页").first()).toBeVisible();
+  });
+
+  test("平板尺寸下布局正常渲染", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto("/#/");
+    await expect(page.getByRole("heading", { name: "我的任务" })).toBeVisible();
+  });
+
+  test("设置页面在不同宽度下不溢出", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/#/settings");
+    await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
+    // Check no horizontal scrollbar
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 2);
+  });
+
+  test("小屏幕下 wizard 页面可用", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/#/wizard");
+    await expect(page.getByRole("tablist")).toBeVisible();
+  });
 });

@@ -11,6 +11,12 @@ const mockGitInstance = {
   checkIsRepo: vi.fn().mockResolvedValue(false),
   init: vi.fn().mockResolvedValue(undefined),
   addConfig: vi.fn().mockResolvedValue(undefined),
+  push: vi.fn().mockResolvedValue({}),
+  pull: vi.fn().mockResolvedValue({}),
+  fetch: vi.fn().mockResolvedValue({}),
+  addRemote: vi.fn().mockResolvedValue(undefined),
+  getRemotes: vi.fn().mockResolvedValue([]),
+  revparse: vi.fn().mockResolvedValue("main\n"),
 };
 
 vi.mock("simple-git", () => ({
@@ -114,6 +120,83 @@ describe("GitManager", () => {
       const diff = await gm.getDiffSince("abc123");
       expect(diff).toBe("diff --git a/file");
       expect(mockGitInstance.diff).toHaveBeenCalledWith(["abc123"]);
+    });
+  });
+
+  describe("push", () => {
+    it("should push to remote with branch", async () => {
+      const result = await gm.push("origin", "main");
+      expect(mockGitInstance.push).toHaveBeenCalledWith("origin", "main");
+      expect(result).toBe("Pushed");
+    });
+
+    it("should push to remote without branch", async () => {
+      const result = await gm.push("origin");
+      expect(mockGitInstance.push).toHaveBeenCalledWith("origin");
+      expect(result).toBe("Pushed");
+    });
+  });
+
+  describe("pull", () => {
+    it("should pull from remote with branch", async () => {
+      const result = await gm.pull("origin", "main");
+      expect(mockGitInstance.pull).toHaveBeenCalledWith("origin", "main");
+      expect(result).toBe("Pulled");
+    });
+
+    it("should pull from remote without branch", async () => {
+      const result = await gm.pull("origin");
+      expect(mockGitInstance.pull).toHaveBeenCalledWith("origin");
+      expect(result).toBe("Pulled");
+    });
+  });
+
+  describe("fetch", () => {
+    it("should fetch from remote", async () => {
+      const result = await gm.fetch("upstream");
+      expect(mockGitInstance.fetch).toHaveBeenCalledWith(["upstream"]);
+      expect(result).toBe("Fetched");
+    });
+
+    it("should default to origin", async () => {
+      await gm.fetch();
+      expect(mockGitInstance.fetch).toHaveBeenCalledWith(["origin"]);
+    });
+  });
+
+  describe("addRemote", () => {
+    it("should add a remote", async () => {
+      await gm.addRemote("origin", "git@github.com:user/repo.git");
+      expect(mockGitInstance.addRemote).toHaveBeenCalledWith("origin", "git@github.com:user/repo.git");
+    });
+
+    it("should ignore already exists error", async () => {
+      mockGitInstance.addRemote.mockRejectedValueOnce(new Error("remote origin already exists"));
+      await expect(gm.addRemote("origin", "git@github.com:user/repo.git")).resolves.toBeUndefined();
+    });
+
+    it("should throw non-already-exists errors", async () => {
+      mockGitInstance.addRemote.mockRejectedValueOnce(new Error("other error"));
+      await expect(gm.addRemote("origin", "url")).rejects.toThrow("other error");
+    });
+  });
+
+  describe("listRemotes", () => {
+    it("should return remotes", async () => {
+      mockGitInstance.getRemotes.mockResolvedValueOnce([
+        { name: "origin", refs: { fetch: "git@github.com:user/repo.git", push: "git@github.com:user/repo.git" } },
+      ]);
+      const remotes = await gm.listRemotes();
+      expect(remotes).toHaveLength(1);
+      expect(remotes[0].name).toBe("origin");
+    });
+  });
+
+  describe("getCurrentBranch", () => {
+    it("should return current branch name", async () => {
+      mockGitInstance.revparse.mockResolvedValueOnce("feature-branch\n");
+      const branch = await gm.getCurrentBranch();
+      expect(branch).toBe("feature-branch");
     });
   });
 });

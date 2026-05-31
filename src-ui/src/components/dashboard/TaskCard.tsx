@@ -16,8 +16,12 @@ const STATUS_CFG: Record<string, { color: string; label: string; mood: RobotMood
   idle:      { color: "var(--text-secondary)", label: "准备中", mood: "idle" },
   running:   { color: "var(--blue-light)",     label: "工作中", mood: "working" },
   paused:    { color: "var(--yellow)",          label: "已暂停", mood: "thinking" },
+  scoring:   { color: "var(--purple)",          label: "评分中", mood: "thinking" },
   completed: { color: "var(--green)",           label: "已完成", mood: "celebrating" },
   failed:    { color: "var(--red)",             label: "出错了", mood: "error" },
+  reverted:  { color: "var(--orange)",          label: "已回退", mood: "error" },
+  cancelled: { color: "var(--text-tertiary)",   label: "已取消", mood: "idle" },
+  skipped:   { color: "var(--gray)",            label: "已跳过", mood: "idle" },
 };
 
 export function TaskCard({ task, onDelete }: TaskCardProps) {

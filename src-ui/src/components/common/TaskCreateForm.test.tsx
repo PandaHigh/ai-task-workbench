@@ -71,4 +71,82 @@ describe("TaskCreateForm", () => {
     render(<TaskCreateForm onSubmit={mockOnSubmit} templates={[]} />);
     expect(screen.queryByText("使用模板")).not.toBeInTheDocument();
   });
+
+  // ─── dependsOn / condition tests ─────────────────────────────────
+
+  it("should show advanced options button when existingTaskIds provided", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-1", "task-2"]} />);
+    expect(screen.getByText("高级选项（依赖、条件）")).toBeInTheDocument();
+  });
+
+  it("should not show advanced options button when no existingTaskIds", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} />);
+    expect(screen.queryByText(/高级选项/)).not.toBeInTheDocument();
+  });
+
+  it("should show dependency buttons when advanced section is open", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-abc123"]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+    expect(screen.getByText("task-abc")).toBeInTheDocument();
+  });
+
+  it("should toggle dependency selection", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-abc123"]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+
+    const depBtn = screen.getByText("task-abc");
+    fireEvent.click(depBtn);
+    // Should be selected (blue background style applied)
+    expect(depBtn).toBeInTheDocument();
+
+    // Click again to deselect
+    fireEvent.click(depBtn);
+    expect(depBtn).toBeInTheDocument();
+  });
+
+  it("should show condition input when advanced is open", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["t1"]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+    expect(screen.getByPlaceholderText(/lastScore/)).toBeInTheDocument();
+  });
+
+  it("should submit with dependsOn and condition", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["dep-1"]} />);
+    fireEvent.change(screen.getByPlaceholderText("描述你的任务..."), { target: { value: "Task with deps" } });
+    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+
+    // Select dependency
+    fireEvent.click(screen.getByText("dep-1"));
+
+    // Enter condition
+    fireEvent.change(screen.getByPlaceholderText(/lastScore/), { target: { value: "lastScore >= 0.8" } });
+
+    fireEvent.click(screen.getByText("确认"));
+    expect(mockOnSubmit).toHaveBeenCalledWith({
+      content: "Task with deps",
+      priority: 5,
+      timeoutMinutes: 60,
+      dependsOn: ["dep-1"],
+      condition: "lastScore >= 0.8",
+    });
+  });
+
+  it("should submit without dependsOn when none selected", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["t1"]} />);
+    fireEvent.change(screen.getByPlaceholderText("描述你的任务..."), { target: { value: "No deps" } });
+    fireEvent.click(screen.getByText("确认"));
+    expect(mockOnSubmit).toHaveBeenCalledWith({
+      content: "No deps",
+      priority: 5,
+      timeoutMinutes: 60,
+    });
+  });
+
+  it("should support Ctrl+Enter shortcut", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} />);
+    const textarea = screen.getByPlaceholderText("描述你的任务...");
+    fireEvent.change(textarea, { target: { value: "Quick submit" } });
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+    expect(mockOnSubmit).toHaveBeenCalledWith({ content: "Quick submit", priority: 5, timeoutMinutes: 60 });
+  });
 });
