@@ -65,6 +65,7 @@ export type EngineMethod =
   | "task.cancel"
   | "task.retry"
   | "task.delete"
+  | "task.update"
   | "task.setTimeout"
   | "queue.list"
   | "queue.remove"
@@ -81,6 +82,7 @@ export type EngineMethod =
   | "run.logs"
   | "run.stop"
   | "run.delete"
+  | "run.update"
   | "config.get"
   | "config.set"
   | "share.create"
@@ -113,7 +115,12 @@ export type EngineMethod =
   | "profile.set"
   | "profile.delete"
   | "suggestion.list"
-  | "error.history";
+  | "error.history"
+  | "template.create"
+  | "template.list"
+  | "template.update"
+  | "template.delete"
+  | "metrics.snapshot";
 
 export type EngineNotification =
   | "task.progress"

@@ -26,17 +26,15 @@ export async function killProcessTree(pid: number): Promise<void> {
       process.kill(pid);
     } else {
       // Kill the entire process group by sending SIGTERM to -pid (negative = group)
-      try { process.kill(-pid, "SIGTERM"); } catch { /* fallback to single pid */ }
-      try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ }
+      try { process.kill(-pid, "SIGTERM"); } catch { /* process group may have already exited — will try single pid next */ }
+      try { process.kill(pid, "SIGTERM"); } catch { /* process may have already exited */ }
       // Give processes 2s then SIGKILL
       await new Promise((r) => setTimeout(r, 2000));
-      try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+      try { process.kill(-pid, "SIGKILL"); } catch { /* process may have already exited */ }
       try { process.kill(pid, 0); } catch { return; } // confirmed dead
-      try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ }
+      try { process.kill(pid, "SIGKILL"); } catch { /* process may have already exited */ }
     }
-  } catch {
-    // Process already gone
-  }
+  } catch { /* process may have already exited */ }
 }
 
 export async function killAllActiveProcesses(): Promise<void> {
@@ -201,7 +199,11 @@ export class CCClient {
           } else {
             const assistantTexts = messages
               .filter((m) => m.type === "assistant")
-              .map((m) => typeof m.content === "string" ? m.content : (m.content as Array<{text: string}>)?.map?.(c => c.text)?.join?.("") || "")
+              .map((m) => {
+                if (typeof m.content === "string") return m.content;
+                if (Array.isArray(m.content)) return m.content.map((c: any) => c?.text ?? "").join("");
+                return "";
+              })
               .filter(Boolean);
             const fallbackResult = assistantTexts.length > 0
               ? assistantTexts[assistantTexts.length - 1]
@@ -249,7 +251,12 @@ export class CCClient {
           reject(new Error("Task was aborted"));
         };
         options.abortSignal.addEventListener("abort", onAbort);
+        // Safety: remove listener after 30s to prevent leak if proc never exits
+        const safetyTimer = setTimeout(() => {
+          options.abortSignal!.removeEventListener("abort", onAbort);
+        }, 30000);
         const removeAbortListener = () => {
+          clearTimeout(safetyTimer);
           options.abortSignal!.removeEventListener("abort", onAbort);
         };
         proc.on("close", removeAbortListener);
@@ -358,7 +365,12 @@ export class CCClient {
         sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
       };
       options.abortSignal.addEventListener("abort", onAbort);
+      // Safety: remove listener after 30s to prevent leak if proc never exits
+      const safetyTimer = setTimeout(() => {
+        options.abortSignal!.removeEventListener("abort", onAbort);
+      }, 30000);
       const removeAbortListener = () => {
+        clearTimeout(safetyTimer);
         options.abortSignal!.removeEventListener("abort", onAbort);
       };
       proc.on("close", removeAbortListener);

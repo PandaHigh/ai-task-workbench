@@ -11,7 +11,7 @@ const ROLE_COLORS: Record<string, string> = {
   planner: "var(--blue)",
   developer: "var(--green)",
   tester: "var(--yellow)",
-  reviewer: "#8b5cf6",
+  reviewer: "var(--purple, #8b5cf6)",
 };
 
 export function AgentProgressPanel() {
@@ -40,6 +40,10 @@ export function AgentProgressPanel() {
               </div>
               <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
                 <div
+                  role="progressbar"
+                  aria-valuenow={Math.round(progress.progress)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
                   className="h-full rounded-full transition-all duration-300"
                   style={{ width: `${Math.max(2, progress.progress)}%`, background: color }}
                 />

@@ -18,7 +18,7 @@ export function ReviewSuggestions({ runId }: ReviewSuggestionsProps) {
     setLoading(true);
     call("suggestion.list", { runId })
       .then((data) => setSuggestions(data as ReviewSuggestion[]))
-      .catch(() => setSuggestions([]))
+      .catch((err) => { console.warn("[ReviewSuggestions] load failed:", err instanceof Error ? err.message : err); setSuggestions([]); })
       .finally(() => setLoading(false));
   }, [runId, call, setSuggestions]);
 

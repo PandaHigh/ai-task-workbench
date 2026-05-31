@@ -10,7 +10,7 @@ const ROLE_COLORS: Record<string, { bg: string; border: string; text: string }> 
   planner: { bg: "rgba(77, 107, 254, 0.15)", border: "var(--blue)", text: "var(--blue)" },
   developer: { bg: "rgba(16, 185, 129, 0.15)", border: "var(--green)", text: "var(--green)" },
   tester: { bg: "rgba(234, 179, 8, 0.15)", border: "var(--yellow)", text: "var(--yellow)" },
-  reviewer: { bg: "rgba(139, 92, 246, 0.15)", border: "#8b5cf6", text: "#8b5cf6" },
+  reviewer: { bg: "rgba(139, 92, 246, 0.15)", border: "var(--purple, #8b5cf6)", text: "var(--purple, #8b5cf6)" },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,6 +31,7 @@ function getRoleFromOperation(operation: string): string {
 
 export function TraceTimeline({ spans }: TraceTimelineProps) {
   const [expandedSpan, setExpandedSpan] = useState<string | null>(null);
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (spans.length === 0) {
     return (
@@ -74,16 +75,18 @@ export function TraceTimeline({ spans }: TraceTimelineProps) {
 
           return (
             <div key={span.spanId} className="relative" style={{ height: "36px", marginBottom: "4px" }}>
-              <div
+              <button
+                type="button"
                 onClick={() => setExpandedSpan(isExpanded ? null : span.spanId)}
-                className="absolute top-0 h-[32px] rounded flex items-center px-2 cursor-pointer overflow-hidden"
+                className="absolute top-0 h-[32px] rounded flex items-center px-2 cursor-pointer overflow-hidden border-0 p-0 bg-transparent text-left w-auto"
+                aria-expanded={isExpanded}
                 style={{
                   left: `${leftPct}%`,
                   width: `${widthPct}%`,
                   minWidth: "60px",
                   background: colors.bg,
                   border: `1px solid ${colors.border}`,
-                  animation: isRunning ? "pulse 2s ease-in-out infinite" : undefined,
+                  animation: isRunning && !prefersReducedMotion ? "pulse 2s ease-in-out infinite" : undefined,
                   transition: "opacity 0.15s",
                 }}
               >
@@ -108,7 +111,7 @@ export function TraceTimeline({ spans }: TraceTimelineProps) {
                     {span.status === "ok" ? "OK" : "ERR"}
                   </span>
                 )}
-              </div>
+              </button>
               {isExpanded && (
                 <div
                   className="absolute left-0 right-0 rounded p-3 text-xs z-10"

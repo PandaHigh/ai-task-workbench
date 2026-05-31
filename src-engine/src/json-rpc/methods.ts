@@ -1,4 +1,4 @@
-import type { CreateRunParams, ExecutionRun } from "@ai-workbench/shared";
+import type { ExecutionRun } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
@@ -73,6 +73,7 @@ function requireNonEmptyString(params: Record<string, unknown>, key: string): st
 }
 
 function validateRunId(runId: string): void {
+  if (runId.includes("\0")) throw new RpcValidationError("Invalid runId");
   if (runId.includes("..") || runId.includes("/") || runId.includes("\\")) {
     throw new RpcValidationError("runId contains invalid path characters");
   }
@@ -92,6 +93,7 @@ function validateWorkingDir(dir: string): string {
   if (!dir || typeof dir !== "string") {
     throw new Error("workingDir is required and must be a string");
   }
+  if (dir.includes("\0")) throw new RpcValidationError("Invalid directory path");
   // Expand ~/ to home directory
   const expanded = dir.startsWith("~/") ? dir.replace("~", homedir()) : dir;
   const resolved = resolve(expanded);
@@ -247,33 +249,35 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "run.create": async (params) => {
-    const p = params as unknown as CreateRunParams;
     const safeWorkingDir = validateWorkingDir(
       requireNonEmptyString(params, "workingDir"),
     );
-    if (!Array.isArray(p.goals) || p.goals.length === 0) {
+    const goals = Array.isArray(params.goals) ? params.goals : [];
+    const terminationConditions = Array.isArray(params.terminationConditions) ? params.terminationConditions : [];
+    if (goals.length === 0) {
       throw new RpcValidationError("Parameter 'goals' must be a non-empty array");
     }
-    if (!Array.isArray(p.terminationConditions) || p.terminationConditions.length === 0) {
+    if (terminationConditions.length === 0) {
       throw new RpcValidationError("Parameter 'terminationConditions' must be a non-empty array");
     }
     const run: ExecutionRun = {
       id: crypto.randomUUID(),
       workingDir: safeWorkingDir,
-      goals: p.goals,
-      terminationConditions: p.terminationConditions,
+      goals,
+      terminationConditions,
       status: "idle",
       totalCostUsd: 0,
       totalTasksCompleted: 0,
     };
     store.saveRun(run);
 
-    if (p.tasks) {
-      if (!Array.isArray(p.tasks)) {
+    const tasks = params.tasks;
+    if (tasks) {
+      if (!Array.isArray(tasks)) {
         throw new RpcValidationError("Parameter 'tasks' must be an array when provided");
       }
-      for (const t of p.tasks) {
-        const task = queueManager.enqueue(run.id, t);
+      for (const t of tasks) {
+        const task = queueManager.enqueue(run.id, t as import("@ai-workbench/shared").CreateTaskParams);
         store.saveTask(run.id, task);
       }
     }
@@ -435,8 +439,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
       run.finalReport = undefined;
     }
 
-    if (activeExecutors.has(runId)) {
-      throw new RpcValidationError(`Run ${runId} already has an active executor`);
+    const existingExecutor = activeExecutors.get(runId);
+    if (existingExecutor && typeof existingExecutor.isRunning === "function" && existingExecutor.isRunning()) {
+      throw new RpcValidationError(`Run ${runId} is already executing`);
+    }
+    if (existingExecutor) {
+      activeExecutors.delete(runId);
     }
 
     const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
@@ -482,6 +490,14 @@ export const methodHandlers: Record<string, MethodHandler> = {
     validateRunId(runId);
     const run = store.getRun(runId);
     if (run && run.status === "paused") {
+      const existingExecutor = activeExecutors.get(runId);
+      if (existingExecutor && typeof existingExecutor.isRunning === "function" && existingExecutor.isRunning()) {
+        throw new RpcValidationError(`Run ${runId} is already executing`);
+      }
+      if (existingExecutor) {
+        activeExecutors.delete(runId);
+      }
+
       const pendingTasks = store.listTasks(runId).filter((t) => t.status === "pending");
       for (const t of pendingTasks) {
         if (!queueManager.list(runId).some((q) => q.id === t.id)) {

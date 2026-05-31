@@ -21,9 +21,5 @@
     "shared",
     "src-engine",
     "src-ui"
-  ],
-  "dependencies": {
-    "@playwright/mcp": "^0.0.75",
-    "archiver": "^8.0.0"
-  }
+  ]
 }

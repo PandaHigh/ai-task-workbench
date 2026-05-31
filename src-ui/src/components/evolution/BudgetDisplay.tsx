@@ -18,6 +18,10 @@ export function BudgetDisplay({ budgetUsed, budgetMax, budgetPct, isRunning }: B
       </div>
       <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
         <div
+          role="progressbar"
+          aria-valuenow={Math.round(budgetPct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className="h-full rounded transition-all"
           style={{
             width: `${budgetPct}%`,

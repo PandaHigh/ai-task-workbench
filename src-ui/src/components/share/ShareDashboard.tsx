@@ -43,7 +43,7 @@ export function ShareDashboard() {
     ? formatDuration((run.completedAt || Date.now()) - run.startedAt)
     : "未开始";
   const budgetUsed = run?.totalCostUsd ?? 0;
-  const budgetMax = 50;
+  const budgetMax = 50000;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -320,12 +320,12 @@ export function ShareDashboard() {
             <div>
               <div className="flex justify-between mb-1">
                 <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
-                <span style={{ color: budgetUsed > 40 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
+                <span style={{ color: budgetUsed / budgetMax > 0.8 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
               </div>
               <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
                 <div className="h-full rounded transition-all" style={{
                   width: `${Math.min(100, (budgetUsed / budgetMax) * 100)}%`,
-                  background: budgetUsed > 40 ? "var(--red)" : budgetUsed > 25 ? "var(--yellow)" : "var(--green)",
+                  background: budgetUsed / budgetMax > 0.8 ? "var(--red)" : budgetUsed / budgetMax > 0.5 ? "var(--yellow)" : "var(--green)",
                 }} />
               </div>
             </div>

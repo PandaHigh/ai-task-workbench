@@ -140,7 +140,7 @@ export function EvolutionDashboard() {
         const historyLogs = (await call("run.logs", { runId })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
         if (cancelled) return;
         setLogs(historyLogs);
-      } catch { /* ignore */ }
+      } catch (err) { console.warn("[poll] refresh logs failed:", err); }
 
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
@@ -148,8 +148,8 @@ export function EvolutionDashboard() {
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setRunningTask(allTasks.find((t) => t.status === "running") || null);
-      } catch { /* ignore */ }
-      try { const v = await call("config.get", { key: "maxBudgetUsd" }); if (typeof v === "number" && v > 0) setBudgetMax(v); } catch { /* ignore */ }
+      } catch (err) { console.warn("[poll] refresh tasks failed:", err); }
+      try { const v = await call("config.get", { key: "maxBudgetUsd" }); if (typeof v === "number" && v > 0) setBudgetMax(v); } catch (err) { console.warn("[poll] refresh budget config failed:", err); }
       if (!cancelled) setLoading(false);
     };
     load();
@@ -159,8 +159,11 @@ export function EvolutionDashboard() {
   // Periodically refresh all tasks, queue, and run data while running
   useEffect(() => {
     if (!runId || !connected) return;
-    const POLL_INTERVAL = connected ? 10_000 : 30_000;
+    const POLL_INTERVAL = connected ? 15_000 : 30_000;
     const interval = setInterval(async () => {
+      // Skip polling if run is in a terminal state
+      const currentRun = fetchedRun || useTaskStore.getState().tasks.find((t) => t.id === runId) as ExecutionRun | undefined;
+      if (currentRun?.status === "completed" || currentRun?.status === "failed" || currentRun?.status === "stopped") return;
       try {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
@@ -175,9 +178,9 @@ export function EvolutionDashboard() {
           useTaskStore.getState().updateTask(runId, freshRun);
           setRunning(freshRun.status === "running");
         }
-        try { setCommits((await call("run.commits", { runId })) as GitCommit[]); } catch { /* ignore */ }
-        try { setLessons((await call("run.lessons", { runId })) as LessonLearned[]); } catch { /* ignore */ }
-      } catch { /* ignore */ }
+        try { setCommits((await call("run.commits", { runId })) as GitCommit[]); } catch (err) { console.warn("[poll] refresh commits failed:", err); }
+        try { setLessons((await call("run.lessons", { runId })) as LessonLearned[]); } catch (err) { console.warn("[poll] refresh lessons failed:", err); }
+      } catch (err) { console.warn("[poll] refresh failed:", err); }
     }, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [runId, call, connected]);
@@ -194,6 +197,29 @@ export function EvolutionDashboard() {
   const handleTabChange = (t: TabType) => {
     setTab(t);
     refreshTabData(t);
+  };
+
+  const allTabs: TabType[] = simpleMode
+    ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+    : (["logs" as const, "commits" as const, "lessons" as const, ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    const idx = allTabs.indexOf(tab);
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = allTabs[(idx + 1) % allTabs.length];
+      handleTabChange(next);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = allTabs[(idx - 1 + allTabs.length) % allTabs.length];
+      handleTabChange(prev);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      handleTabChange(allTabs[0]);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      handleTabChange(allTabs[allTabs.length - 1]);
+    }
   };
 
   const handleStart = async () => {
@@ -343,12 +369,9 @@ export function EvolutionDashboard() {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab bar with sliding indicator */}
             <div className="px-4 py-2 border-b relative flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-              <div className="flex">
-              {(simpleMode
-                ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-                : (["logs", "commits", "lessons", ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-              ).map((t) => (
-                <button key={t} onClick={() => handleTabChange(t)} className="text-sm px-4 py-2 rounded-md transition-all" style={{
+              <div className="flex" role="tablist" onKeyDown={handleTabKeyDown}>
+              {allTabs.map((t) => (
+                <button key={t} onClick={() => handleTabChange(t)} role="tab" aria-selected={tab === t} className="text-sm px-4 py-2 rounded-md transition-all" style={{
                   color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
                   background: tab === t ? "var(--bg-tertiary)" : "transparent",
                   border: tab === t ? "1px solid var(--border)" : "1px solid transparent",
@@ -555,9 +578,9 @@ export function EvolutionDashboard() {
                 onSaveTerminationConditions={(items) => call("run.update", { runId, terminationConditions: items })}
                 onClearGoal={(id) => call("run.clearGoal", { runId: id }).then(() => {
                   useTaskStore.getState().updateTask(id, { goalStatus: "unmet", goalEvidence: [], goalLastEvalReason: "" });
-                }).catch(() => {})}
-                onPauseGoal={(id) => call("run.pauseGoal", { runId: id }).catch(() => {})}
-                onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch(() => {})}
+                }).catch((err) => { console.warn("[EvolutionDashboard] clearGoal failed:", err instanceof Error ? err.message : err); })}
+                onPauseGoal={(id) => call("run.pauseGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] pauseGoal failed:", err instanceof Error ? err.message : err); })}
+                onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] resumeGoal failed:", err instanceof Error ? err.message : err); })}
                 presenceSlot={<PresencePanel />}
               />
             </div>
@@ -622,6 +645,8 @@ export function EvolutionDashboard() {
       {/* Edit Task Modal */}
       {editTarget && (
         <div
+          role="dialog"
+          aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
           onClick={() => setEditTarget(null)}

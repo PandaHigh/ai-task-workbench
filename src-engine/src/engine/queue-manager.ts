@@ -192,8 +192,8 @@ export class QueueManager {
       } else {
         writeJsonFile(filePath, queue);
       }
-    } catch {
-      // Persistence failure should not interrupt queue operations
+    } catch (err) {
+      console.error("[queue] persistQueue failed:", err instanceof Error ? err.message : err);
     }
   }
 
@@ -202,7 +202,8 @@ export class QueueManager {
     try {
       const filePath = path.join(this.dataDir, "runs", runId, "queue.json");
       return readJsonFile<QueueEntry[]>(filePath, [], "queue");
-    } catch {
+    } catch (err) {
+      console.warn("[queue] loadQueue failed:", err instanceof Error ? err.message : err);
       return [];
     }
   }

@@ -14,7 +14,7 @@ function NotFound() {
   const navigate = useNavigate();
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16 }}>
-      <div style={{ fontSize: 48, opacity: 0.3 }}>404</div>
+      <h1 style={{ fontSize: 48, opacity: 0.3, margin: 0 }}>404</h1>
       <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>页面不存在</p>
       <button
         onClick={() => navigate("/")}

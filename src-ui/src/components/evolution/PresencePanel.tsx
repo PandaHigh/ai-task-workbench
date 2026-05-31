@@ -12,7 +12,7 @@ export function PresencePanel() {
       try {
         const result = (await call("session.list", {})) as { sessions: ClientSession[] };
         setSessions(result.sessions);
-      } catch { /* ignore */ }
+      } catch (err) { console.warn("[PresencePanel] load sessions failed:", err instanceof Error ? err.message : err); }
       setLoaded(true);
     };
     load();

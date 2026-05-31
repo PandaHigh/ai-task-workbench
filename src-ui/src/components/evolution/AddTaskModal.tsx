@@ -19,7 +19,7 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
     try {
       const list = await call("template.list", {}) as UserTaskTemplate[];
       setTemplates(list);
-    } catch { /* ignore */ }
+    } catch (err) { console.warn("[AddTaskModal] loadTemplates failed:", err instanceof Error ? err.message : err); }
   }, [call]);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--bg-secondary)", border: "1px solid var(--border)",
-          borderRadius: "12px", padding: "24px", minWidth: "340px", maxWidth: "480px", width: "90%",
+          borderRadius: "12px", padding: "24px", minWidth: "min(340px, calc(100vw - 32px))", maxWidth: "480px", width: "90%",
           animation: "slideUp 0.2s ease-out",
         }}
       >

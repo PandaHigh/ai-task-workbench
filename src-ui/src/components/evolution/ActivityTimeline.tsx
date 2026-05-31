@@ -26,7 +26,7 @@ export function ActivityTimeline({ runId }: ActivityTimelineProps) {
     try {
       const result = (await call("activity.list", { runId, limit: 50 })) as { activities: ActivityEvent[] };
       setActivities(result.activities);
-    } catch { /* ignore */ }
+    } catch (err) { console.warn("[ActivityTimeline] load failed:", err instanceof Error ? err.message : err); }
   }, [runId, call]);
 
   useEffect(() => { load(); }, [load]);

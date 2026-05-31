@@ -142,7 +142,7 @@ describe("TaskCard", () => {
     renderCard(makeRun({ id: "run-del" }), onDelete);
     await user.click(screen.getByLabelText("删除任务"));
     // Wait for ConfirmDialog to mount
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("alertdialog");
     // Use fireEvent for the confirm click to avoid async timing issues
     const confirmBtn = within(dialog).getByRole("button", { name: "删除" });
     fireEvent.click(confirmBtn);
@@ -165,7 +165,7 @@ describe("TaskCard", () => {
     const cancelBtn = screen.getByRole("button", { name: "取消" });
     await user.click(cancelBtn);
     // ConfirmDialog uses transitionEnd to unmount, fire it to complete the close
-    const dialog = screen.getByRole("dialog");
+    const dialog = screen.getByRole("alertdialog");
     fireEvent.transitionEnd(dialog);
     await vi.waitFor(() => {
       expect(screen.queryByText("确定删除此任务？所有相关数据将被清除。")).not.toBeInTheDocument();

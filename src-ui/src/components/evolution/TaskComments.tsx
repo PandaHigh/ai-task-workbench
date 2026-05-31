@@ -20,7 +20,7 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
     try {
       const result = (await call("comment.list", { runId, taskId })) as { comments: TaskComment[] };
       setComments(result.comments);
-    } catch { /* ignore */ }
+    } catch (err) { console.warn("[TaskComments] load failed:", err instanceof Error ? err.message : err); }
   }, [runId, taskId, call]);
 
   useEffect(() => { load(); }, [load]);

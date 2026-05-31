@@ -324,7 +324,7 @@ describe("RPC Methods", () => {
       const run = await createRun();
       await methodHandlers["task.start"]({ runId: run.id });
       await expect(methodHandlers["task.start"]({ runId: run.id }))
-        .rejects.toThrow("already has an active executor");
+        .rejects.toThrow("already executing");
       await methodHandlers["run.stop"]({ runId: run.id });
     });
   });

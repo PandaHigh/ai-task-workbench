@@ -35,8 +35,12 @@ const TOAST_STYLES: Record<ToastType, { border: string; icon: string }> = {
   info: { border: "var(--blue)", icon: "ℹ" },
 };
 
+const MAX_VISIBLE_TOASTS = 5;
+const REMOVE_ANIMATION_MS = 200;
+
 function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
   const style = TOAST_STYLES[toast.type];
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const DURATION: Record<ToastType, number> = { success: 2500, info: 4000, warning: 5000, error: 6000 };
 
@@ -59,7 +63,7 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
         borderLeft: `3px solid ${style.border}`,
         borderRadius: "var(--radius-md)",
         boxShadow: "var(--shadow-lg)",
-        animation: exiting ? "none" : "slideIn 0.3s ease-out",
+        animation: exiting || prefersReducedMotion ? "none" : "slideIn 0.3s ease-out",
         transition: "opacity 0.2s ease, transform 0.2s ease",
         opacity: exiting ? 0 : 1,
         transform: exiting ? "translateX(100%)" : "translateX(0)",
@@ -84,12 +88,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
 
-  const MAX_TOASTS = 5;
+  const maxToasts = MAX_VISIBLE_TOASTS;
   const addToast = useCallback((type: ToastType, message: string) => {
     const id = Date.now() + Math.random();
     setToasts((prev) => {
       const next = [...prev, { id, type, message }];
-      return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next;
+      return next.length > maxToasts ? next.slice(-maxToasts) : next;
     });
   }, []);
 
@@ -111,7 +115,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         next.delete(id);
         return next;
       });
-    }, 200);
+    }, REMOVE_ANIMATION_MS);
   }, []);
 
   return (

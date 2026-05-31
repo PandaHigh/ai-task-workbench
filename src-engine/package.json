@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@ai-workbench/shared": "*",
+    "@playwright/mcp": "^0.0.75",
+    "archiver": "^8.0.0",
     "simple-git": "^3.27.0",
     "ws": "^8.18.0"
   },

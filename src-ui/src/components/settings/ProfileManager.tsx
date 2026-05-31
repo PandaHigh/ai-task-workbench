@@ -158,12 +158,15 @@ export function ProfileManager() {
       {profiles.map((profile) => (
         <div
           key={profile.id}
+          role="button"
+          tabIndex={0}
           className="p-2 rounded flex items-center justify-between cursor-pointer"
           style={{
             background: activeId === profile.id ? "rgba(77, 107, 254, 0.12)" : "var(--bg-tertiary)",
             border: activeId === profile.id ? "1px solid var(--blue)" : "1px solid transparent",
           }}
           onClick={() => activate(profile.id)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(profile.id); } }}
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">

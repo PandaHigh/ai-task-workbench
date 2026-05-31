@@ -108,16 +108,86 @@ tests/engine/       后端集成测试
 
 ## JSON-RPC API
 
+### 运行管理
 | 方法 | 说明 |
 |------|------|
-| `run.create / run.list / run.stop` | 运行管理 |
-| `run.tasks / run.commits / run.lessons` | 运行数据查询 |
-| `task.create / task.start / task.pause / task.cancel` | 任务操作 |
+| `run.create` | 创建新运行 |
+| `run.list` | 列出所有运行 |
+| `run.stop` | 停止运行 |
+| `run.delete` | 删除运行 |
+| `run.update` | 更新运行（goals, terminationConditions） |
+| `run.report` | 获取运行报告 |
+| `run.pauseGoal` | 暂停目标 |
+| `run.resumeGoal` | 恢复目标 |
+| `run.clearGoal` | 清除目标状态 |
+
+### 运行数据查询
+| 方法 | 说明 |
+|------|------|
+| `run.tasks` | 获取运行的任务列表 |
+| `run.commits` | 获取运行的 Git 提交 |
+| `run.lessons` | 获取经验教训 |
+| `run.logs` | 获取运行日志 |
+
+### 任务操作
+| 方法 | 说明 |
+|------|------|
+| `task.create` | 创建任务 |
+| `task.start` | 启动执行 |
+| `task.pause` | 暂停执行 |
+| `task.resume` | 恢复执行 |
+| `task.cancel` | 取消任务 |
+| `task.retry` | 重试任务 |
+| `task.update` | 更新任务（content, priority, timeout） |
 | `task.setTimeout` | 设置任务超时 |
-| `queue.list / queue.reorder` | 队列管理 |
-| `wizard.start / wizard.chat / wizard.validate` | 任务向导 |
+
+### 队列管理
+| 方法 | 说明 |
+|------|------|
+| `queue.list` | 查看队列 |
+| `queue.reorder` | 重排队列 |
+| `queue.remove` | 移除任务 |
+
+### 任务向导
+| 方法 | 说明 |
+|------|------|
+| `wizard.start` | 启动向导会话 |
+| `wizard.chat` | 向导对话 |
+| `wizard.validate` | 验证参数 |
+
+### 配置与模板
+| 方法 | 说明 |
+|------|------|
 | `config.get / config.set` | 配置管理 |
-| `share.create / share.subscribe` | 分享协作 |
+| `config.adaptive` | 自适应配置 |
+| `template.create / template.list / template.update / template.delete` | 模板管理 |
+| `profile.list / profile.get / profile.set / profile.delete` | 编排器配置 |
+
+### 分享协作
+| 方法 | 说明 |
+|------|------|
+| `share.create` | 创建分享链接 |
+| `share.subscribe` | 订阅远程看板 |
+| `share.list / share.revoke / share.unsubscribe / share.subscriptions` | 分享管理 |
+
+### 技能与插件
+| 方法 | 说明 |
+|------|------|
+| `skill.list / skill.delete` | 技能管理 |
+| `plugin.list / plugin.install / plugin.remove / plugin.toggle` | 插件管理 |
+| `crew.list / crew.configure` | Agent 角色配置 |
+
+### 监控与调试
+| 方法 | 说明 |
+|------|------|
+| `trace.list` | Trace 追踪 |
+| `approval.respond` | 审批响应 |
+| `session.identify / session.list` | 会话管理 |
+| `activity.list` | 活动时间线 |
+| `comment.create / comment.list` | 评论系统 |
+| `suggestion.list` | 审查建议 |
+| `error.history` | 错误历史 |
+| `metrics.snapshot` | 性能指标快照 |
 
 HTTP 端点：
 - `GET /api/health` — 健康检查

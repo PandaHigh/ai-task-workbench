@@ -32,6 +32,14 @@ const CYCLE_COOLDOWN_MS = 5000;
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 
+function sanitizePromptInput(input: string): string {
+  return input
+    .replace(/```/g, "``​`") // break code blocks
+    .replace(/<system[^>]*>/gi, "[filtered]") // filter system tags
+    .replace(/\bignore\s+(previous|above|all)\s+(instructions?|rules?)/gi, "[filtered]")
+    .substring(0, 2000); // limit length
+}
+
 export class Executor {
   private ccClient: CCClient;
   private store: Store;
@@ -46,6 +54,7 @@ export class Executor {
   private tracer: Tracer;
   private errorWatcher: ErrorWatcher;
   private activeProfile: OrchestratorProfile | null = null;
+  private cachedCost: number | null = null;
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -319,8 +328,11 @@ export class Executor {
   }
 
   private recalculateCost(runId: string): number {
+    if (this.cachedCost !== null) return this.cachedCost;
     const tasks = this.store.listTasks(runId);
-    return tasks.reduce((sum, t) => sum + (t.costUsd || 0), 0);
+    const cost = tasks.reduce((sum, t) => sum + (t.costUsd || 0), 0);
+    this.cachedCost = cost;
+    return cost;
   }
 
   private loadProfile(): OrchestratorProfile | null {
@@ -330,23 +342,28 @@ export class Executor {
       const adaptive = new AdaptiveConfig({});
       const builtIn = adaptive.getBuiltInProfiles();
       return builtIn.find((p) => p.id === profileId) ?? this.store.listProfiles().find((p) => p.id === profileId) ?? null;
-    } catch {
+    } catch (err) {
+      console.warn("[executor] loadProfile failed:", err instanceof Error ? err.message : err);
       return null;
     }
   }
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(resolve, ms);
       if (this.stopController?.signal.aborted) {
-        clearTimeout(timer);
         reject(new Error("Stopped"));
         return;
       }
-      this.stopController?.signal.addEventListener("abort", () => {
+      let timer: ReturnType<typeof setTimeout>;
+      const onAbort = () => {
         clearTimeout(timer);
         reject(new Error("Stopped"));
-      }, { once: true });
+      };
+      this.stopController?.signal.addEventListener("abort", onAbort, { once: true });
+      timer = setTimeout(() => {
+        this.stopController?.signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
     });
   }
 
@@ -388,6 +405,7 @@ export class Executor {
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
+      this.cachedCost = null; // invalidate since costs changed
 
       // End trace and persist
       this.tracer.endSpan(taskSpanId, "ok", { costUsd: pipelineResult.totalCostUsd, durationMs: pipelineResult.durationMs });
@@ -541,7 +559,7 @@ export class Executor {
         if (traceSpans.length > 0) {
           this.store.appendTrace(run.id, traceSpans);
         }
-      } catch { /* trace cleanup failure is non-critical */ }
+      } catch (traceErr) { console.warn("[executor] trace cleanup failed:", traceErr instanceof Error ? traceErr.message : traceErr); }
 
       // Check ErrorWatcher for critical error accumulation
       const detectedErrors = this.store.getDetectedErrors(run.id, task.id);
@@ -579,9 +597,9 @@ export class Executor {
         // Pause run if needed (e.g., rate limiting)
         if (strategy.pauseRunMs > 0) {
           this.log(run.id, "engine", "warn", `Pausing run for ${strategy.pauseRunMs / 1000}s (${categoryLabel})`);
-          try { await this.sleep(strategy.pauseRunMs); } catch { /* interrupted by stop */ }
+          try { await this.sleep(strategy.pauseRunMs); } catch (sleepErr) { if (!(sleepErr instanceof Error && sleepErr.message === "Stopped")) console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr); }
         }
-        try { await this.sleep(backoffMs); } catch { /* interrupted by stop */ }
+        try { await this.sleep(backoffMs); } catch (sleepErr) { if (!(sleepErr instanceof Error && sleepErr.message === "Stopped")) console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr); }
       } else if (taskErr.category === "quota_exceeded") {
         this.log(run.id, "engine", "error", `Quota exceeded: ${taskErr.message}`);
         this.stop();
@@ -591,6 +609,7 @@ export class Executor {
       }
     } finally {
       this.abortControllers.delete(task.id);
+      this.cachedCost = null;
     }
   }
 
@@ -613,7 +632,7 @@ export class Executor {
   }
 
   private async buildContext(_task: TaskDefinition, run: ExecutionRun, gitManager: GitManager): Promise<TaskContext> {
-    const lastTenCommits = await gitManager.getLastNCommits(10).catch(() => []);
+    const lastTenCommits = await gitManager.getLastNCommits(10).catch((err) => { console.warn("[executor] getCommits failed:", err instanceof Error ? err.message : err); return []; });
     const nextFiveTasks = this.queueManager.peekNext(run.id, 5);
     const lessons = this.store.getLessons(run.id).slice(-20);
 
@@ -638,10 +657,10 @@ export class Executor {
       `You are a goal evaluator. Your job is to audit whether the following goals have been ACTUALLY achieved based on REAL evidence.
 
 GOALS:
-${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}
+${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}
 
 TERMINATION CONDITIONS:
-${run.terminationConditions.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+${run.terminationConditions.map((c, i) => `${i + 1}. ${sanitizePromptInput(c)}`).join("\n")}
 
 PREVIOUS EVIDENCE COLLECTED:
 ${evidence.length > 0 ? evidence.map((e, i) => `${i + 1}. ${e}`).join("\n") : "(none yet)"}
@@ -670,6 +689,7 @@ Respond ONLY with valid JSON:
 
     try {
       const parsed = JSON.parse(extractJson(result.result));
+      if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid evaluation result");
 
       // Update unified goal state
       run.goalEvaluationCycles = evaluationCycles;
@@ -715,11 +735,12 @@ Respond ONLY with valid JSON:
 
   private async scoreTask(task: TaskDefinition, result: string, run: ExecutionRun): Promise<ScoreDetails> {
     const scoreResult = await this.ccClient.executeTask(
-      `Score this task result against goals. Be strict.\nTask: ${task.content}\nResult: ${result.substring(0, 2000)}\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}\nRespond ONLY with JSON:\n{ "goalAlignment": 0_to_0.3, "correctness": 0_to_0.3, "completeness": 0_to_0.2, "quality": 0_to_0.2, "reasoning": "brief explanation" }`,
+      `Score this task result against goals. Be strict.\nTask: ${sanitizePromptInput(task.content)}\nResult: ${result.substring(0, 2000)}\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nRespond ONLY with JSON:\n{ "goalAlignment": 0_to_0.3, "correctness": 0_to_0.3, "completeness": 0_to_0.2, "quality": 0_to_0.2, "reasoning": "brief explanation" }`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 5, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     try {
       const parsed = JSON.parse(extractJson(scoreResult.result));
+      if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid score result");
       const overall = (parsed.goalAlignment || 0) + (parsed.correctness || 0) + (parsed.completeness || 0) + (parsed.quality || 0);
       return { ...parsed, overall, passed: overall >= this.config.qualityThreshold } as ScoreDetails;
     } catch (scoreErr) {
@@ -732,11 +753,13 @@ Respond ONLY with valid JSON:
     const lessons = this.store.getLessons(run.id, "failure").slice(-5);
     const lessonStr = lessons.length > 0 ? `\n\nLessons from failures:\n${lessons.map((l) => `- ${l.lesson}`).join("\n")}` : "";
     const result = await this.ccClient.executeTask(
-      `Generate next tasks for this project.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}\nRemaining:\n${evaluation.remainingGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")}\nProgress: ${evaluation.progressReport}${lessonStr}\nGenerate 1-3 tasks. Respond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why" }]`,
+      `Generate next tasks for this project.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nRemaining:\n${evaluation.remainingGoals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nProgress: ${evaluation.progressReport}${lessonStr}\nGenerate 1-3 tasks. Respond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why" }]`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     try {
-      return JSON.parse(extractJson(result.result));
+      const tasks = JSON.parse(extractJson(result.result));
+      if (!Array.isArray(tasks)) throw new Error("Expected task array from CC");
+      return tasks;
     } catch (genErr) {
       console.warn("[executor] failed to parse smart task generation result:", errorToMessage(genErr));
       return [{ content: `Work on: ${evaluation.remainingGoals[0] || "project goals"}`, priority: 5, reasoning: "Fallback task" }];
@@ -748,7 +771,7 @@ Respond ONLY with valid JSON:
     const commits = this.store.getCommits(run.id);
     const cost = this.recalculateCost(run.id);
     const result = await this.ccClient.executeTask(
-      `Generate a final summary report.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}\nTasks completed: ${tasks.filter((t) => t.status === "completed").length}\nReverted: ${tasks.filter((t) => t.status === "reverted").length}\nCommits: ${commits.length}\nCost: $${cost.toFixed(4)}\nProvide a concise summary.`,
+      `Generate a final summary report.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nTasks completed: ${tasks.filter((t) => t.status === "completed").length}\nReverted: ${tasks.filter((t) => t.status === "reverted").length}\nCommits: ${commits.length}\nCost: $${cost.toFixed(4)}\nProvide a concise summary.`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     return result.result;
@@ -762,6 +785,10 @@ Respond ONLY with valid JSON:
 
   private broadcast(method: string, params: Record<string, unknown>): void {
     this.notify(method, params);
+  }
+
+  isRunning(): boolean {
+    return this.running;
   }
 
   cancelTask(taskId: string, runId: string): void {
@@ -863,8 +890,8 @@ Respond ONLY with valid JSON:
       };
 
       const prompt = `Based on these goals and the project at ${run.workingDir}, generate a comprehensive feature checklist.
-Goals: ${run.goals.join("; ")}
-Termination conditions: ${run.terminationConditions.join("; ")}
+Goals: ${run.goals.map(g => sanitizePromptInput(g)).join("; ")}
+Termination conditions: ${run.terminationConditions.map(c => sanitizePromptInput(c)).join("; ")}
 
 Generate 30-100 verifiable features covering:
 1. Functional requirements (core features, API endpoints, data flows)

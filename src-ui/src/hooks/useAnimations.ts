@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type CSSProperties } from "react";
 
+const STAGGER_BASE_DELAY = 50;
+const STAGGER_DURATION = 0.4;
+const SHIMMER_DURATION = "1.5s";
+
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -18,7 +22,7 @@ export function pageEnterStyle(): CSSProperties {
   return { animation: "fadeIn 0.4s ease-out" };
 }
 
-export function staggerItemStyle(index: number, baseDelay: number, name = "slideUp", duration = 0.4): CSSProperties {
+export function staggerItemStyle(index: number, baseDelay: number = STAGGER_BASE_DELAY, name = "slideUp", duration: number = STAGGER_DURATION): CSSProperties {
   return { animation: `${name} ${duration}s ease-out ${index * baseDelay}ms both` };
 }
 
@@ -26,7 +30,7 @@ export function shimmerStyle(): CSSProperties {
   return {
     background: "linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%)",
     backgroundSize: "200% 100%",
-    animation: "shimmer 1.5s ease-in-out infinite",
+    animation: `shimmer ${SHIMMER_DURATION} ease-in-out infinite`,
   };
 }
 
@@ -34,7 +38,7 @@ type AnimName = "fadeIn" | "slideUp" | "slideDown" | "staggerFadeIn" | "pulse";
 
 export function useAnimationStyle(opts: { name?: AnimName; duration?: number; delay?: number; disabled?: boolean } = {}): CSSProperties {
   const reduced = useReducedMotion();
-  const { name = "fadeIn", duration = 0.4, delay = 0, disabled = false } = opts;
+  const { name = "fadeIn", duration = STAGGER_DURATION, delay = 0, disabled = false } = opts;
   return useMemo(() => {
     if (disabled) return {};
     if (reduced) return { animation: `fadeIn ${duration}s ease-out ${delay}ms both` };
@@ -42,7 +46,7 @@ export function useAnimationStyle(opts: { name?: AnimName; duration?: number; de
   }, [reduced, name, duration, delay, disabled]);
 }
 
-export function useStagger(baseDelay = 50, name: AnimName = "slideUp", duration = 0.4) {
+export function useStagger(baseDelay = STAGGER_BASE_DELAY, name: AnimName = "slideUp", duration = STAGGER_DURATION) {
   const reduced = useReducedMotion();
   return useCallback(
     (index: number): CSSProperties => {

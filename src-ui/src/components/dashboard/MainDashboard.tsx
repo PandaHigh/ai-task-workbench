@@ -107,6 +107,8 @@ export function MainDashboard() {
       {/* Import Modal */}
       {showImportModal && (
         <div
+          role="dialog"
+          aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={() => setShowImportModal(false)}

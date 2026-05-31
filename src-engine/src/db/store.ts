@@ -98,12 +98,17 @@ export class Store {
   }
 
   deleteRun(runId: string): void {
+    // Delete directory first for atomicity — if index write fails later,
+    // a stale entry pointing to a missing directory is less dangerous than
+    // an orphan directory consuming disk space silently.
+    const runDir = path.join(this.runsDir, runId);
+    if (fs.existsSync(runDir)) {
+      fs.rmSync(runDir, { recursive: true });
+    }
+    // Then update index
     const runs = this.listRuns().filter((r) => r.id !== runId);
     writeJsonFile(path.join(this.runsDir, "index.json"), runs);
     this.invalidateRunIndex();
-    const runDir = path.join(this.runsDir, runId);
-    if (!fs.existsSync(runDir)) return;
-    fs.rmSync(runDir, { recursive: true });
   }
 
   listRunsPaginated(options: { page?: number; pageSize?: number; status?: string }): { runs: ExecutionRun[]; total: number; page: number; pageSize: number } {
@@ -197,7 +202,7 @@ export class Store {
   appendLog(runId: string, log: Omit<TaskLog, "id">): void {
     const file = path.join(this.runDir(runId), "logs.json");
     const logs = readJsonFile<TaskLog[]>(file, []);
-    logs.push({ ...log, id: logs.length + 1 } as TaskLog);
+    logs.push({ ...log, id: logs.length + 1 });
     // Keep last MAX_LOG_ENTRIES logs in file
     const trimmed = logs.length > MAX_LOG_ENTRIES ? logs.slice(-MAX_LOG_ENTRIES) : logs;
     this.debouncedWrite(file, trimmed);
@@ -220,7 +225,7 @@ export class Store {
   appendCommit(runId: string, commit: Omit<GitCommit, "id">): void {
     const file = path.join(this.runDir(runId), "commits.json");
     const commits = readJsonFile<GitCommit[]>(file, []);
-    commits.push({ ...commit, id: commits.length + 1 } as GitCommit);
+    commits.push({ ...commit, id: commits.length + 1 });
     const trimmed = commits.length > MAX_HISTORY_ENTRIES ? commits.slice(-MAX_HISTORY_ENTRIES) : commits;
     this.debouncedWrite(file, trimmed);
   }
@@ -236,7 +241,7 @@ export class Store {
   appendLesson(runId: string, lesson: Omit<LessonLearned, "id">): void {
     const file = path.join(this.runDir(runId), "lessons.json");
     const lessons = readJsonFile<LessonLearned[]>(file, []);
-    lessons.push({ ...lesson, id: lessons.length + 1 } as LessonLearned);
+    lessons.push({ ...lesson, id: lessons.length + 1 });
     const trimmed = lessons.length > MAX_HISTORY_ENTRIES ? lessons.slice(-MAX_HISTORY_ENTRIES) : lessons;
     this.debouncedWrite(file, trimmed);
   }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface LogEntry {
   id: number;
@@ -39,7 +39,7 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
   }, [logs, search, levelFilter, sourceFilter]);
 
   // Notify parent of filtered results
-  useMemo(() => {
+  useEffect(() => {
     onFilteredChange(filtered);
   }, [filtered, onFilteredChange]);
 
@@ -58,7 +58,7 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
           color: "var(--text-primary)",
           border: "1px solid var(--border)",
           outline: "none",
-          width: 160,
+          width: "clamp(120px, 30vw, 200px)",
         }}
         aria-label="搜索日志"
       />

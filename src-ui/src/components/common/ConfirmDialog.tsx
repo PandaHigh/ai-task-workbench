@@ -103,7 +103,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      role="dialog"
+      role="alertdialog"
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descId}
@@ -130,8 +130,8 @@ export function ConfirmDialog({
           border: "1px solid var(--border)",
           borderRadius: "12px",
           padding: "24px",
-          minWidth: "320px",
-          maxWidth: "420px",
+          minWidth: "280px",
+          maxWidth: "min(420px, calc(100vw - 32px))",
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0) scale(1)" : "translateY(-20px) scale(0.95)",
           transition: "opacity 0.2s ease-out, transform 0.2s ease-out",

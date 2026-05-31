@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket, type Data } from "ws";
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "http";
 import path from "path";
+import fs from "fs";
 import type { RpcRequest, RpcResponse, RpcNotification } from "@ai-workbench/shared";
 import { RPC_ERRORS } from "@ai-workbench/shared";
 import { methodHandlers, RpcValidationError, skillManager } from "./json-rpc/methods.js";
@@ -229,12 +230,16 @@ export class WsServer {
   }
 
   private setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
+    const origin = req.headers.origin || "";
+    const allowed = ["localhost", "127.0.0.1"];
+    const extraOrigins = process.env.CORS_ORIGINS?.split(",").map(s => s.trim()).filter(Boolean) ?? [];
+    const allAllowed = [...allowed, ...extraOrigins];
+    if (allAllowed.some(allowed => origin.includes(allowed)) || !origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin || "*");
     }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "86400");
   }
 
   private async handleDownload(res: ServerResponse, url: string): Promise<void> {
@@ -322,8 +327,17 @@ export class WsServer {
   }
 
   private handleSharePost(req: IncomingMessage, res: ServerResponse, runId: string, resource: string): void {
+    const MAX_BODY_SIZE = 1024 * 1024; // 1MB
     let body = "";
-    req.on("data", (chunk) => { body += chunk; });
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > MAX_BODY_SIZE) {
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Request body too large" }));
+        req.destroy();
+        return;
+      }
+    });
     req.on("end", () => {
       try {
         const params = body ? JSON.parse(body) : {};
@@ -418,8 +432,15 @@ export class WsServer {
       return;
     }
     // In production, serve built frontend files
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end("<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: npm run build</p></body></html>");
+    const frontendPath = path.resolve(process.cwd(), "src-ui/dist/index.html");
+    try {
+      const html = fs.readFileSync(frontendPath, "utf-8");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    } catch {
+      res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: cd src-ui &amp;&amp; npm run build</p></body></html>");
+    }
   }
 
   private sendJson(res: ServerResponse, status: number, data: unknown): void {

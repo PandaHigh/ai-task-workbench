@@ -51,7 +51,7 @@ export function ApprovalPanel() {
 
   const formatTimer = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
@@ -66,6 +66,8 @@ export function ApprovalPanel() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       className="fixed bottom-0 left-0 right-0 z-50 border-t"
       style={{
         background: "var(--bg-elevated)",

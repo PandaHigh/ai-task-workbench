@@ -33,7 +33,7 @@ export function ErrorStream({ runId }: ErrorStreamProps) {
     setLoading(true);
     call("error.history", { runId })
       .then((data) => setErrors(data as DetectedError[]))
-      .catch(() => setErrors([]))
+      .catch((err) => { console.warn("[ErrorStream] load failed:", err instanceof Error ? err.message : err); setErrors([]); })
       .finally(() => setLoading(false));
   }, [runId, call, setErrors]);
 
