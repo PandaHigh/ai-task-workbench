@@ -38,6 +38,7 @@ export interface TaskDefinition {
   pipelineIterations?: number;
   dependsOn?: string[];
   condition?: string;
+  modelHint?: string;
   branchName?: string;
   worktreePath?: string;
 }

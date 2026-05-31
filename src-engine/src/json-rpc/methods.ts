@@ -421,6 +421,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       ...(promptJson !== undefined && { promptJson: String(promptJson) }),
       ...(Array.isArray(dependsOn) && { dependsOn: dependsOn.map(String) }),
       ...(typeof condition === "string" && { condition }),
+      ...(typeof params.modelHint === "string" && { modelHint: params.modelHint }),
     });
     store.saveTask(runId, task);
     sessionManager.recordActivity({ userId: "system", runId, action: "task.created", details: { taskId: task.id, content: content.substring(0, 80) } });
@@ -1348,5 +1349,19 @@ export const methodHandlers: Record<string, MethodHandler> = {
     sessionManager.recordActivity({ userId: "system", runId, action: "task.injected", details: { targetTaskId: taskId, instruction: instruction.substring(0, 100) } });
     notify("queue.updated", { runId, queue: queueManager.list(runId) });
     return { injected: true, newTaskId: injectedTask.id };
+  },
+
+  // ─── Notification Configuration ──────────────────────────────────────────
+
+  "notification.rules": async () => {
+    const config = store.getConfig("notificationRules");
+    return config || [];
+  },
+
+  "notification.configure": async (params) => {
+    const rules = params.rules;
+    if (!Array.isArray(rules)) throw new RpcValidationError("rules must be an array");
+    store.setConfig("notificationRules", rules);
+    return { saved: true, count: rules.length };
   },
 };

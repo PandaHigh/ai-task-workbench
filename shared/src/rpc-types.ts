@@ -135,7 +135,9 @@ export type EngineMethod =
   | "snapshot.list"
   | "snapshot.restore"
   | "task.intervene"
-  | "task.inject";
+  | "task.inject"
+  | "notification.rules"
+  | "notification.configure";
 
 export type EngineNotification =
   | "task.progress"

@@ -67,6 +67,24 @@ export const REVIEWER_ROLE: AgentRole = {
   maxTurns: 20,
 };
 
+export const ARCHITECT_ROLE: AgentRole = {
+  id: "architect",
+  name: "Architect",
+  description: "Analyzes codebase architecture, identifies structural issues, and proposes design improvements.",
+  systemPrompt: "You are a software architect. Analyze the codebase structure, identify design issues, and propose improvements. Focus on modularity, separation of concerns, and scalability. Output concrete, actionable recommendations.",
+  tools: ["Read", "Glob", "Grep", "Bash"],
+  maxTurns: 15,
+};
+
+export const INTEGRATOR_ROLE: AgentRole = {
+  id: "integrator",
+  name: "Integrator",
+  description: "Integrates changes from multiple branches, resolves conflicts, and ensures build correctness.",
+  systemPrompt: "You are an integration specialist. Merge code changes, resolve conflicts, and verify the build passes. Run tests after integration. If conflicts arise, resolve them preserving both sides' intent where possible.",
+  tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+  maxTurns: 20,
+};
+
 /**
  * Registry of all built-in roles, keyed by role id.
  */
@@ -75,6 +93,8 @@ export const BUILT_IN_ROLES: Readonly<Record<string, AgentRole>> = {
   developer: DEVELOPER_ROLE,
   tester: TESTER_ROLE,
   reviewer: REVIEWER_ROLE,
+  architect: ARCHITECT_ROLE,
+  integrator: INTEGRATOR_ROLE,
 };
 
 /**

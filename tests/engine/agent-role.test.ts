@@ -10,12 +10,14 @@ import {
 } from "../../src-engine/src/engine/agents/agent-role.js";
 
 describe("AgentRole", () => {
-  it("should define 4 built-in roles", () => {
-    expect(Object.keys(BUILT_IN_ROLES)).toHaveLength(4);
+  it("should define 6 built-in roles", () => {
+    expect(Object.keys(BUILT_IN_ROLES)).toHaveLength(6);
     expect(BUILT_IN_ROLES).toHaveProperty("planner");
     expect(BUILT_IN_ROLES).toHaveProperty("developer");
     expect(BUILT_IN_ROLES).toHaveProperty("tester");
     expect(BUILT_IN_ROLES).toHaveProperty("reviewer");
+    expect(BUILT_IN_ROLES).toHaveProperty("architect");
+    expect(BUILT_IN_ROLES).toHaveProperty("integrator");
   });
 
   it("each role should have required fields", () => {
