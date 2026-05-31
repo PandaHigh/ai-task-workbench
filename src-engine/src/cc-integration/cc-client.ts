@@ -67,6 +67,7 @@ export interface CCExecutionOptions {
   disallowedTools?: string[];
   systemPrompt?: string;
   jsonSchema?: Record<string, unknown>;
+  mcpConfig?: string;
   abortSignal?: AbortSignal;
   stderrCallback?: (data: string) => void;
 }
@@ -402,6 +403,10 @@ export class CCClient {
 
     if (options.jsonSchema) {
       args.push("--json-schema", JSON.stringify(options.jsonSchema));
+    }
+
+    if (options.mcpConfig) {
+      args.push("--mcp-config", options.mcpConfig);
     }
 
     return args;

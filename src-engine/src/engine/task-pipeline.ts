@@ -9,6 +9,7 @@ import type {
 } from "@ai-workbench/shared";
 import type { CCClient, CCTaskResult, CCMessage, CCExecutionOptions } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
+import { ensurePlaywrightMcpConfig } from "../lib/playwright-mcp.js";
 import {
   buildPlannerPrompt,
   buildPlannerSystemPrompt,
@@ -277,6 +278,10 @@ export class TaskPipeline {
     // Inject stderr callback from pipeline config
     if (this.config.stderrCallback && !options.stderrCallback) {
       options = { ...options, stderrCallback: this.config.stderrCallback };
+    }
+    // Inject Playwright MCP config
+    if (!options.mcpConfig) {
+      options = { ...options, mcpConfig: ensurePlaywrightMcpConfig() };
     }
     const collectedMessages: CCMessage[] = [];
     let result: CCTaskResult | null = null;
