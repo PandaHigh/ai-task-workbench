@@ -21,7 +21,7 @@ describe("GitRemotePanel", () => {
   it("should show empty state when no remotes", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("暂无远程仓库配置")).toBeInTheDocument();
     });
@@ -30,7 +30,7 @@ describe("GitRemotePanel", () => {
   it("should display current branch", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("feature-x");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("feature-x")).toBeInTheDocument();
     });
@@ -41,7 +41,7 @@ describe("GitRemotePanel", () => {
       { name: "origin", refs: { fetch: "git@github.com:user/repo.git" } },
     ]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("origin")).toBeInTheDocument();
       expect(screen.getByText("git@github.com:user/repo.git")).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe("GitRemotePanel", () => {
   it("should show push/pull/fetch buttons", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("推送")).toBeInTheDocument();
       expect(screen.getByText("拉取")).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe("GitRemotePanel", () => {
   it("should show add remote form", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByPlaceholderText("名称 (如 origin)")).toBeInTheDocument();
       expect(screen.getByPlaceholderText("URL (如 git@github.com:user/repo.git)")).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("GitRemotePanel", () => {
   it("should disable push button when branch is empty", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("推送")).toBeInTheDocument();
     });
@@ -82,7 +82,7 @@ describe("GitRemotePanel", () => {
   it("should disable add remote when url is empty", async () => {
     mockCall.mockResolvedValueOnce([]);
     mockCall.mockResolvedValueOnce("main");
-    render(<GitRemotePanel />);
+    render(<GitRemotePanel workingDir="/tmp/test-project" />);
     await waitFor(() => {
       expect(screen.getByText("添加")).toBeInTheDocument();
     });

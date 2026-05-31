@@ -72,6 +72,7 @@ export interface ExecutionRun {
   // Approval system
   approvalTimeoutMs?: number;
   autonomyLevel?: AutonomyLevel;
+  maxConcurrentTasks?: number;
 
   // Feature tracking
   features?: FeatureItem[];

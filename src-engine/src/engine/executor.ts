@@ -58,6 +58,7 @@ export class Executor {
   private errorWatcher: ErrorWatcher;
   private activeProfile: OrchestratorProfile | null = null;
   private cachedCost: number | null = null;
+  private maxConcurrency: number = 1;
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -115,6 +116,8 @@ export class Executor {
     this.broadcast("run.status", { runId: run.id, status: "running" });
     this.log(run.id, "engine", "info", "Execution loop started");
 
+    this.maxConcurrency = run.maxConcurrentTasks ?? this.config.maxConcurrentTasks;
+
     // Initialize unified goal state
     if (!run.goalStatus && run.goals.length > 0) {
       run.goalStatus = "pursuing";
@@ -153,7 +156,7 @@ export class Executor {
         }
 
         // Single-task mode (maxConcurrentTasks = 1) — original sequential logic
-        if (this.config.maxConcurrentTasks <= 1) {
+        if (this.maxConcurrency <= 1) {
           // Autonomy gate: supervised mode requires approval before each task
           if (run.autonomyLevel === "supervised") {
             this.log(run.id, "engine", "info", `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`);
@@ -218,7 +221,7 @@ export class Executor {
       const next = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
       if (!next) break;
       readyTasks.push(next);
-      if (readyTasks.length >= this.config.maxConcurrentTasks) break;
+      if (readyTasks.length >= this.maxConcurrency) break;
     }
 
     if (readyTasks.length === 1) {
@@ -243,7 +246,7 @@ export class Executor {
     });
     for (const id of completedTaskIds) scheduler.markCompleted(id);
 
-    this.log(run.id, "engine", "info", `Parallel execution: ${readyTasks.length} tasks with concurrency ${this.config.maxConcurrentTasks}`);
+    this.log(run.id, "engine", "info", `Parallel execution: ${readyTasks.length} tasks with concurrency ${this.maxConcurrency}`);
 
     // Mark tasks as running
     for (const t of readyTasks) {
@@ -254,7 +257,7 @@ export class Executor {
 
     const pool = new ExecutionPool(
       (task) => this.executeSingleTask(task, run),
-      this.config.maxConcurrentTasks,
+      this.maxConcurrency,
     );
 
     const results = await pool.runAll(readyTasks, scheduler, (task) => {

@@ -282,6 +282,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       status: "idle",
       totalCostUsd: 0,
       totalTasksCompleted: 0,
+      autonomyLevel: params.autonomyLevel as ExecutionRun["autonomyLevel"],
+      maxConcurrentTasks: typeof params.maxConcurrentTasks === "number" ? params.maxConcurrentTasks : undefined,
     };
     store.saveRun(run);
 

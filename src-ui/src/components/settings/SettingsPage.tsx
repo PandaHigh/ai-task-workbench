@@ -7,7 +7,6 @@ import { SkillsManager } from "./SkillsManager";
 import { PluginManager } from "./PluginManager";
 import { ProfileManager } from "./ProfileManager";
 import { ScheduleManager } from "./ScheduleManager";
-import { GitRemotePanel } from "./GitRemotePanel";
 import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface OrigValues {
@@ -40,8 +39,6 @@ export function SettingsPage() {
   const [origValues, setOrigValues] = useState<OrigValues | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [autonomyLevel, setAutonomyLevel] = useState<string>("assisted");
-  const [maxConcurrentTasks, setMaxConcurrentTasks] = useState(1);
 
   const isDirty = origValues != null && (
     origValues.qualityThreshold !== qualityThreshold
@@ -70,13 +67,11 @@ export function SettingsPage() {
     let cancelled = false;
 
     const load = async () => {
-      const [qtRes, dtRes, cpRes, puRes, alRes, mcRes] = await Promise.allSettled([
+      const [qtRes, dtRes, cpRes, puRes] = await Promise.allSettled([
         call("config.get", { key: "qualityThreshold" }),
         call("config.get", { key: "defaultTimeout" }),
         call("config.get", { key: "claudePath" }),
         call("config.get", { key: "publicUrl" }),
-        call("config.get", { key: "autonomyLevel" }),
-        call("config.get", { key: "maxConcurrentTasks" }),
       ]);
 
       if (cancelled) return;
@@ -87,10 +82,6 @@ export function SettingsPage() {
       const cp = cpRaw ? String(cpRaw) : "claude";
       const puRaw = puRes.status === "fulfilled" ? (puRes.value as Record<string, unknown>)?.value : null;
       const pu = puRaw ? String(puRaw) : "";
-      const alRaw = alRes.status === "fulfilled" ? (alRes.value as Record<string, unknown>)?.value : null;
-      const al = alRaw ? String(alRaw) : "assisted";
-      const mcRaw = mcRes.status === "fulfilled" ? (mcRes.value as Record<string, unknown>)?.value : null;
-      const mc = mcRaw ? Number(mcRaw) : 1;
 
       if (qtRes.status === "rejected") toast.error("加载质量设置失败");
       if (dtRes.status === "rejected") toast.error("加载超时设置失败");
@@ -100,8 +91,6 @@ export function SettingsPage() {
       setDefaultTimeout(dt);
       setClaudePath(cp);
       setPublicUrl(pu);
-      setAutonomyLevel(al);
-      setMaxConcurrentTasks(mc);
       setOrigValues({ qualityThreshold: qt, defaultTimeout: dt, claudePath: cp });
       setLoaded(true);
     };
@@ -120,8 +109,6 @@ export function SettingsPage() {
       await call("config.set", { key: "defaultTimeout", value: defaultTimeout });
       await call("config.set", { key: "claudePath", value: claudePath });
       await call("config.set", { key: "publicUrl", value: publicUrl });
-      await call("config.set", { key: "autonomyLevel", value: autonomyLevel });
-      await call("config.set", { key: "maxConcurrentTasks", value: maxConcurrentTasks });
       setOrigValues({ qualityThreshold, defaultTimeout, claudePath });
       setSaved(true);
       toast.success("设置已保存");
@@ -259,47 +246,6 @@ export function SettingsPage() {
 
         {showAdvanced && (
           <div className="space-y-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
-            {/* Autonomy Level */}
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>自主级别</h3>
-              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-                控制 AI 执行任务时的自主程度
-              </p>
-              <div className="flex gap-2">
-                {([
-                  { value: "supervised", label: "监督模式", desc: "每步需要确认" },
-                  { value: "assisted", label: "辅助模式", desc: "关键操作确认" },
-                  { value: "autonomous", label: "自主模式", desc: "完全自动执行" },
-                ] as const).map((opt) => (
-                  <button key={opt.value} onClick={() => setAutonomyLevel(opt.value)}
-                    className="flex-1 px-3 py-2 rounded text-xs text-center transition-all"
-                    style={{
-                      background: autonomyLevel === opt.value ? "var(--blue)" : "var(--bg-tertiary)",
-                      color: autonomyLevel === opt.value ? "#fff" : "var(--text-secondary)",
-                      border: autonomyLevel === opt.value ? "1px solid var(--blue)" : "1px solid var(--border)",
-                    }}
-                  >
-                    <div className="font-semibold">{opt.label}</div>
-                    <div className="text-[10px] mt-0.5 opacity-70">{opt.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Max Concurrent Tasks */}
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>最大并发任务数</h3>
-              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-                同时执行的任务数量上限（需要 Feature Branch 支持）
-              </p>
-              <div className="flex items-center gap-3">
-                <input type="range" min="1" max="5" value={maxConcurrentTasks}
-                  onChange={(e) => setMaxConcurrentTasks(Number(e.target.value))}
-                  className="flex-1" />
-                <span className="text-sm font-semibold w-8 text-center" style={{ color: "var(--text-primary)" }}>{maxConcurrentTasks}</span>
-              </div>
-            </div>
-
             {/* Claude path */}
             <div className="glass-card p-4">
               <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>AI 程序位置</h3>
@@ -345,12 +291,6 @@ export function SettingsPage() {
               <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
                 留空则使用 http://localhost:9731
               </p>
-            </div>
-
-            {/* Git Remote Operations */}
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>Git 远程操作</h3>
-              <GitRemotePanel />
             </div>
           </div>
         )}

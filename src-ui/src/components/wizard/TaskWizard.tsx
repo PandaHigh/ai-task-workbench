@@ -74,6 +74,8 @@ export function TaskWizard() {
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [autonomyLevel, setAutonomyLevel] = useState<"assisted" | "supervised" | "autonomous">("assisted");
+  const [maxConcurrent, setMaxConcurrent] = useState(1);
   const [isStartingSession, setIsStartingSession] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -261,6 +263,8 @@ export function TaskWizard() {
         workingDir,
         goals,
         terminationConditions: conditions.length > 0 ? conditions : ["所有目标均已达成并验证通过"],
+        autonomyLevel,
+        maxConcurrentTasks: maxConcurrent,
         tasks: [{
           content,
           type: "user_defined",
@@ -632,6 +636,36 @@ export function TaskWizard() {
               <div>
                 <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>完成标准</label>
                 {renderEditableList(editedConditions, setEditedConditions, "var(--yellow)", "+ 添加条件")}
+              </div>
+
+              {/* Autonomy Level */}
+              <div>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>自主级别</label>
+                <div className="flex gap-1.5">
+                  {([
+                    { value: "supervised", label: "受监督" },
+                    { value: "assisted", label: "辅助" },
+                    { value: "autonomous", label: "自主" },
+                  ] as const).map((opt) => (
+                    <button key={opt.value} onClick={() => setAutonomyLevel(opt.value)}
+                      className="flex-1 px-2 py-1.5 rounded text-xs font-medium"
+                      style={{
+                        background: autonomyLevel === opt.value ? "var(--blue)" : "var(--bg-tertiary)",
+                        color: autonomyLevel === opt.value ? "#fff" : "var(--text-secondary)",
+                        border: autonomyLevel === opt.value ? "1px solid var(--blue)" : "1px solid var(--border)",
+                      }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Max Concurrent Tasks */}
+              <div>
+                <label className="block mb-1 font-bold" style={{ color: "var(--text-secondary)" }}>并发任务数: {maxConcurrent}</label>
+                <input type="range" min="1" max="5" value={maxConcurrent}
+                  onChange={(e) => setMaxConcurrent(Number(e.target.value))}
+                  className="w-full"
+                />
               </div>
             </div>
 

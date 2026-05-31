@@ -18,6 +18,7 @@ import { AgentProgressPanel } from "./AgentProgressPanel";
 import { ErrorStream } from "./ErrorStream";
 import { ReviewSuggestions } from "./ReviewSuggestions";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { GitRemotePanel } from "../settings/GitRemotePanel";
 import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
 import { AddTaskModal } from "./AddTaskModal";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
@@ -589,6 +590,14 @@ export function EvolutionDashboard() {
                 onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] resumeGoal failed:", err instanceof Error ? err.message : err); })}
                 presenceSlot={<PresencePanel />}
               />
+            </div>
+          )}
+
+          {/* Git Remote Operations */}
+          {run && showAdvancedPanel && (
+            <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <h4 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>Git 远程操作</h4>
+              <GitRemotePanel workingDir={run.workingDir} />
             </div>
           )}
 

@@ -7,7 +7,11 @@ interface RemoteInfo {
   refs: Record<string, string>;
 }
 
-export function GitRemotePanel(_props: { runId?: string }) {
+interface GitRemotePanelProps {
+  workingDir?: string;
+}
+
+export function GitRemotePanel({ workingDir }: GitRemotePanelProps) {
   const { call } = useEngine();
   const toast = useToast();
   const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
@@ -20,63 +24,70 @@ export function GitRemotePanel(_props: { runId?: string }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadRemotes = useCallback(async () => {
+    if (!workingDir) return;
     setLoading(true);
     try {
-      const list = await call("git.listRemotes", {}) as RemoteInfo[];
+      const list = await call("git.listRemotes", { workingDir }) as RemoteInfo[];
       setRemotes(list ?? []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [call]);
+  }, [call, workingDir]);
 
   const loadBranch = useCallback(async () => {
+    if (!workingDir) return;
     try {
-      const res = await call("git.currentBranch", {}) as string;
+      const res = await call("git.currentBranch", { workingDir }) as string;
       setBranch(res ?? "");
     } catch { /* ignore */ }
-  }, [call]);
+  }, [call, workingDir]);
 
   useEffect(() => { loadRemotes(); loadBranch(); }, [loadRemotes, loadBranch]);
 
   const handlePush = async () => {
-    if (!pushBranch.trim()) return;
+    if (!pushBranch.trim() || !workingDir) return;
     setActionLoading("push");
     try {
-      await call("git.push", { remote: remoteName, branch: pushBranch.trim() });
+      await call("git.push", { workingDir, remote: remoteName, branch: pushBranch.trim() });
       toast.success(`已推送到 ${remoteName}/${pushBranch}`);
     } catch (err) { toast.error(`推送失败: ${err instanceof Error ? err.message : err}`); }
     setActionLoading(null);
   };
 
   const handlePull = async () => {
-    if (!pullBranch.trim()) return;
+    if (!pullBranch.trim() || !workingDir) return;
     setActionLoading("pull");
     try {
-      await call("git.pull", { remote: remoteName, branch: pullBranch.trim() });
+      await call("git.pull", { workingDir, remote: remoteName, branch: pullBranch.trim() });
       toast.success(`已从 ${remoteName}/${pullBranch} 拉取`);
     } catch (err) { toast.error(`拉取失败: ${err instanceof Error ? err.message : err}`); }
     setActionLoading(null);
   };
 
   const handleFetch = async () => {
+    if (!workingDir) return;
     setActionLoading("fetch");
     try {
-      await call("git.fetch", { remote: remoteName });
+      await call("git.fetch", { workingDir, remote: remoteName });
       toast.success(`已从 ${remoteName} 获取`);
     } catch (err) { toast.error(`获取失败: ${err instanceof Error ? err.message : err}`); }
     setActionLoading(null);
   };
 
   const handleAddRemote = async () => {
-    if (!remoteName.trim() || !remoteUrl.trim()) return;
+    if (!remoteName.trim() || !remoteUrl.trim() || !workingDir) return;
     setActionLoading("addRemote");
     try {
-      await call("git.addRemote", { name: remoteName.trim(), url: remoteUrl.trim() });
+      await call("git.addRemote", { workingDir, name: remoteName.trim(), url: remoteUrl.trim() });
       toast.success(`已添加远程仓库 ${remoteName}`);
       setRemoteUrl("");
       loadRemotes();
     } catch (err) { toast.error(`添加失败: ${err instanceof Error ? err.message : err}`); }
     setActionLoading(null);
   };
+
+  if (!workingDir) {
+    return <p className="text-xs" style={{ color: "var(--text-secondary)" }}>请先选择项目目录</p>;
+  }
 
   return (
     <div className="space-y-4">

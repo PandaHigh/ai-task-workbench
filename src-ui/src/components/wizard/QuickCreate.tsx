@@ -24,6 +24,8 @@ export function QuickCreate() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [userTemplates, setUserTemplates] = useState<UserTaskTemplate[]>([]);
   const [creating, setCreating] = useState(false);
+  const [autonomyLevel, setAutonomyLevel] = useState<"assisted" | "supervised" | "autonomous">("assisted");
+  const [maxConcurrent, setMaxConcurrent] = useState(1);
   const [dirError, setDirError] = useState("");
   const [contentError, setContentError] = useState("");
   const [showDirInput, setShowDirInput] = useState(false);
@@ -101,6 +103,8 @@ export function QuickCreate() {
         workingDir: workingDir.trim(),
         goals,
         terminationConditions: conditions,
+        autonomyLevel,
+        maxConcurrentTasks: maxConcurrent,
         tasks: [{
           content: content.trim(),
           type: "user_defined",
@@ -239,7 +243,7 @@ export function QuickCreate() {
 
         {/* Priority & Timeout */}
         <div className="glass-card p-4">
-          <div className="flex items-center gap-6 text-xs">
+          <div className="flex items-center gap-6 text-xs flex-wrap">
             <div className="flex items-center gap-2">
               <span className="font-bold" style={{ color: "var(--text-secondary)" }}>优先级</span>
               <select
@@ -265,6 +269,27 @@ export function QuickCreate() {
                   <option key={v} value={v}>{v}分钟</option>
                 ))}
               </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold" style={{ color: "var(--text-secondary)" }}>自主级别</span>
+              <select
+                value={autonomyLevel}
+                onChange={(e) => setAutonomyLevel(e.target.value as typeof autonomyLevel)}
+                className="px-2 py-1 rounded text-xs outline-none"
+                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              >
+                <option value="supervised">受监督</option>
+                <option value="assisted">辅助</option>
+                <option value="autonomous">自主</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold" style={{ color: "var(--text-secondary)" }}>并发</span>
+              <input type="range" min="1" max="5" value={maxConcurrent}
+                onChange={(e) => setMaxConcurrent(Number(e.target.value))}
+                className="w-16"
+              />
+              <span style={{ color: "var(--text-primary)" }}>{maxConcurrent}</span>
             </div>
           </div>
         </div>
