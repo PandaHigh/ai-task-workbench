@@ -72,6 +72,17 @@ function requireNonEmptyString(params: Record<string, unknown>, key: string): st
   return value;
 }
 
+function requireStringArray(params: Record<string, unknown>, key: string): string[] {
+  const value = params[key];
+  if (!Array.isArray(value)) {
+    throw new RpcValidationError(`Parameter '${key}' must be an array of strings`);
+  }
+  return value.map((v, i) => {
+    if (typeof v !== "string") throw new RpcValidationError(`Parameter '${key}[${i}]' must be a string`);
+    return v;
+  });
+}
+
 function validateRunId(runId: string): void {
   if (runId.includes("\0")) throw new RpcValidationError("Invalid runId");
   if (runId.includes("..") || runId.includes("/") || runId.includes("\\")) {
@@ -1142,5 +1153,54 @@ export const methodHandlers: Record<string, MethodHandler> = {
   "metrics.snapshot": async () => {
     const { metrics } = await import("../lib/metrics.js");
     return metrics.snapshot();
+  },
+
+  // ─── Scheduled Jobs ─────────────────────────────────────────────────────
+
+  "schedule.create": async (params) => {
+    const name = requireString(params, "name");
+    const cronExpr = requireString(params, "cronExpr");
+    const goals = requireStringArray(params, "goals");
+    const workingDir = requireString(params, "workingDir");
+    validateWorkingDir(workingDir);
+    const terminationConditions = params.terminationConditions
+      ? requireStringArray(params, "terminationConditions")
+      : [];
+
+    const { TaskScheduler } = await import("../engine/task-scheduler.js");
+    const triggerFn = async () => {}; // placeholder — actual trigger set during server init
+    const scheduler = new TaskScheduler(triggerFn);
+    const job = scheduler.addJob({
+      name,
+      cronExpr,
+      goals,
+      workingDir,
+      terminationConditions,
+      enabled: true,
+      config: params.config as Record<string, unknown> | undefined,
+    });
+    store.saveScheduledJob(job);
+    return job;
+  },
+
+  "schedule.list": async () => {
+    return store.getScheduledJobs();
+  },
+
+  "schedule.delete": async (params) => {
+    const id = requireString(params, "id");
+    const deleted = store.deleteScheduledJob(id);
+    return { deleted };
+  },
+
+  "schedule.toggle": async (params) => {
+    const id = requireString(params, "id");
+    const enabled = !!params.enabled;
+    const jobs = store.getScheduledJobs();
+    const job = jobs.find((j) => j.id === id);
+    if (!job) throw new RpcValidationError("Scheduled job not found");
+    job.enabled = enabled;
+    store.saveScheduledJob(job);
+    return job;
   },
 };
