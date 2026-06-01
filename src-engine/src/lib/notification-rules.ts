@@ -24,6 +24,13 @@ export interface NotificationEvent {
 
 export class NotificationEngine {
   private rules: NotificationRule[] = [];
+  private quietHoursStart?: string;
+  private quietHoursEnd?: string;
+
+  setQuietHours(start?: string, end?: string): void {
+    this.quietHoursStart = start;
+    this.quietHoursEnd = end;
+  }
 
   loadRules(rules: NotificationRule[]): void {
     this.rules = rules.filter((r) => r.enabled);
@@ -51,10 +58,12 @@ export class NotificationEngine {
   }
 
   private isQuietHours(): boolean {
+    if (!this.quietHoursStart || !this.quietHoursEnd) return false;
     const now = new Date();
     const hour = now.getHours();
-    // Default quiet hours check: 22:00 - 08:00
-    return hour >= 22 || hour < 8;
+    const start = parseInt(this.quietHoursStart.split(":")[0], 10);
+    const end = parseInt(this.quietHoursEnd.split(":")[0], 10);
+    return start >= end ? (hour >= start || hour < end) : (hour >= start && hour < end);
   }
 
   private async sendToChannel(channel: NotificationChannel, event: NotificationEvent): Promise<void> {
