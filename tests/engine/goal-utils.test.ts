@@ -22,7 +22,7 @@ describe("serializeGoalState", () => {
     expect(state).toEqual({
       status: "unmet",
       tokensUsed: 0,
-      budgetTokens: 500_000,
+      budgetTokens: Infinity,
       timeElapsedMs: 0,
       evaluationCycles: 0,
       lastEvaluationReason: "",
@@ -68,7 +68,7 @@ describe("serializeGoalState", () => {
     expect(state.evidence).toEqual(["partial evidence"]);
     // Defaults for unspecified fields
     expect(state.tokensUsed).toBe(0);
-    expect(state.budgetTokens).toBe(500_000);
+    expect(state.budgetTokens).toBe(Infinity);
     expect(state.timeElapsedMs).toBe(0);
     expect(state.lastEvaluationReason).toBe("");
   });

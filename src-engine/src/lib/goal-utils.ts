@@ -4,7 +4,7 @@ export function serializeGoalState(run: ExecutionRun): Record<string, unknown> {
   return {
     status: run.goalStatus ?? "unmet",
     tokensUsed: run.goalTokensUsed ?? 0,
-    budgetTokens: run.goalBudgetTokens ?? 500_000,
+    budgetTokens: run.goalBudgetTokens ?? Infinity,
     timeElapsedMs: run.goalTimeElapsedMs ?? 0,
     evaluationCycles: run.goalEvaluationCycles ?? 0,
     lastEvaluationReason: run.goalLastEvalReason ?? "",

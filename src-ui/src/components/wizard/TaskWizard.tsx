@@ -272,12 +272,6 @@ export function TaskWizard() {
         terminationConditions: conditions.length > 0 ? conditions : ["所有目标均已达成并验证通过"],
         autonomyLevel,
         maxConcurrentTasks: maxConcurrent,
-        tasks: [{
-          content,
-          type: "user_defined",
-          priority: 1,
-          timeoutMinutes,
-        }],
       })) as ExecutionRun;
 
       if (autoStart) {

@@ -121,7 +121,7 @@ export class Executor {
     // Initialize unified goal state
     if (!run.goalStatus && run.goals.length > 0) {
       run.goalStatus = "pursuing";
-      run.goalBudgetTokens = 500_000;
+      run.goalBudgetTokens = Infinity;
       run.goalTokensUsed = 0;
       run.goalTimeStartedAt = Date.now();
       run.goalTimeElapsedMs = 0;
@@ -136,6 +136,11 @@ export class Executor {
       // Generate feature list on first run
       if (!run.featuresGeneratedAt && run.goals.length > 0) {
         await this.generateFeatures(run);
+      }
+
+      // Generate initial task plan if queue is empty — AI breaks down goals into sub-tasks
+      if (this.queueManager.list(run.id).length === 0 && run.goals.length > 0) {
+        await this.generateInitialTasks(run);
       }
 
       while (this.running) {
@@ -872,6 +877,60 @@ Respond ONLY with valid JSON:
     } catch (scoreErr) {
       console.warn("[executor] failed to parse score result:", errorToMessage(scoreErr));
       return { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: "Failed to parse score" };
+    }
+  }
+
+  private async generateInitialTasks(run: ExecutionRun): Promise<void> {
+    this.log(run.id, "engine", "info", "Generating initial task plan from goals...");
+    const result = await this.ccClient.executeTask(
+      `Analyze the project and generate an initial task plan.\n\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\n\nGuidelines:\n- List tasks in recommended execution order (setup → core logic → features → polish → test)\n- UI/UX restyling tasks MUST depend on feature tasks that create/modify the components they style\n- Independent tasks (no shared files) should have NO dependency on each other — they can run in parallel\n- Set priority to reflect importance (1=highest, 10=lowest)\n\nGenerate 5-10 specific, actionable tasks.\n\nRespond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why this task", "dependsOnIndices": [0-based indices of tasks this depends on, or [] if independent] }]`,
+      { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
+    );
+    try {
+      const tasks = JSON.parse(extractJson(result.result));
+      if (!Array.isArray(tasks)) throw new Error("Expected task array");
+
+      // First pass: enqueue all tasks to get their IDs
+      const taskIds: string[] = [];
+      const taskParams: Array<{ content: string; priority: number; dependsOnIndices?: number[] }> = tasks;
+      for (const t of taskParams) {
+        const newTask = this.queueManager.enqueue(run.id, {
+          content: t.content,
+          type: "smart_task" as const,
+          priority: t.priority,
+        });
+        this.store.saveTask(run.id, newTask);
+        taskIds.push(newTask.id);
+        this.log(run.id, "engine", "info", `Initial task queued: ${t.content.substring(0, 50)}...`);
+      }
+
+      // Second pass: resolve index-based dependencies to actual task IDs
+      for (let i = 0; i < taskParams.length; i++) {
+        const indices = taskParams[i].dependsOnIndices;
+        if (Array.isArray(indices) && indices.length > 0) {
+          const deps = indices
+            .filter((idx) => idx >= 0 && idx < taskIds.length && idx !== i)
+            .map((idx) => taskIds[idx]);
+          if (deps.length > 0) {
+            this.queueManager.updateDependencies(run.id, taskIds[i], deps);
+            this.store.updateTask(run.id, taskIds[i], { dependsOn: deps });
+          }
+        }
+      }
+
+      this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+    } catch (err) {
+      console.warn("[executor] failed to parse initial task plan:", errorToMessage(err));
+      // Fallback: one task per goal, no dependencies (independent by default)
+      for (const goal of run.goals) {
+        const fallbackTask = this.queueManager.enqueue(run.id, {
+          content: `Work on: ${goal}`,
+          type: "smart_task" as const,
+          priority: 5,
+        });
+        this.store.saveTask(run.id, fallbackTask);
+      }
+      this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
     }
   }
 

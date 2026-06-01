@@ -42,8 +42,6 @@ export function ShareDashboard() {
   const elapsed = run?.startedAt
     ? formatDuration((run.completedAt || Date.now()) - run.startedAt)
     : "未开始";
-  const budgetUsed = run?.totalCostUsd ?? 0;
-  const budgetMax = Infinity;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -316,20 +314,6 @@ export function ShareDashboard() {
             <button onClick={() => setShowSidebar(false)} className="md:hidden text-xs" style={{ color: "var(--text-secondary)" }}>✕</button>
           </div>
           <div className="space-y-3 text-xs">
-            {/* Budget — always visible */}
-            <div>
-              <div className="flex justify-between mb-1">
-                <span style={{ color: "var(--text-secondary)" }}>预算消耗</span>
-                <span style={{ color: budgetUsed / budgetMax > 0.8 ? "var(--red)" : "var(--yellow)" }}>${budgetUsed.toFixed(2)} / ${budgetMax}</span>
-              </div>
-              <div className="w-full h-1.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
-                <div className="h-full rounded transition-all" style={{
-                  width: `${Math.min(100, (budgetUsed / budgetMax) * 100)}%`,
-                  background: budgetUsed / budgetMax > 0.8 ? "var(--red)" : budgetUsed / budgetMax > 0.5 ? "var(--yellow)" : "var(--green)",
-                }} />
-              </div>
-            </div>
-
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-2">
               <div className="px-2 py-2 rounded text-center" style={{ background: "var(--bg-tertiary)" }}>

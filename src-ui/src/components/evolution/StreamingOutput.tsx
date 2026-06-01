@@ -7,7 +7,6 @@ interface StreamMessage {
   timestamp?: number;
   result?: string;
   error?: string;
-  total_cost_usd?: number;
   duration_ms?: number;
   num_turns?: number;
 }
@@ -79,7 +78,6 @@ function MessageBubble({ message }: { message: StreamMessage }) {
             <span className={labelCls} style={{ color: "var(--green)" }}>OK</span>
             <span className="font-mono text-xs" style={{ color: "var(--green)", opacity: 0.7 }}>
               {message.duration_ms ? `${(message.duration_ms / 1000).toFixed(1)}s` : ""}
-              {message.total_cost_usd ? ` $${message.total_cost_usd.toFixed(4)}` : ""}
               {message.num_turns ? ` ${message.num_turns} turns` : ""}
             </span>
           </div>

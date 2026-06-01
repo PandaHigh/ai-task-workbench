@@ -162,6 +162,17 @@ export class QueueManager {
     return true;
   }
 
+  /** Update the dependency list of a task already in the queue */
+  updateDependencies(runId: string, taskId: string, dependsOn: string[]): void {
+    const queue = this.queues.get(runId);
+    if (!queue) return;
+    const entry = queue.find((e) => e.task.id === taskId);
+    if (entry) {
+      entry.task.dependsOn = dependsOn;
+      this.persistQueue(runId);
+    }
+  }
+
   clear(runId: string): void {
     this.queues.delete(runId);
     this.persistQueue(runId);

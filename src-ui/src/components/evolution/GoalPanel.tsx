@@ -16,12 +16,6 @@ function formatGoalDuration(ms: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function formatGoalTokens(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 0 : 1)}K`;
-  return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
 interface EditableListProps {
   title: string;
   items: string[];
@@ -206,25 +200,6 @@ export function GoalPanel({
             </div>
           )}
 
-          {run.goalBudgetTokens && (
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span style={{ color: "var(--text-secondary)" }}>AI 用量</span>
-                <span>{formatGoalTokens(run.goalTokensUsed ?? 0)} / {formatGoalTokens(run.goalBudgetTokens)}</span>
-              </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(((run.goalTokensUsed ?? 0) / run.goalBudgetTokens) * 100, 100)}%`,
-                    background: (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.8 ? "var(--red)"
-                      : (run.goalTokensUsed ?? 0) / run.goalBudgetTokens > 0.5 ? "var(--yellow)"
-                      : "var(--green)",
-                  }}
-                />
-              </div>
-            </div>
-          )}
 
           {run.goalLastEvalReason && (
             <div className="text-xs p-2 rounded" style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}>

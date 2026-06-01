@@ -119,11 +119,6 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
                 <span className="truncate">{(task.workingDir || "").split("/").pop()}</span>
                 <span>已完成 {task.totalTasksCompleted}/{Math.max(task.totalTasksCompleted, task.goals.length)} 项</span>
               </div>
-              {task.totalCostUsd > 0 && (
-                <span className="flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--yellow)" }}>
-                  ${task.totalCostUsd.toFixed(2)}
-                </span>
-              )}
             </div>
           </div>
         </div>

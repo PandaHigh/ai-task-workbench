@@ -109,12 +109,6 @@ export function QuickCreate() {
         terminationConditions: conditions,
         autonomyLevel,
         maxConcurrentTasks: maxConcurrent,
-        tasks: [{
-          content: content.trim(),
-          type: "user_defined",
-          priority,
-          timeoutMinutes,
-        }],
       })) as ExecutionRun;
 
       if (autoStart) {

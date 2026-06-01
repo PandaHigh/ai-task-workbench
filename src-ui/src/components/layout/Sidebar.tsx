@@ -103,24 +103,48 @@ export function Sidebar() {
               >
                 <span style={{ fontSize: 15, lineHeight: 1 }}>🐼</span>
               </div>
-              <div>
-                <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
-                  <span className="max-md:hidden">PandaAI</span>
-                  <span className="hidden max-md:inline">PandaAI</span>
-                </h1>
-              </div>
+              <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                PandaAI
+              </h1>
             </div>
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="md:hidden text-xs px-1"
-              style={{ color: "var(--text-secondary)" }}
-              aria-label="关闭导航"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <line x1="3" y1="3" x2="11" y2="11" />
-                <line x1="11" y1="3" x2="3" y2="11" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggle}
+                className="w-7 h-7 rounded-md flex items-center justify-center"
+                style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", cursor: "pointer" }}
+                aria-label={theme === "light" ? "切换到深色模式" : "切换到浅色模式"}
+                title={theme === "light" ? "深色模式" : "浅色模式"}
+              >
+                {theme === "light" ? (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 8.5A6.5 6.5 0 117.5 2a5 5 0 006.5 6.5z" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--yellow)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="8" r="3.5" />
+                    <line x1="8" y1="1" x2="8" y2="3" />
+                    <line x1="8" y1="13" x2="8" y2="15" />
+                    <line x1="1" y1="8" x2="3" y2="8" />
+                    <line x1="13" y1="8" x2="15" y2="8" />
+                    <line x1="3.05" y1="3.05" x2="4.46" y2="4.46" />
+                    <line x1="11.54" y1="11.54" x2="12.95" y2="12.95" />
+                    <line x1="3.05" y1="12.95" x2="4.46" y2="11.54" />
+                    <line x1="11.54" y1="4.46" x2="12.95" y2="3.05" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="md:hidden text-xs px-1"
+                style={{ color: "var(--text-secondary)" }}
+                aria-label="关闭导航"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <line x1="3" y1="3" x2="11" y2="11" />
+                  <line x1="11" y1="3" x2="3" y2="11" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -162,44 +186,17 @@ export function Sidebar() {
                 {connected ? "AI 已就绪" : "AI 未连接"}
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              {isDesktop && !connected && (
-                <button
-                  onClick={() => restartEngine()}
-                  disabled={restarting}
-                  className="text-[10px] px-2 py-0.5 rounded disabled:opacity-50"
-                  style={{ background: "var(--blue)", color: "#fff", cursor: "pointer" }}
-                  title="重启引擎进程"
-                >
-                  {restarting ? "重启中..." : "重启"}
-                </button>
-              )}
-            <button
-              onClick={toggle}
-              className="w-7 h-7 rounded-md flex items-center justify-center"
-              style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)", cursor: "pointer" }}
-              aria-label={theme === "light" ? "切换到深色模式" : "切换到浅色模式"}
-              title={theme === "light" ? "深色模式" : "浅色模式"}
-            >
-              {theme === "light" ? (
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 8.5A6.5 6.5 0 117.5 2a5 5 0 006.5 6.5z" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--yellow)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="8" cy="8" r="3.5" />
-                  <line x1="8" y1="1" x2="8" y2="3" />
-                  <line x1="8" y1="13" x2="8" y2="15" />
-                  <line x1="1" y1="8" x2="3" y2="8" />
-                  <line x1="13" y1="8" x2="15" y2="8" />
-                  <line x1="3.05" y1="3.05" x2="4.46" y2="4.46" />
-                  <line x1="11.54" y1="11.54" x2="12.95" y2="12.95" />
-                  <line x1="3.05" y1="12.95" x2="4.46" y2="11.54" />
-                  <line x1="11.54" y1="4.46" x2="12.95" y2="3.05" />
-                </svg>
-              )}
-            </button>
-            </div>
+            {isDesktop && !connected && (
+              <button
+                onClick={() => restartEngine()}
+                disabled={restarting}
+                className="text-[10px] px-2 py-0.5 rounded disabled:opacity-50"
+                style={{ background: "var(--blue)", color: "#fff", cursor: "pointer" }}
+                title="重启引擎进程"
+              >
+                {restarting ? "重启中..." : "重启"}
+              </button>
+            )}
           </div>
         </div>
       </aside>

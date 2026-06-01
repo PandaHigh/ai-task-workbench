@@ -26,7 +26,6 @@ import { SharePanel } from "../share/SharePanel";
 import { TaskCreateForm } from "../common/TaskCreateForm";
 import { RunHeader } from "./RunHeader";
 import { TaskQueue } from "./TaskQueue";
-import { BudgetDisplay } from "./BudgetDisplay";
 import { GoalPanel } from "./GoalPanel";
 import { LogPanel } from "./LogPanel";
 import { ReportTab } from "./ReportTab";
@@ -75,7 +74,6 @@ export function EvolutionDashboard() {
   const [stopTarget, setStopTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<TaskDefinition | null>(null);
-  const [budgetMax, setBudgetMax] = useState(Infinity);
   const toast = useToast();
 
   const handleShare = () => setShowSharePanel(true);
@@ -151,7 +149,6 @@ export function EvolutionDashboard() {
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setRunningTask(allTasks.find((t) => t.status === "running") || null);
       } catch (err) { console.warn("[poll] refresh tasks failed:", err); }
-      try { const v = await call("config.get", { key: "maxBudgetUsd" }); if (typeof v === "number" && v > 0) setBudgetMax(v); } catch (err) { console.warn("[poll] refresh budget config failed:", err); }
       if (!cancelled) setLoading(false);
     };
     load();
@@ -319,8 +316,6 @@ export function EvolutionDashboard() {
   };
 
   const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "--";
-  const budgetUsed = run?.totalCostUsd ?? 0;
-  const budgetPct = Math.min(100, (budgetUsed / budgetMax) * 100);
   const runningElapsed = useElapsedTimer(runningTask?.startedAt);
 
   return (
@@ -509,7 +504,7 @@ export function EvolutionDashboard() {
       {/* Right sidebar - desktop: always visible, mobile: drawer */}
       <DashboardErrorBoundary name="操作面板">
       <div
-        className={`glass-sidebar w-64 border-l flex flex-col max-md:mobile-drawer max-md:mobile-drawer-right ${showPanel ? "" : "max-md:drawer-closed"}`}
+        className={`glass-sidebar w-80 border-l flex flex-col max-md:mobile-drawer max-md:mobile-drawer-right ${showPanel ? "" : "max-md:drawer-closed"}`}
         style={{ borderColor: "var(--border)", animation: "fadeIn 0.5s ease-out 0.15s both" }}
       >
         <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
@@ -528,16 +523,6 @@ export function EvolutionDashboard() {
               <button onClick={() => setStopTarget(runId ?? "")} disabled={actionLoading === "stop"} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: actionLoading === "stop" ? "var(--bg-tertiary)" : "var(--red)", color: actionLoading === "stop" ? "var(--text-secondary)" : "#fff", opacity: actionLoading === "stop" ? 0.7 : 1 }}>{actionLoading === "stop" ? "停止中..." : "⏹ 停止"}</button>
             )}
           </div>
-
-          {/* Budget progress */}
-          {run && (
-            <BudgetDisplay
-              budgetUsed={budgetUsed}
-              budgetMax={budgetMax}
-              budgetPct={budgetPct}
-              isRunning={isRunning}
-            />
-          )}
 
           {/* Timeout - hidden in simple mode unless advanced */}
           {(!simpleMode || showAdvancedPanel) && <div>
@@ -569,7 +554,6 @@ export function EvolutionDashboard() {
                 <h4 className="text-xs font-bold mb-1" style={{ color: "var(--text-secondary)" }}>概况</h4>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>已完成</span><span style={{ color: "var(--green)" }}>{run.totalTasksCompleted}</span></div>
-                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>费用</span><span style={{ color: "var(--yellow)" }}>${run.totalCostUsd.toFixed(4)}</span></div>
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>保存</span><span style={{ color: "var(--blue)" }}>{commits.length}</span></div>
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>经验</span><span style={{ color: "var(--red)" }}>{lessons.length}</span></div>
                 </div>

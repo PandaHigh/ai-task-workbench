@@ -150,3 +150,12 @@ npm run build
 - 前端: `cd src-ui && npx vitest run`
 - E2E: `cd src-ui && npx playwright test`
 - 构建验证: `npx tsc --noEmit`（在各子项目目录）
+
+## 常见问题排查
+
+### Vite 热更新失效 / 改动不生效
+- **症状**: 修改了前端文件但浏览器没有反映变更，强制刷新也无效
+- **原因**: Vite 的内存模块缓存与文件系统 watcher 不同步（macOS fsevents 偶发丢失）
+- **排查**: `curl -s http://localhost:1420/src/components/...tsx` 对比实际文件内容，确认 Vite 是否在返回旧代码
+- **解决**: 重启 Vite 开发服务器 — 先 `kill` 端口 1420 的进程，再 `cd src-ui && npx vite --host --port 1420`
+- **注意**: 本项目是 npm workspace 结构，Vite 必须从 `src-ui/` 目录启动，否则会 404

@@ -38,12 +38,12 @@ describe("AgentProgressPanel", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "100");
   });
 
-  it("should enforce minimum 2% bar width", () => {
+  it("should enforce minimum 3% bar width", () => {
     Object.keys(mockAgentProgress).forEach((k) => delete mockAgentProgress[k]);
     mockAgentProgress.developer = { progress: 0, phase: "idle" };
     render(<AgentProgressPanel />);
     const bar = screen.getByRole("progressbar");
-    expect(bar).toHaveStyle({ width: "2%" });
+    expect(bar).toHaveStyle({ width: "3%" });
   });
 
   it("should show unknown role with raw string", () => {
