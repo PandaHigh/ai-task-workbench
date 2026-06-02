@@ -6,7 +6,7 @@ import { SkillStore } from "../db/skill-store.js";
 import { TemplateStore } from "../db/template-store.js";
 import { SkillManager } from "../skills/skill-manager.js";
 import { QueueManager } from "../engine/queue-manager.js";
-import { Executor } from "../engine/executor.js";
+import { Executor } from "../engine/omx-executor.js";
 import { SessionManager } from "../engine/session-manager.js";
 import * as wizardHandler from "../wizard/wizard-handler.js";
 import * as remoteProxy from "../remote/remote-proxy.js";
@@ -14,7 +14,8 @@ import { resolve, normalize } from "path";
 import { homedir, tmpdir } from "os";
 import { errorToMessage } from "../lib/error-utils.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
-import { BUILT_IN_ROLES, DEFAULT_CREW_CONFIG, type CrewMode } from "../engine/agents/agent-role.js";
+import { OMX_ROLES } from "../engine/omx-roles.js";
+import { DEFAULT_CREW_CONFIG, type CrewMode, getBuiltInProfiles } from "../engine/builtin-profiles.js";
 import { PluginRegistry, type McpServerConfig } from "../plugins/plugin-registry.js";
 import { McpManager } from "../plugins/mcp-manager.js";
 import { getDataDir } from "../db/store-utils.js";
@@ -989,10 +990,10 @@ export const methodHandlers: Record<string, MethodHandler> = {
   // ─── Crew / Agent roles ────────────────────────────────────────────────
 
   "crew.list": async () => {
-    return Object.values(BUILT_IN_ROLES).map((r) => ({
+    return Object.values(OMX_ROLES).map((r) => ({
       id: r.id,
       name: r.name,
-      description: r.description,
+      description: r.description.slice(0, 120),
       tools: r.tools,
       maxTurns: r.maxTurns,
     }));
@@ -1092,18 +1093,14 @@ export const methodHandlers: Record<string, MethodHandler> = {
   // ─── Orchestrator Profiles ─────────────────────────────────────────────
 
   "profile.list": async () => {
-    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
-    const adaptive = new AdaptiveConfig({});
-    const builtIn = adaptive.getBuiltInProfiles();
+    const builtIn = getBuiltInProfiles();
     const custom = store.listProfiles();
     return [...builtIn, ...custom];
   },
 
   "profile.get": async (params) => {
     const id = requireString(params, "id");
-    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
-    const adaptive = new AdaptiveConfig({});
-    const builtIn = adaptive.getBuiltInProfiles();
+    const builtIn = getBuiltInProfiles();
     const found = builtIn.find((p) => p.id === id) ?? store.listProfiles().find((p) => p.id === id);
     if (!found) throw new Error(`Profile not found: ${id}`);
     return found;
@@ -1114,9 +1111,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!profile || !profile.id || !profile.name || !profile.config) {
       throw new Error("Missing required parameter: profile (with id, name, config)");
     }
-    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
-    const adaptive = new AdaptiveConfig({});
-    const builtIn = adaptive.getBuiltInProfiles();
+    const builtIn = getBuiltInProfiles();
     if (builtIn.some((p) => p.id === profile.id)) {
       throw new Error("Cannot modify built-in profiles");
     }
@@ -1127,9 +1122,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "profile.delete": async (params) => {
     const id = requireString(params, "id");
-    const { AdaptiveConfig } = await import("../engine/adaptive-config.js");
-    const adaptive = new AdaptiveConfig({});
-    const builtIn = adaptive.getBuiltInProfiles();
+    const builtIn = getBuiltInProfiles();
     if (builtIn.some((p) => p.id === id)) {
       throw new Error("Cannot delete built-in profiles");
     }

@@ -60,7 +60,7 @@ describe("7x24: Evaluation cycle reset logic", () => {
   });
 
   it("should halve evaluationCycles when progress increases >0.01", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
       dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
       peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
@@ -102,7 +102,7 @@ describe("7x24: Evaluation cycle reset logic", () => {
   });
 
   it("should NOT reset evaluationCycles when progress does not increase", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
       dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
       peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
@@ -135,7 +135,7 @@ describe("7x24: Evaluation cycle reset logic", () => {
   });
 
   it("should trim progressHistory to stagnationWindow * 2", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
       dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
       peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),

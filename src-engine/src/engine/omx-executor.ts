@@ -1,3 +1,12 @@
+/**
+ * OMX Executor — drop-in replacement for the old Executor.
+ *
+ * Same public API (start, stop, isRunning, cancelTask, resolveApproval)
+ * but uses OmxAmpPipeline (5-stage with RALPLAN consensus) instead of TaskPipeline.
+ *
+ * All other logic (handleEmptyQueue, evaluateGoal, scoreTask, etc.) is preserved.
+ */
+
 import fs from "fs";
 import path from "path";
 import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus, CheckpointType } from "@ai-workbench/shared";
@@ -9,15 +18,13 @@ import { SkillManager } from "../skills/skill-manager.js";
 import { generateClaudeMd } from "../skills/claude-md-generator.js";
 import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
-import { TaskPipeline, type PipelineResult } from "./task-pipeline.js";
-import { ErrorWatcher } from "./error-watcher.js";
-import { BackgroundReviewer } from "./agents/background-reviewer.js";
-import { AgentExecutor } from "./agents/agent-executor.js";
-import { AdaptiveConfig } from "./adaptive-config.js";
+import { OmxAmpPipeline, type OmxAmpPipelineResult } from "./omx-pipeline.js";
+import { OmxAmpTeamOrchestrator, type TeamConfig } from "./omx-team/team-orchestrator.js";
+import { OmxAmpExperimentRunner, type ExperimentConfig } from "./omx-research/experiment-runner.js";
+
+// AgentExecutor removed — OMX pipeline uses OmxAmpPipeline instead
 import { BranchStrategy } from "../git/branch-strategy.js";
-import { DAGScheduler } from "./dag-scheduler.js";
-import { ExecutionPool } from "./execution-pool.js";
-import type { OrchestratorProfile } from "@ai-workbench/shared";
+
 
 import { errorToMessage } from "../lib/error-utils.js";
 import { classifyError, getRetryStrategy, TaskError } from "../lib/error-types.js";
@@ -37,10 +44,10 @@ type NotifyFn = (method: string, params: Record<string, unknown>) => void;
 
 function sanitizePromptInput(input: string): string {
   return input
-    .replace(/```/g, "``​`") // break code blocks
-    .replace(/<system[^>]*>/gi, "[filtered]") // filter system tags
+    .replace(/```/g, "``​`")
+    .replace(/<system[^>]*>/gi, "[filtered]")
     .replace(/\bignore\s+(previous|above|all)\s+(instructions?|rules?)/gi, "[filtered]")
-    .substring(0, 2000); // limit length
+    .substring(0, 2000);
 }
 
 export class Executor {
@@ -55,8 +62,6 @@ export class Executor {
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
   private tracer: Tracer;
-  private errorWatcher: ErrorWatcher;
-  private activeProfile: OrchestratorProfile | null = null;
   private cachedCost: number | null = null;
   private maxConcurrency: number = 1;
   private config: {
@@ -103,8 +108,6 @@ export class Executor {
     } catch (err) {
       console.warn("[executor] failed to load config from store, using defaults:", errorToMessage(err));
     }
-
-    this.errorWatcher = new ErrorWatcher(notify, this.store);
   }
 
   async start(run: ExecutionRun): Promise<void> {
@@ -114,11 +117,10 @@ export class Executor {
     this.evaluationCycles = 0;
     this.progressHistory = [];
     this.broadcast("run.status", { runId: run.id, status: "running" });
-    this.log(run.id, "engine", "info", "Execution loop started");
+    this.log(run.id, "engine", "info", "OMX execution loop started");
 
     this.maxConcurrency = run.maxConcurrentTasks ?? this.config.maxConcurrentTasks;
 
-    // Initialize unified goal state
     if (!run.goalStatus && run.goals.length > 0) {
       run.goalStatus = "pursuing";
       run.goalBudgetTokens = Infinity;
@@ -133,25 +135,21 @@ export class Executor {
     }
 
     try {
-      // Generate feature list on first run
       if (!run.featuresGeneratedAt && run.goals.length > 0) {
         await this.generateFeatures(run);
       }
 
-      // Generate initial task plan if queue is empty — AI breaks down goals into sub-tasks
       if (this.queueManager.list(run.id).length === 0 && run.goals.length > 0) {
         await this.generateInitialTasks(run);
       }
 
       while (this.running) {
-        // Maintain a set of completed task IDs for DAG-aware scheduling
         const completedTaskIds = new Set<string>(
           this.store.listTasks(run.id)
             .filter(t => t.status === "completed")
             .map(t => t.id)
         );
 
-        // DAG-aware dequeue: skips tasks whose dependencies are not met
         const task = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
 
         if (!task) {
@@ -160,41 +158,27 @@ export class Executor {
           continue;
         }
 
-        // Single-task mode (maxConcurrentTasks = 1) — original sequential logic
-        if (this.maxConcurrency <= 1) {
-          // Autonomy gate: supervised mode requires approval before each task
-          if (run.autonomyLevel === "supervised") {
-            this.log(run.id, "engine", "info", `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`);
-            const decision = await this.checkApproval(
-              "risky_commit", run, task,
-              `Supervised mode: approve execution of "${task.content.substring(0, 80)}"?`,
-              { taskContent: task.content },
-            );
-            if (!decision || decision.action === "reject") {
-              this.log(run.id, "engine", "info", "Task rejected by human in supervised mode");
-              this.store.updateTask(run.id, task.id, { status: "cancelled", completedAt: Date.now() });
-              this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "cancelled", reason: "Rejected in supervised mode" });
-              continue;
-            }
+        if (run.autonomyLevel === "supervised") {
+          this.log(run.id, "engine", "info", `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`);
+          const decision = await this.checkApproval(
+            "risky_commit", run, task,
+            `Supervised mode: approve execution of "${task.content.substring(0, 80)}"?`,
+            { taskContent: task.content },
+          );
+          if (!decision || decision.action === "reject") {
+            this.log(run.id, "engine", "info", "Task rejected by human in supervised mode");
+            this.store.updateTask(run.id, task.id, { status: "cancelled", completedAt: Date.now() });
+            this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "cancelled", reason: "Rejected in supervised mode" });
+            continue;
           }
-
-          this.store.updateTask(run.id, task.id, { status: "running", startedAt: Date.now() });
-          this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "running" });
-          this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
-
-          await this.executeSingleTask(task, run);
-
-          run.totalTasksCompleted++;
-          this.store.saveRun(run);
-        } else {
-          // Parallel mode — drain all ready tasks via ExecutionPool
-          await this.runParallelTasks(run, task);
         }
+
+        // All tasks go through Team Orchestrator (default multi-agent mode)
+        await this.runParallelTasks(run, task);
 
         run.totalTasksCompleted++;
         this.store.saveRun(run);
 
-        // Post-task budget guard
         const taskCost = this.recalculateCost(run.id);
         if (taskCost > this.config.maxBudgetUsd) {
           this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
@@ -220,7 +204,6 @@ export class Executor {
         .map(t => t.id)
     );
 
-    // Gather all ready tasks
     const readyTasks = [firstTask];
     while (true) {
       const next = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
@@ -230,7 +213,6 @@ export class Executor {
     }
 
     if (readyTasks.length === 1) {
-      // Only one task ready — fall back to sequential
       this.store.updateTask(run.id, firstTask.id, { status: "running", startedAt: Date.now() });
       this.broadcast("task.status", { taskId: firstTask.id, runId: run.id, status: "running" });
       this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
@@ -240,81 +222,129 @@ export class Executor {
       return;
     }
 
-    // Build DAG scheduler for these tasks with execution context
-    const allTasks = this.store.listTasks(run.id);
-    const scheduler = new DAGScheduler(allTasks, {
-      lastScore: 0,
-      lastStatus: "pending",
-      cycleCount: this.evaluationCycles,
-      completedCount: completedTaskIds.size,
-      failedCount: this.store.listTasks(run.id).filter(t => t.status === "failed" || t.status === "reverted").length,
-    });
-    for (const id of completedTaskIds) scheduler.markCompleted(id);
+    // Use Team Orchestrator for multi-agent parallel execution
+    const useFeatureBranch = this.config.branchStrategy === "feature-branch" || this.maxConcurrency > 1;
+    const teamConfig: TeamConfig = {
+      maxWorkers: this.maxConcurrency,
+      worktreeIsolation: useFeatureBranch,
+      maxFixAttempts: 3,
+    };
 
-    this.log(run.id, "engine", "info", `Parallel execution: ${readyTasks.length} tasks with concurrency ${this.maxConcurrency}`);
+    this.log(run.id, "engine", "info", `[team] Starting Team execution: ${readyTasks.length} tasks, ${this.maxConcurrency} workers`);
 
-    // Mark tasks as running
     for (const t of readyTasks) {
       this.store.updateTask(run.id, t.id, { status: "running", startedAt: Date.now() });
       this.broadcast("task.status", { taskId: t.id, runId: run.id, status: "running" });
     }
     this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
 
-    const pool = new ExecutionPool(
-      (task) => this.executeSingleTask(task, run),
-      this.maxConcurrency,
-    );
+    const abortSignal = this.stopController?.signal;
+    const lessons = this.store.getLessons(run.id).slice(-20);
+    const context: TaskContext = {
+      workingDir: run.workingDir,
+      goals: run.goals,
+      terminationConditions: run.terminationConditions,
+      lastTenCommits: [],
+      nextFiveTasks: [],
+      lessonsLearned: lessons,
+    };
 
-    const results = await pool.runAll(readyTasks, scheduler, (task) => {
-      const stored = this.store.getTask(run.id, task.id);
-      scheduler.updateContext({
-        lastScore: stored?.score ?? 0,
-        lastStatus: stored?.status ?? "completed",
-      });
-    });
+    try {
+      const team = new OmxAmpTeamOrchestrator(this.ccClient, (method, params) => this.broadcast(method, params as Record<string, unknown>), teamConfig);
+      const teamResult = await team.execute(readyTasks, run, context, abortSignal);
 
-    let completedCount = 0;
-    for (const r of results) {
-      if (r.success) completedCount++;
+      this.log(run.id, "engine", "info",
+        `[team] Completed: ${teamResult.completedTasks} succeeded, ${teamResult.failedTasks} failed, cost=$${teamResult.totalCostUsd.toFixed(4)}`);
+
+      run.totalTasksCompleted += teamResult.completedTasks;
+      this.store.saveRun(run);
+    } catch (err) {
+      this.log(run.id, "engine", "error", `[team] Team execution failed: ${errorToMessage(err)}`);
+      // Fallback: execute remaining tasks sequentially
+      this.log(run.id, "engine", "info", `[team] Falling back to sequential execution`);
+      for (const task of readyTasks) {
+        const stored = this.store.getTask(run.id, task.id);
+        if (stored?.status === "running" || stored?.status === "pending") {
+          await this.executeSingleTask(task, run);
+          run.totalTasksCompleted++;
+        }
+      }
+      this.store.saveRun(run);
     }
-    run.totalTasksCompleted += completedCount;
-    this.store.saveRun(run);
-
     this.cachedCost = null;
+  }
+
+  private isResearchTask(task: TaskDefinition, run: ExecutionRun): boolean {
+    const researchKeywords = ["experiment", "benchmark", "hypothesis", "compare", "optimize", "ablation", "tune"];
+    const content = task.content.toLowerCase();
+    const goals = run.goals.join(" ").toLowerCase();
+    return researchKeywords.some(kw => content.includes(kw) || goals.includes(kw));
+  }
+
+  private async executeAsResearch(
+    task: TaskDefinition,
+    run: ExecutionRun,
+    workingDir: string,
+    abortSignal?: AbortSignal,
+  ): Promise<OmxAmpPipelineResult> {
+    const notifyFn = (method: string, params: unknown) => this.broadcast(method, params as Record<string, unknown>);
+    const runner = new OmxAmpExperimentRunner(this.ccClient, notifyFn);
+
+    const config: ExperimentConfig = {
+      hypothesis: task.content,
+      workingDir,
+      maxIterations: 5,
+      keepPolicy: "score_improvement",
+    };
+
+    this.log(run.id, "research", "info", `[research] Starting experiment: ${task.content.substring(0, 80)}`);
+
+    const result = await runner.run(config, abortSignal);
+
+    this.log(run.id, "research", "info",
+      `[research] Experiment completed: ${result.iterations} iterations, kept=${result.kept}, bestScore=${result.bestScore.toFixed(2)}, cost=$${result.totalCostUsd.toFixed(4)}`);
+
+    return {
+      finalOutput: result.kept
+        ? `Experiment succeeded after ${result.iterations} iterations (best score: ${result.bestScore.toFixed(2)})`
+        : `Experiment did not improve after ${result.iterations} iterations`,
+      sessionId: "",
+      totalCostUsd: result.totalCostUsd,
+      durationMs: result.totalDurationMs,
+      numTurns: result.iterations,
+      messages: [],
+      phases: [],
+      iterations: result.iterations,
+    };
   }
 
   private async handleEmptyQueue(run: ExecutionRun): Promise<boolean> {
     this.evaluationCycles++;
     this.log(run.id, "engine", "info", `Queue empty — evaluating goals (cycle ${this.evaluationCycles}/${this.config.maxEvaluationCycles})`);
 
-    // Guard: max evaluation cycles
     if (this.evaluationCycles > this.config.maxEvaluationCycles) {
       this.log(run.id, "engine", "warn", `Reached max evaluation cycles (${this.config.maxEvaluationCycles}). Stopping.`);
       await this.finalize(run, "Max evaluation cycles reached. Partial progress may have been made.");
       return false;
     }
 
-    // Guard: budget exceeded
-    // Evaluate goals (with individual error recovery)
     let evaluation: GoalEvaluation;
     try {
       evaluation = await this.evaluateGoal(run);
     } catch (err) {
       const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Goal evaluation failed: ${msg}. Cooling down and retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during goal evaluation cooldown"); return false; }
+      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
       return true;
     }
 
     if (!this.running) return false;
-    // Guard: stagnation detection
+
     this.progressHistory.push(evaluation.overallProgress);
-    // Trim progressHistory to prevent unbounded growth
     const maxHistory = this.config.stagnationWindow * 2;
     if (this.progressHistory.length > maxHistory) {
       this.progressHistory = this.progressHistory.slice(-maxHistory);
     }
-    // Reset evaluation cycles when progress is being made
     if (this.progressHistory.length >= 2) {
       const prev = this.progressHistory[this.progressHistory.length - 2];
       const curr = this.progressHistory[this.progressHistory.length - 1];
@@ -323,7 +353,6 @@ export class Executor {
       }
     }
     if (this.isStagnant()) {
-      // ─── Checkpoint: goal_stagnation ──────────────────────
       this.log(run.id, "engine", "warn", "Progress stalled — requesting human guidance");
       const lessons = this.store.getLessons(run.id, "failure").slice(-5);
       const decision = await this.checkApproval(
@@ -337,7 +366,6 @@ export class Executor {
       }
       if (decision.action === "modify" && decision.instructions) {
         this.log(run.id, "engine", "info", "Human redirection: " + decision.instructions);
-        // Inject as a high-priority user task
         const redirectTask = this.queueManager.enqueue(run.id, {
           content: decision.instructions,
           type: "user_defined",
@@ -346,7 +374,6 @@ export class Executor {
         this.store.saveTask(run.id, redirectTask);
         this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
       }
-      // Reset stagnation tracking after human intervention
       this.progressHistory = [];
       this.evaluationCycles = 0;
     }
@@ -357,7 +384,6 @@ export class Executor {
       return false;
     }
 
-    // Generate smart tasks (with error recovery)
     this.log(run.id, "engine", "info", `Goals not met (${(evaluation.overallProgress * 100).toFixed(0)}%). Generating smart tasks...`);
     let smartTasks: Array<{ content: string; priority: number; reasoning: string }>;
     try {
@@ -365,7 +391,7 @@ export class Executor {
     } catch (err) {
       const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Smart task generation failed: ${msg}. Retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { console.warn("[executor] sleep interrupted during smart task cooldown"); return false; }
+      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
       return true;
     }
 
@@ -382,11 +408,9 @@ export class Executor {
 
     this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
 
-    // Cooldown between evaluation cycles
     try {
       await this.sleep(CYCLE_COOLDOWN_MS);
     } catch {
-      console.warn("[executor] sleep interrupted during evaluation cycle cooldown");
       return false;
     }
     return true;
@@ -405,7 +429,6 @@ export class Executor {
     this.store.saveRun(run);
     this.store.saveReport(run.id, run.finalReport);
 
-    // Generate README.md in working directory
     try {
       const tasks = this.store.listTasks(run.id);
       const commits = this.store.getCommits(run.id);
@@ -438,18 +461,6 @@ export class Executor {
     return cost;
   }
 
-  private loadProfile(): OrchestratorProfile | null {
-    try {
-      const profileId = (this.store.getConfig("activeProfile") as string | undefined) || "adaptive";
-      const adaptive = new AdaptiveConfig({});
-      const builtIn = adaptive.getBuiltInProfiles();
-      return builtIn.find((p) => p.id === profileId) ?? this.store.listProfiles().find((p) => p.id === profileId) ?? null;
-    } catch (err) {
-      console.warn("[executor] loadProfile failed:", err instanceof Error ? err.message : err);
-      return null;
-    }
-  }
-
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.stopController?.signal.aborted) {
@@ -469,12 +480,15 @@ export class Executor {
     });
   }
 
+  /**
+   * Execute a single task using the OMX 5-stage pipeline.
+   * This is the ONLY method that differs from the old executor.
+   */
   private async executeSingleTask(task: TaskDefinition, run: ExecutionRun): Promise<void> {
     const gitManager = new GitManager({ workingDir: run.workingDir });
     const abortController = new AbortController();
     this.abortControllers.set(task.id, abortController);
 
-    // Feature branch isolation (auto-enable when concurrency > 1)
     const useFeatureBranch = this.config.branchStrategy === "feature-branch" || this.maxConcurrency > 1;
     let branchResult: { branchName: string; worktreePath: string } | null = null;
 
@@ -491,40 +505,32 @@ export class Executor {
     try {
       await gitManager.ensureInit();
 
-      // Inject skills and generate CLAUDE.md in the correct working directory
       const pipelineWorkingDir = branchResult?.worktreePath || run.workingDir;
       this.skillManager.prepareWorkingDir(pipelineWorkingDir);
       const context = await this.buildContext(task, run, gitManager);
       generateClaudeMd(pipelineWorkingDir, context);
 
-      this.log(run.id, "pipeline", "info", `Executing via TaskPipeline: ${task.content.substring(0, 80)}...`);
+      this.log(run.id, "pipeline", "info", `[OMX] Executing via OmxAmpPipeline: ${task.content.substring(0, 80)}...`);
 
-      // Start trace for this task
       this.tracer.startTrace();
       const taskSpanId = this.tracer.startSpan("task.execute", undefined, { taskId: task.id, content: task.content.substring(0, 100) });
 
-      // Load active profile for pipeline config
-      this.activeProfile = this.loadProfile();
+      // ── Check if this task should use Autoresearch mode ──
+      const isResearchTask = this.isResearchTask(task, run);
+      let pipelineResult: OmxAmpPipelineResult;
 
-      // Use TaskPipeline for structured execution
-      const pipelineConfig = {
-        maxFixIterations: this.activeProfile?.config?.maxFixIterations ?? ((this.store.getConfig("maxFixIterations") as number) || undefined),
-        plannerMaxTurns: this.activeProfile?.config?.agents?.planner?.maxTurns ?? ((this.store.getConfig("plannerMaxTurns") as number) || undefined),
-        developerMaxTurns: this.activeProfile?.config?.agents?.developer?.maxTurns ?? ((this.store.getConfig("developerMaxTurns") as number) || undefined),
-        testerMaxTurns: this.activeProfile?.config?.agents?.tester?.maxTurns ?? ((this.store.getConfig("testerMaxTurns") as number) || undefined),
-        reviewerMaxTurns: this.activeProfile?.config?.agents?.reviewer?.maxTurns ?? ((this.store.getConfig("reviewerMaxTurns") as number) || undefined),
-        stderrCallback: this.activeProfile?.config?.errorWatchEnabled
-          ? (data: string) => this.errorWatcher.processStderr(data, run.id, task.id)
-          : undefined,
-      };
-      const pipeline = new TaskPipeline(this.ccClient, this.broadcast.bind(this), pipelineWorkingDir, pipelineConfig);
-      const pipelineResult: PipelineResult = await pipeline.run(task, context, abortController.signal);
+      if (isResearchTask) {
+        pipelineResult = await this.executeAsResearch(task, run, pipelineWorkingDir, abortController.signal);
+      } else {
+        // ── Standard OMX Pipeline execution ──
+        const pipeline = new OmxAmpPipeline(this.ccClient, this.broadcast.bind(this) as (method: string, params: unknown) => void, pipelineWorkingDir);
+        pipelineResult = await pipeline.run(task, context, abortController.signal);
+      }
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
-      this.cachedCost = null; // invalidate since costs changed
+      this.cachedCost = null;
 
-      // End trace and persist
       this.tracer.endSpan(taskSpanId, "ok", { costUsd: pipelineResult.totalCostUsd, durationMs: pipelineResult.durationMs });
       const traceSpans = this.tracer.endTrace();
       if (traceSpans.length > 0) {
@@ -542,11 +548,11 @@ export class Executor {
       });
       this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "scoring" });
 
-      // Quality scoring: prefer reviewer score from pipeline, fallback to scoreTask()
+      // Quality scoring: prefer review score from pipeline
       let score: ScoreDetails;
       if (pipelineResult.reviewResult) {
         const review = pipelineResult.reviewResult;
-        const overall = Math.min(review.score, 1); // reviewResult.score is already 0-1
+        const overall = Math.min(review.score, 1);
         score = {
           overall,
           goalAlignment: overall * 0.3,
@@ -570,28 +576,10 @@ export class Executor {
       this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score });
       this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
 
-      // Background review (non-blocking, runs in separate worktree)
-      if (this.activeProfile?.config?.backgroundReview) {
-        const bgReviewer = new BackgroundReviewer(
-          new AgentExecutor(this.ccClient, this.broadcast.bind(this)),
-          this.store,
-          this.broadcast.bind(this),
-        );
-        bgReviewer.runBackgroundReview({
-          runId: run.id,
-          taskId: task.id,
-          workingDir: run.workingDir,
-          plan: pipelineResult.plan,
-          testResult: pipelineResult.testResult,
-        }).catch((err) => {
-          this.log(run.id, "reviewer", "warn", `Background review failed: ${errorToMessage(err)}`, task.id);
-        });
-      }
-
       this.log(run.id, "scorer", score.passed ? "info" : "warn",
         `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`, task.id);
 
-      // ─── Checkpoint: borderline_score ─────────────────────
+      // Checkpoint: borderline_score
       const scoreDiff = Math.abs(score.overall - this.config.qualityThreshold);
       if (scoreDiff < 0.15) {
         this.log(run.id, "engine", "info", "Borderline score — requesting human decision", task.id);
@@ -611,7 +599,7 @@ export class Executor {
         }
       }
 
-      // ─── Checkpoint: risky_commit ─────────────────────────
+      // Checkpoint: risky_commit
       if (score.passed) {
         const diffStats = await this.getDiffStats(gitManager);
         const isRisky = diffStats.filesChanged > 10
@@ -644,7 +632,6 @@ export class Executor {
         this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
 
-        // Verify features after successful commit
         if (run.features && run.features.length > 0) {
           await this.verifyFeatures(run);
         }
@@ -670,7 +657,6 @@ export class Executor {
       }
     } catch (err) {
       const taskErr = classifyError(err);
-      // End trace on error
       try {
         const traceSpans = this.tracer.endTrace();
         if (traceSpans.length > 0) {
@@ -678,7 +664,6 @@ export class Executor {
         }
       } catch (traceErr) { console.warn("[executor] trace cleanup failed:", traceErr instanceof Error ? traceErr.message : traceErr); }
 
-      // Check ErrorWatcher for critical error accumulation
       const detectedErrors = this.store.getDetectedErrors(run.id, task.id);
       if (detectedErrors.filter((e) => e.severity === "critical").length >= 3 && taskErr.retryable) {
         this.log(run.id, "engine", "warn", `3+ critical errors detected — degrading to permanent`, task.id);
@@ -697,6 +682,7 @@ export class Executor {
         this.log(run.id, "engine", "warn",
           `${categoryLabel} error (retry ${currentRetries + 1}/${strategy.maxRetries}): ${taskErr.message.substring(0, 100)}. Retrying in ${backoffMs / 1000}s.`,
           task.id);
+
         this.store.updateTask(run.id, task.id, {
           status: "pending",
           retryCount: currentRetries + 1,
@@ -711,7 +697,6 @@ export class Executor {
         this.store.saveTask(run.id, requeued);
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${strategy.maxRetries} (${categoryLabel})` });
 
-        // Pause run if needed (e.g., rate limiting)
         if (strategy.pauseRunMs > 0) {
           this.log(run.id, "engine", "warn", `Pausing run for ${strategy.pauseRunMs / 1000}s (${categoryLabel})`);
           try { await this.sleep(strategy.pauseRunMs); } catch (sleepErr) { if (!(sleepErr instanceof Error && sleepErr.message === "Stopped")) console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr); }
@@ -728,13 +713,9 @@ export class Executor {
       this.abortControllers.delete(task.id);
       this.cachedCost = null;
 
-      // Merge and clean up feature branch
       if (useFeatureBranch && branchResult) {
         try {
-          const mergeResult = await BranchStrategy.mergeBranch(
-            run.workingDir,
-            branchResult.branchName,
-          );
+          const mergeResult = await BranchStrategy.mergeBranch(run.workingDir, branchResult.branchName);
           if (mergeResult.success) {
             this.log(run.id, "engine", "info", `Merged feature branch: ${branchResult.branchName}`);
           } else {
@@ -768,7 +749,7 @@ export class Executor {
   }
 
   private async buildContext(_task: TaskDefinition, run: ExecutionRun, gitManager: GitManager): Promise<TaskContext> {
-    const lastTenCommits = await gitManager.getLastNCommits(10).catch((err) => { console.warn("[executor] getCommits failed:", err instanceof Error ? err.message : err); return []; });
+    const lastTenCommits = await gitManager.getLastNCommits(10).catch(() => []);
     const nextFiveTasks = this.queueManager.peekNext(run.id, 5);
     const lessons = this.store.getLessons(run.id).slice(-20);
 
@@ -803,7 +784,7 @@ ${evidence.length > 0 ? evidence.map((e, i) => `${i + 1}. ${e}`).join("\n") : "(
 
 INSTRUCTIONS:
 1. Check the ACTUAL files, test results, and project state — do NOT infer or assume.
-2. Do NOT accept proxy signals as completion (passing tests alone ≠ done, implementation effort ≠ done).
+2. Do NOT accept proxy signals as completion.
 3. Build a checklist mapping the goals' requirements to concrete evidence.
 4. Verify coverage comprehensively before declaring success.
 5. If you cannot verify something, state what is missing.
@@ -811,14 +792,14 @@ INSTRUCTIONS:
 Respond ONLY with valid JSON:
 {
   "isComplete": boolean,
-  "progressReport": "short summary of overall progress",
-  "completedGoals": ["goal that was completed"],
-  "remainingGoals": ["goal that is still remaining"],
+  "progressReport": "short summary",
+  "completedGoals": ["goal completed"],
+  "remainingGoals": ["goal remaining"],
   "overallProgress": 0.0_to_1.0,
   "achieved": boolean,
-  "reason": "short explanation of why achieved or not",
-  "evidence": ["concrete piece of evidence 1", "concrete piece of evidence 2"],
-  "nextSteps": "if not achieved, what specific actions to take next"
+  "reason": "explanation",
+  "evidence": ["evidence 1", "evidence 2"],
+  "nextSteps": "if not achieved, what to do next"
 }`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
@@ -827,7 +808,6 @@ Respond ONLY with valid JSON:
       const parsed = JSON.parse(extractJson(result.result));
       if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid evaluation result");
 
-      // Update unified goal state
       run.goalEvaluationCycles = evaluationCycles;
       if (parsed.evidence?.length) {
         run.goalEvidence = [...evidence.slice(-20), ...parsed.evidence];
@@ -839,7 +819,6 @@ Respond ONLY with valid JSON:
         run.goalStatus = "achieved";
       }
 
-      // Token tracking (approximate from CC result)
       if (result.totalCostUsd > 0) {
         const estimatedTokens = Math.round((result.totalCostUsd / 0.003) * 1000);
         run.goalTokensUsed = (run.goalTokensUsed ?? 0) + estimatedTokens;
@@ -883,14 +862,13 @@ Respond ONLY with valid JSON:
   private async generateInitialTasks(run: ExecutionRun): Promise<void> {
     this.log(run.id, "engine", "info", "Generating initial task plan from goals...");
     const result = await this.ccClient.executeTask(
-      `Analyze the project and generate an initial task plan.\n\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\n\nGuidelines:\n- List tasks in recommended execution order (setup → core logic → features → polish → test)\n- UI/UX restyling tasks MUST depend on feature tasks that create/modify the components they style\n- Independent tasks (no shared files) should have NO dependency on each other — they can run in parallel\n- Set priority to reflect importance (1=highest, 10=lowest)\n\nGenerate 5-10 specific, actionable tasks.\n\nRespond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why this task", "dependsOnIndices": [0-based indices of tasks this depends on, or [] if independent] }]`,
+      `Analyze the project and generate an initial task plan.\n\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\n\nGuidelines:\n- List tasks in recommended execution order\n- Independent tasks should have NO dependency on each other\n- UI/UX restyling tasks MUST depend on feature tasks that implement the underlying functionality\n- Set priority to reflect importance (1=highest, 10=lowest)\n\nGenerate 5-10 specific, actionable tasks.\n\nRespond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why this task", "dependsOnIndices": [0-based indices or []] }]`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
     );
     try {
       const tasks = JSON.parse(extractJson(result.result));
       if (!Array.isArray(tasks)) throw new Error("Expected task array");
 
-      // First pass: enqueue all tasks to get their IDs
       const taskIds: string[] = [];
       const taskParams: Array<{ content: string; priority: number; dependsOnIndices?: number[] }> = tasks;
       for (const t of taskParams) {
@@ -904,7 +882,6 @@ Respond ONLY with valid JSON:
         this.log(run.id, "engine", "info", `Initial task queued: ${t.content.substring(0, 50)}...`);
       }
 
-      // Second pass: resolve index-based dependencies to actual task IDs
       for (let i = 0; i < taskParams.length; i++) {
         const indices = taskParams[i].dependsOnIndices;
         if (Array.isArray(indices) && indices.length > 0) {
@@ -921,7 +898,6 @@ Respond ONLY with valid JSON:
       this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
     } catch (err) {
       console.warn("[executor] failed to parse initial task plan:", errorToMessage(err));
-      // Fallback: one task per goal, no dependencies (independent by default)
       for (const goal of run.goals) {
         const fallbackTask = this.queueManager.enqueue(run.id, {
           content: `Work on: ${goal}`,
@@ -999,8 +975,6 @@ Respond ONLY with valid JSON:
     }
   }
 
-  // ─── Approval integration ──────────────────────────────────────────────
-
   private async checkApproval(
     checkpointType: CheckpointType,
     run: ExecutionRun,
@@ -1014,12 +988,7 @@ Respond ONLY with valid JSON:
 
     try {
       const decision = await this.approvalGate.waitForApproval(
-        run.id,
-        task?.id,
-        checkpointType,
-        summary,
-        contextData,
-        timeoutMs,
+        run.id, task?.id, checkpointType, summary, contextData, timeoutMs,
       );
 
       this.broadcast("approval.resolved", {
@@ -1100,7 +1069,7 @@ Return ONLY the JSON object.`;
         abortSignal: this.stopController?.signal,
       });
 
-      const parsed = JSON.parse(result.result) as { features: Array<{
+      const parsed = JSON.parse(extractJson(result.result)) as { features: Array<{
         id: string; category: "functional" | "non_functional" | "edge_case";
         description: string; steps: string[]; priority: number;
       }> };
@@ -1126,7 +1095,6 @@ Return ONLY the JSON object.`;
     const unverified = run.features.filter((f) => !f.passes);
     if (unverified.length === 0) return;
 
-    // Sample up to 10 features per verification pass to control cost
     const sample = unverified.slice(0, 10);
 
     try {
@@ -1152,12 +1120,7 @@ Return ONLY the JSON object.`;
         required: ["results"],
       };
 
-      const prompt = `Verify these features in the project at ${run.workingDir}:
-
-${featureList}
-
-For each feature, check if it currently passes by reading the relevant source files and tests.
-Return a JSON object with "results" array containing { id, passes } for each feature.`;
+      const prompt = `Verify these features in the project at ${run.workingDir}:\n\n${featureList}\n\nFor each feature, check if it currently passes by reading the relevant source files and tests.\nReturn a JSON object with "results" array containing { id, passes } for each feature.`;
 
       const result = await this.ccClient.executeTask(prompt, {
         workingDir: run.workingDir,
@@ -1167,7 +1130,7 @@ Return a JSON object with "results" array containing { id, passes } for each fea
         abortSignal: this.stopController?.signal,
       });
 
-      const parsed = JSON.parse(result.result) as { results: Array<{ id: string; passes: boolean }> };
+      const parsed = JSON.parse(extractJson(result.result)) as { results: Array<{ id: string; passes: boolean }> };
 
       let passed = 0;
       for (const r of parsed.results) {

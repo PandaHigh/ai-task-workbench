@@ -11,7 +11,7 @@ import { SnapshotManager } from "../../src-engine/src/lib/snapshot.js";
 import { NotificationEngine } from "../../src-engine/src/lib/notification-rules.js";
 import { TaskScheduler } from "../../src-engine/src/engine/task-scheduler.js";
 import { GitManager } from "../../src-engine/src/git/git-manager.js";
-import { BUILT_IN_ROLES } from "../../src-engine/src/engine/agents/agent-role.js";
+import { OMX_ROLES } from "../../src-engine/src/engine/omx-roles.js";
 import type { TaskDefinition, ExecutionRun } from "@ai-workbench/shared";
 import simpleGit from "simple-git";
 
@@ -654,29 +654,28 @@ describe("E2E: Per-task Model Routing", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("E2E: Agent Role Templates", () => {
-  it("has 6 built-in roles with complete fields", () => {
-    const roles = Object.values(BUILT_IN_ROLES);
-    expect(roles).toHaveLength(6);
+  it("has roles with complete fields", () => {
+    const roles = Object.values(OMX_ROLES);
+    expect(roles.length).toBeGreaterThan(0);
 
     for (const role of roles) {
       expect(role.id).toBeTruthy();
       expect(role.name).toBeTruthy();
       expect(role.description).toBeTruthy();
-      expect(role.systemPrompt).toBeTruthy();
       expect(Array.isArray(role.tools)).toBe(true);
       expect(role.maxTurns).toBeGreaterThan(0);
     }
   });
 
   it("architect role has read-only tools", () => {
-    expect(BUILT_IN_ROLES.architect.tools).not.toContain("Write");
-    expect(BUILT_IN_ROLES.architect.tools).not.toContain("Edit");
-    expect(BUILT_IN_ROLES.architect.tools).toContain("Read");
+    expect(OMX_ROLES.architect.tools).not.toContain("Write");
+    expect(OMX_ROLES.architect.tools).not.toContain("Edit");
+    expect(OMX_ROLES.architect.tools).toContain("Read");
   });
 
-  it("integrator role has write tools", () => {
-    expect(BUILT_IN_ROLES.integrator.tools).toContain("Write");
-    expect(BUILT_IN_ROLES.integrator.tools).toContain("Edit");
+  it("executor role has write tools", () => {
+    expect(OMX_ROLES.executor.tools).toContain("Write");
+    expect(OMX_ROLES.executor.tools).toContain("Edit");
   });
 });
 

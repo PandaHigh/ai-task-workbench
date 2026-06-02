@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { useEngine } from "../../hooks/useEngine";
 import { useTheme } from "../../hooks/useTheme";
 import { useDesktopEngine } from "../../hooks/useDesktopEngine";
+import { RobotMascot } from "../dashboard/RobotMascot";
 
 const navItems = [
   {
@@ -97,12 +98,7 @@ export function Sidebar() {
         <div className="px-4 py-5 border-b" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div
-                className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{ background: "var(--blue)", color: "#fff" }}
-              >
-                <span style={{ fontSize: 15, lineHeight: 1 }}>🐼</span>
-              </div>
+              <RobotMascot mood="idle" size={28} />
               <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
                 PandaAI
               </h1>

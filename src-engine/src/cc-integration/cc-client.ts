@@ -67,7 +67,11 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
     }
   }
   if (!env.HOME) env.HOME = homedir();
-  if (!env.PATH) env.PATH = isWin ? process.env.SYSTEMROOT ? `${process.env.SYSTEMROOT}\\System32` : "C:\\Windows\\System32" : "/usr/bin:/bin";
+  // Ensure ~/.local/bin is in PATH for claude CLI
+  if (env.PATH && !env.PATH.includes("/.local/bin")) {
+    env.PATH = `${homedir()}/.local/bin:${env.PATH}`;
+  }
+  if (!env.PATH) env.PATH = isWin ? process.env.SYSTEMROOT ? `${process.env.SYSTEMROOT}\\System32` : "C:\\Windows\\System32" : `/usr/local/bin:/usr/bin:/bin:${homedir()}/.local/bin`;
   env.LANG = env.LANG || "en_US.UTF-8";
   return env;
 }
@@ -82,6 +86,7 @@ export interface CCExecutionOptions {
   systemPrompt?: string;
   jsonSchema?: Record<string, unknown>;
   mcpConfig?: string;
+  model?: string;
   abortSignal?: AbortSignal;
   stderrCallback?: (data: string) => void;
 }
@@ -397,17 +402,16 @@ export class CCClient {
   }
 
   private buildArgs(prompt: string, options: CCExecutionOptions): string[] {
-    const useStream = !options.jsonSchema;
     const args: string[] = [
       "-p", prompt,
-      "--output-format", useStream ? "stream-json" : "text",
+      "--output-format", "stream-json",
+      "--verbose",
+      "--permission-mode", "acceptEdits",
     ];
 
-    if (useStream) {
-      args.push("--verbose");
+    if (options.model) {
+      args.push("--model", options.model);
     }
-
-    args.push("--permission-mode", "acceptEdits");
 
     if (options.maxTurns) {
       args.push("--max-turns", String(options.maxTurns));

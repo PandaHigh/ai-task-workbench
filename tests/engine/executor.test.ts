@@ -97,13 +97,13 @@ describe("Executor", () => {
   });
 
   it("should stop and mark active tasks as cancelled", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     executor.stop();
   });
 
   it("should cancel a specific task and update store", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     executor.cancelTask("task-1", "run-1");
     expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "task-1", {
@@ -268,7 +268,7 @@ describe("Executor recalculateCost", () => {
   });
 
   it("should sum task costs", async () => {
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = createMockQueueManager();
     mockStore.listTasks.mockReturnValue([
       { costUsd: 0.5 },
@@ -291,7 +291,7 @@ describe("Executor config loading", () => {
       return undefined;
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = createMockQueueManager();
     const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
     const config = (executor as unknown as { config: Record<string, unknown> }).config;

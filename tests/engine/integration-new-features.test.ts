@@ -95,10 +95,14 @@ describe("New Features Integration", () => {
   // ─── crew.list ────────────────────────────────────────────────────────
 
   describe("crew.list", () => {
-    it("should return 6 built-in roles", async () => {
+    it("should return OMX built-in roles", async () => {
       const roles = await methodHandlers["crew.list"]({}) as Array<Record<string, unknown>>;
-      expect(roles).toHaveLength(6);
-      expect(roles.map((r) => r.id)).toEqual(["planner", "developer", "tester", "reviewer", "architect", "integrator"]);
+      expect(roles.length).toBeGreaterThan(0);
+      // Verify key roles exist
+      const ids = roles.map((r) => r.id);
+      expect(ids).toContain("architect");
+      expect(ids).toContain("executor");
+      expect(ids).toContain("test-engineer");
     });
 
     it("each role should have required fields", async () => {

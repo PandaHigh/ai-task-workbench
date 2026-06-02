@@ -45,12 +45,48 @@ vi.mock("../../src-engine/src/cc-integration/cc-client.js", () => ({
 vi.mock("../../src-engine/src/git/git-manager.js", () => ({
   GitManager: vi.fn(() => ({
     initIfNeeded: vi.fn(),
+    ensureInit: vi.fn(),
     autoCommit: vi.fn(() => "abc1234def"),
     revert: vi.fn(),
     checkoutClean: vi.fn(),
     getLastNCommits: vi.fn(() => []),
     getDiffStats: vi.fn(() => ({ filesChanged: 0, linesChanged: 0, hasCriticalFiles: false })),
   })),
+}));
+
+vi.mock("../../src-engine/src/git/branch-strategy.js", () => ({
+  BranchStrategy: {
+    createTaskBranch: vi.fn(() => Promise.resolve({ branchName: "feature/test", worktreePath: "/tmp/wt" })),
+    cleanupBranch: vi.fn(() => Promise.resolve()),
+    mergeBranch: vi.fn(() => Promise.resolve({ success: true })),
+  },
+}));
+
+vi.mock("../../src-engine/src/skills/skill-manager.js", () => ({
+  SkillManager: vi.fn(() => ({
+    prepareWorkingDir: vi.fn(),
+  })),
+}));
+
+vi.mock("../../src-engine/src/skills/claude-md-generator.js", () => ({
+  generateClaudeMd: vi.fn(),
+}));
+
+vi.mock("../../src-engine/src/engine/omx-state.js", () => ({
+  OmxAmpStateStore: vi.fn(() => ({
+    save: vi.fn(),
+    load: vi.fn(() => null),
+    updateStage: vi.fn(),
+    getResumableIndex: vi.fn(() => -1),
+    getStages: vi.fn(() => ["deep-interview", "ralplan", "ultragoal", "code-review", "ultraqa"]),
+    getStageIndex: vi.fn(() => 1),
+    resetStage: vi.fn(),
+    incrementReviewCycle: vi.fn(),
+    updateSnapshot: vi.fn(),
+    canResume: vi.fn(() => false),
+    clear: vi.fn(),
+  })),
+  createInitialRunState: vi.fn(() => ({ runId: "run-1", pipeline: { stages: [], currentStageIndex: 0 }, snapshot: {} })),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,7 +164,7 @@ describe("Executor generateInitialTasks", () => {
       sessionId: "s-init", totalCostUsd: 0.01, durationMs: 1000, numTurns: 3, messages: [],
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     const run = createTestRun();
 
@@ -169,7 +205,7 @@ describe("Executor generateInitialTasks", () => {
       sessionId: "s-fail", totalCostUsd: 0.01, durationMs: 500, numTurns: 1, messages: [],
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     const run = createTestRun(); // has 2 goals
 
@@ -187,7 +223,7 @@ describe("Executor generateInitialTasks", () => {
       sessionId: "s-fail2", totalCostUsd: 0.01, durationMs: 500, numTurns: 1, messages: [],
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     const run = createTestRun();
 
@@ -203,7 +239,7 @@ describe("Executor generateInitialTasks", () => {
       sessionId: "s1", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     const run = createTestRun({ goals: ["Build auth system", "Write tests"] });
 
@@ -225,7 +261,7 @@ describe("Executor generateInitialTasks", () => {
       sessionId: "s1", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
     const run = createTestRun();
 
@@ -263,23 +299,21 @@ describe("Executor start() — initial task generation condition", () => {
 
   it("should call generateInitialTasks when queue is empty at startup", async () => {
     mockExecuteTask.mockImplementation(async (prompt: string) => {
-      if (prompt.includes("feature")) {
-        return { result: '{"features":[]}', sessionId: "s-feat", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
-      }
-      if (prompt.includes("initial task plan")) {
+      if (prompt.includes("initial task plan") || prompt.includes("task plan")) {
         return { result: '[{"content":"Setup project","priority":8,"reasoning":"Foundation"}]', sessionId: "s-init", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
       }
-      return { result: '{"isComplete":true,"progressReport":"Done","completedGoals":["g1"],"remainingGoals":[],"overallProgress":1}', sessionId: "s-eval", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
+      return { result: '{"features":[]}', sessionId: "s-default", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
     });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
     const run = createTestRun({ featuresGeneratedAt: Date.now() });
 
     const spy = vi.spyOn(executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }, "generateInitialTasks");
 
+    // Stop executor early to avoid pipeline execution
     const startPromise = executor.start(run);
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 100));
     executor.stop();
     await startPromise.catch(() => {});
 
@@ -289,7 +323,7 @@ describe("Executor start() — initial task generation condition", () => {
   it("should NOT call generateInitialTasks when queue has pre-existing tasks", async () => {
     queueManager.enqueue("run-1", { content: "Existing task", type: "user_defined", priority: 1 });
 
-    const { Executor } = await import("../../src-engine/src/engine/executor.js");
+    const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
 
     const spy = vi.spyOn(executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }, "generateInitialTasks");

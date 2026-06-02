@@ -7,7 +7,7 @@
  */
 
 import type { CCClient, CCMessage, CCExecutionOptions } from "../../cc-integration/cc-client.js";
-import type { AgentRole } from "./agent-role.js";
+import type { AgentRole } from "../omx-roles.js";
 import type { AgentProgress } from "@ai-workbench/shared";
 
 // ─── Result type ────────────────────────────────────────────────────────────

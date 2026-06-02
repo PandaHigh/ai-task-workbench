@@ -41,7 +41,9 @@ export type ApprovalStatus = "pending" | "approved" | "rejected" | "modified" | 
 
 // ─── Pipeline phases ──────────────────────────────────────────────────
 
-export type TaskPhase = "planner" | "developer" | "tester" | "reviewer";
+export type TaskPhase =
+  | "planner" | "developer" | "tester" | "reviewer"
+  | "deep-interview" | "ralplan" | "ultragoal" | "code-review" | "ultraqa";
 
 // ─── Multi-user collaboration ──────────────────────────────────────────
 
