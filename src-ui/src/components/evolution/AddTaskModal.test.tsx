@@ -52,6 +52,6 @@ describe("AddTaskModal", () => {
     const textarea = screen.getByPlaceholderText("描述你的任务...");
     fireEvent.change(textarea, { target: { value: "Fix the bug" } });
     fireEvent.click(screen.getByText("确认添加"));
-    expect(mockOnSubmit).toHaveBeenCalledWith("Fix the bug", 3, 120, { condition: undefined, dependsOn: undefined });
+    expect(mockOnSubmit).toHaveBeenCalledWith("Fix the bug", 3, 120, { dependsOn: undefined });
   });
 });

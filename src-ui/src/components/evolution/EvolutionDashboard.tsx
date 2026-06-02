@@ -264,7 +264,7 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[]; condition?: string }) => {
+  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[] }) => {
     if (!runId || !text.trim()) return;
     try {
       await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes, ...extra });
@@ -601,7 +601,7 @@ export function EvolutionDashboard() {
           setShowAddModal(false);
         }}
         call={call}
-        existingTaskIds={queue.map((t) => t.id)}
+        existingTasks={queue.map((t) => ({ id: t.id, content: t.content }))}
       />
 
       <ConfirmDialog

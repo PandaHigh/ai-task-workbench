@@ -2,17 +2,22 @@ import { useState, useEffect, useCallback } from "react";
 import { TaskCreateForm } from "../common/TaskCreateForm";
 import type { UserTaskTemplate } from "@ai-workbench/shared";
 
+interface ExistingTask {
+  id: string;
+  content: string;
+}
+
 interface AddTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[]; condition?: string }) => void;
+  onSubmit: (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[] }) => void;
   defaultPriority?: number;
   defaultTimeout?: number;
   call?: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
-  existingTaskIds?: string[];
+  existingTasks?: ExistingTask[];
 }
 
-export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60, call, existingTaskIds = [] }: AddTaskModalProps) {
+export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60, call, existingTasks = [] }: AddTaskModalProps) {
   const [templates, setTemplates] = useState<UserTaskTemplate[]>([]);
 
   const loadTemplates = useCallback(async () => {
@@ -54,14 +59,14 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
           添加任务
         </h3>
         <TaskCreateForm
-          onSubmit={({ content, priority, timeoutMinutes, dependsOn, condition }) => {
-            onSubmit(content, priority, timeoutMinutes, { dependsOn, condition });
+          onSubmit={({ content, priority, timeoutMinutes, dependsOn }) => {
+            onSubmit(content, priority, timeoutMinutes, { dependsOn });
           }}
           onCancel={onClose}
           defaultPriority={defaultPriority}
           defaultTimeout={defaultTimeout}
           templates={templates}
-          existingTaskIds={existingTaskIds}
+          existingTasks={existingTasks}
           submitLabel="确认添加"
           autoFocus
         />

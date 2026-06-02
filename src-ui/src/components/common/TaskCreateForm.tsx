@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
 import type { UserTaskTemplate } from "@ai-workbench/shared";
 
+interface ExistingTask {
+  id: string;
+  content: string;
+}
+
 interface TaskCreateFormProps {
-  onSubmit: (params: { content: string; priority: number; timeoutMinutes: number; dependsOn?: string[]; condition?: string }) => void;
+  onSubmit: (params: { content: string; priority: number; timeoutMinutes: number; dependsOn?: string[] }) => void;
   onCancel?: () => void;
   defaultPriority?: number;
   defaultTimeout?: number;
@@ -10,7 +15,7 @@ interface TaskCreateFormProps {
   submitLabel?: string;
   autoFocus?: boolean;
   initialContent?: string;
-  existingTaskIds?: string[];
+  existingTasks?: ExistingTask[];
 }
 
 export function TaskCreateForm({
@@ -22,7 +27,7 @@ export function TaskCreateForm({
   submitLabel = "确认",
   autoFocus = true,
   initialContent = "",
-  existingTaskIds = [],
+  existingTasks = [],
 }: TaskCreateFormProps) {
   const [content, setContent] = useState(initialContent);
   const [priority, setPriority] = useState(defaultPriority);
@@ -30,7 +35,6 @@ export function TaskCreateForm({
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dependsOn, setDependsOn] = useState<string[]>([]);
-  const [condition, setCondition] = useState("");
 
   useEffect(() => {
     setContent(initialContent);
@@ -52,7 +56,6 @@ export function TaskCreateForm({
     onSubmit({
       content: content.trim(), priority, timeoutMinutes,
       ...(dependsOn.length > 0 ? { dependsOn } : {}),
-      ...(condition.trim() ? { condition: condition.trim() } : {}),
     });
   };
 
@@ -132,49 +135,39 @@ export function TaskCreateForm({
         </div>
       </div>
 
-      {existingTaskIds.length > 0 && (
+      {existingTasks.length > 0 && (
         <div>
           <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-[10px] underline" style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}>
-            {showAdvanced ? "收起高级选项" : "高级选项（依赖、条件）"}
+            {showAdvanced ? "收起高级选项" : "高级选项（依赖任务）"}
           </button>
         </div>
       )}
 
       {showAdvanced && (
         <div className="space-y-2 p-2 rounded" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
-          {existingTaskIds.length > 0 && (
+          {existingTasks.length > 0 && (
             <div>
               <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>依赖任务（完成后才执行）</label>
               <div className="flex flex-wrap gap-1">
-                {existingTaskIds.map((id) => (
-                  <button key={id} type="button" onClick={() => {
-                    setDependsOn((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
+                {existingTasks.map((task) => (
+                  <button key={task.id} type="button" onClick={() => {
+                    setDependsOn((prev) => prev.includes(task.id) ? prev.filter((d) => d !== task.id) : [...prev, task.id]);
                   }}
-                    className="px-1.5 py-0.5 rounded text-[10px]"
+                    className="px-1.5 py-0.5 rounded text-[10px] max-w-[200px] truncate"
                     style={{
-                      background: dependsOn.includes(id) ? "var(--blue)" : "var(--bg-secondary)",
-                      color: dependsOn.includes(id) ? "#fff" : "var(--text-secondary)",
-                      border: `1px solid ${dependsOn.includes(id) ? "var(--blue)" : "var(--border)"}`,
+                      background: dependsOn.includes(task.id) ? "var(--blue)" : "var(--bg-secondary)",
+                      color: dependsOn.includes(task.id) ? "#fff" : "var(--text-secondary)",
+                      border: `1px solid ${dependsOn.includes(task.id) ? "var(--blue)" : "var(--border)"}`,
                     }}
+                    title={task.content}
                   >
-                    {id.substring(0, 8)}
+                    {task.content}
                   </button>
                 ))}
               </div>
             </div>
           )}
-          <div>
-            <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>执行条件（JavaScript 表达式）</label>
-            <input type="text" value={condition} onChange={(e) => setCondition(e.target.value)}
-              placeholder='例: lastScore >= 0.8 或 lastStatus === "passed"'
-              className="w-full px-2 py-1.5 rounded text-xs outline-none"
-              style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-            />
-            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
-              可用变量: lastScore, lastStatus, cycleCount, completedCount, failedCount
-            </p>
-          </div>
         </div>
       )}
 

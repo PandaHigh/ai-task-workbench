@@ -72,29 +72,29 @@ describe("TaskCreateForm", () => {
     expect(screen.queryByText("使用模板")).not.toBeInTheDocument();
   });
 
-  // ─── dependsOn / condition tests ─────────────────────────────────
+  // ─── dependsOn tests ─────────────────────────────────
 
-  it("should show advanced options button when existingTaskIds provided", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-1", "task-2"]} />);
-    expect(screen.getByText("高级选项（依赖、条件）")).toBeInTheDocument();
+  it("should show advanced options button when existingTasks provided", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "task-1", content: "Task 1 content" }, { id: "task-2", content: "Task 2 content" }]} />);
+    expect(screen.getByText("高级选项（依赖任务）")).toBeInTheDocument();
   });
 
-  it("should not show advanced options button when no existingTaskIds", () => {
+  it("should not show advanced options button when no existingTasks", () => {
     render(<TaskCreateForm onSubmit={mockOnSubmit} />);
     expect(screen.queryByText(/高级选项/)).not.toBeInTheDocument();
   });
 
-  it("should show dependency buttons when advanced section is open", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-abc123"]} />);
-    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
-    expect(screen.getByText("task-abc")).toBeInTheDocument();
+  it("should show dependency buttons with task content when advanced section is open", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "task-abc123", content: "Implement feature X" }]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖任务）"));
+    expect(screen.getByText("Implement feature X")).toBeInTheDocument();
   });
 
   it("should toggle dependency selection", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["task-abc123"]} />);
-    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "task-abc123", content: "Write tests" }]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖任务）"));
 
-    const depBtn = screen.getByText("task-abc");
+    const depBtn = screen.getByText("Write tests");
     fireEvent.click(depBtn);
     // Should be selected (blue background style applied)
     expect(depBtn).toBeInTheDocument();
@@ -104,22 +104,19 @@ describe("TaskCreateForm", () => {
     expect(depBtn).toBeInTheDocument();
   });
 
-  it("should show condition input when advanced is open", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["t1"]} />);
-    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
-    expect(screen.getByPlaceholderText(/lastScore/)).toBeInTheDocument();
+  it("should not show condition input when advanced is open", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "t1", content: "Task 1" }]} />);
+    fireEvent.click(screen.getByText("高级选项（依赖任务）"));
+    expect(screen.queryByPlaceholderText(/lastScore/)).not.toBeInTheDocument();
   });
 
-  it("should submit with dependsOn and condition", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["dep-1"]} />);
+  it("should submit with dependsOn", () => {
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "dep-1", content: "Setup database" }]} />);
     fireEvent.change(screen.getByPlaceholderText("描述你的任务..."), { target: { value: "Task with deps" } });
-    fireEvent.click(screen.getByText("高级选项（依赖、条件）"));
+    fireEvent.click(screen.getByText("高级选项（依赖任务）"));
 
     // Select dependency
-    fireEvent.click(screen.getByText("dep-1"));
-
-    // Enter condition
-    fireEvent.change(screen.getByPlaceholderText(/lastScore/), { target: { value: "lastScore >= 0.8" } });
+    fireEvent.click(screen.getByText("Setup database"));
 
     fireEvent.click(screen.getByText("确认"));
     expect(mockOnSubmit).toHaveBeenCalledWith({
@@ -127,12 +124,11 @@ describe("TaskCreateForm", () => {
       priority: 5,
       timeoutMinutes: 60,
       dependsOn: ["dep-1"],
-      condition: "lastScore >= 0.8",
     });
   });
 
   it("should submit without dependsOn when none selected", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTaskIds={["t1"]} />);
+    render(<TaskCreateForm onSubmit={mockOnSubmit} existingTasks={[{ id: "t1", content: "Task 1" }]} />);
     fireEvent.change(screen.getByPlaceholderText("描述你的任务..."), { target: { value: "No deps" } });
     fireEvent.click(screen.getByText("确认"));
     expect(mockOnSubmit).toHaveBeenCalledWith({
