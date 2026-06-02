@@ -7,7 +7,6 @@ import { QueueManager } from "../../src-engine/src/engine/queue-manager.js";
 import { DAGScheduler } from "../../src-engine/src/engine/dag-scheduler.js";
 import { ExecutionPool } from "../../src-engine/src/engine/execution-pool.js";
 import { BranchStrategy } from "../../src-engine/src/git/branch-strategy.js";
-import { GitManager } from "../../src-engine/src/git/git-manager.js";
 import { OMX_ROLES } from "../../src-engine/src/engine/omx-roles.js";
 import type { TaskDefinition, ExecutionRun } from "@ai-workbench/shared";
 import simpleGit from "simple-git";
@@ -285,47 +284,6 @@ describe("E2E: Conditional Branching", () => {
 
     const loaded = store.getTask(run.id, "t1");
     expect(loaded?.condition).toBe("lastScore > 0.5");
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Feature 6: Git Remote Operations
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("E2E: Git Remote Operations", () => {
-  it("lists remotes (empty repo)", async () => {
-    const gm = new GitManager({ workingDir: tmpDir });
-    await gm.ensureInit();
-    const remotes = await gm.listRemotes();
-    expect(Array.isArray(remotes)).toBe(true);
-  });
-
-  it("adds and lists a remote", async () => {
-    const gm = new GitManager({ workingDir: tmpDir });
-    await gm.ensureInit();
-    await gm.addRemote("origin", "https://github.com/test/repo.git");
-    const remotes = await gm.listRemotes();
-    expect(remotes.some(r => r.name === "origin")).toBe(true);
-  });
-
-  it("gets current branch", async () => {
-    const gm = new GitManager({ workingDir: tmpDir });
-    await gm.ensureInit();
-    fs.writeFileSync(path.join(tmpDir, "test.txt"), "hello");
-    await simpleGit(tmpDir).add("-A");
-    await simpleGit(tmpDir).commit("init");
-    const branch = await gm.getCurrentBranch();
-    expect(branch).toBeTruthy();
-  });
-
-  it("addRemote is idempotent (already exists)", async () => {
-    const gm = new GitManager({ workingDir: tmpDir });
-    await gm.ensureInit();
-    await gm.addRemote("origin", "https://github.com/test/repo.git");
-    // Should not throw
-    await gm.addRemote("origin", "https://github.com/test/repo.git");
-    const remotes = await gm.listRemotes();
-    expect(remotes.filter(r => r.name === "origin")).toHaveLength(1);
   });
 });
 

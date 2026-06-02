@@ -12,7 +12,6 @@ import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { AgentProgressPanel } from "./AgentProgressPanel";
 import { ConfirmDialog } from "../common/ConfirmDialog";
-import { GitRemotePanel } from "../settings/GitRemotePanel";
 import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
 import { AddTaskModal } from "./AddTaskModal";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
@@ -534,16 +533,6 @@ export function EvolutionDashboard() {
                 onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] resumeGoal failed:", err instanceof Error ? err.message : err); })}
               />
             </div>
-          )}
-
-          {/* Git Remote Operations (collapsed by default) */}
-          {run && showAdvancedPanel && (
-            <details className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-              <summary className="text-[10px] cursor-pointer select-none" style={{ color: "var(--text-muted)" }}>Git 远程操作</summary>
-              <div className="mt-2">
-                <GitRemotePanel workingDir={run.workingDir} />
-              </div>
-            </details>
           )}
 
           {/* Task Intervention & Snapshot */}

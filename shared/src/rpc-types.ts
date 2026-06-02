@@ -91,12 +91,6 @@ export type EngineMethod =
   | "profile.set"
   | "profile.delete"
   | "metrics.snapshot"
-  | "git.push"
-  | "git.pull"
-  | "git.fetch"
-  | "git.addRemote"
-  | "git.listRemotes"
-  | "git.currentBranch"
 ;
 
 export type EngineNotification =

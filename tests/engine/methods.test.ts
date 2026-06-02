@@ -58,12 +58,6 @@ describe("RPC Methods", () => {
         checkoutClean: vi.fn(async () => {}),
         getLastNCommits: vi.fn(async () => []),
         getDiffStats: vi.fn(async () => ({ filesChanged: 0, linesChanged: 0, hasCriticalFiles: false })),
-        push: vi.fn(async () => "Pushed"),
-        pull: vi.fn(async () => "Pulled"),
-        fetch: vi.fn(async () => "Fetched"),
-        addRemote: vi.fn(async () => {}),
-        listRemotes: vi.fn(async () => []),
-        getCurrentBranch: vi.fn(async () => "main"),
       })),
     }));
 
@@ -761,58 +755,6 @@ describe("RPC Methods", () => {
       await expect(
         methodHandlers["task.update"]({ runId: run.id, taskId: task.id }),
       ).rejects.toThrow("No valid fields to update");
-    });
-  });
-
-  // ─── Git Remote RPC Methods ────────────────────────────────────────
-
-  describe("git.push", () => {
-    it("should push to remote", async () => {
-      const result = await methodHandlers["git.push"]({ workingDir: "/tmp/test-git-push", remote: "origin", branch: "main" }) as string;
-      expect(result).toBe("Pushed");
-    });
-
-    it("should require workingDir", async () => {
-      await expect(methodHandlers["git.push"]({})).rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  describe("git.pull", () => {
-    it("should pull from remote", async () => {
-      const result = await methodHandlers["git.pull"]({ workingDir: "/tmp/test-git-pull", remote: "origin", branch: "main" }) as string;
-      expect(result).toBe("Pulled");
-    });
-  });
-
-  describe("git.fetch", () => {
-    it("should fetch from remote", async () => {
-      const result = await methodHandlers["git.fetch"]({ workingDir: "/tmp/test-git-fetch", remote: "origin" }) as string;
-      expect(result).toBe("Fetched");
-    });
-  });
-
-  describe("git.addRemote", () => {
-    it("should add a remote", async () => {
-      const result = await methodHandlers["git.addRemote"]({ workingDir: "/tmp/test-git-addremote", name: "upstream", url: "git@github.com:org/repo.git" });
-      expect((result as Record<string, unknown>).added).toBe(true);
-    });
-
-    it("should require name and url", async () => {
-      await expect(methodHandlers["git.addRemote"]({ workingDir: "/tmp/test-git-addremote2" })).rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  describe("git.listRemotes", () => {
-    it("should list remotes as array", async () => {
-      const result = await methodHandlers["git.listRemotes"]({ workingDir: "/tmp/test-git-listremotes" });
-      expect(Array.isArray(result)).toBe(true);
-    });
-  });
-
-  describe("git.currentBranch", () => {
-    it("should return current branch", async () => {
-      const result = await methodHandlers["git.currentBranch"]({ workingDir: "/tmp/test-git-branch" }) as string;
-      expect(result).toBe("main");
     });
   });
 

@@ -77,19 +77,6 @@ test.describe("设置页面", () => {
     await expect(page.getByText(/定时任务/)).toBeVisible();
   });
 
-  test("Git 远程操作区域在高级设置中", async ({ page }) => {
-    await page.getByRole("button", { name: /高级设置/ }).click();
-    // Git remote panel should be visible in advanced section
-    await page.waitForTimeout(500);
-    const gitSection = page.locator("text=/Git|远程|push|pull/").first();
-    await expect(gitSection).toBeVisible();
-  });
-
-  test("自主级别选择器在高级设置中", async ({ page }) => {
-    await page.getByRole("button", { name: /高级设置/ }).click();
-    await expect(page.getByText(/自主级别|Autonomy/)).toBeVisible();
-  });
-
   test("页面滚动到所有设置区域无报错", async ({ page }) => {
     // Scroll to bottom and verify no crashes
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
