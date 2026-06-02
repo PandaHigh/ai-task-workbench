@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useWizardStore } from "./wizard-store";
-import { BUILT_IN_TEMPLATES } from "../lib/task-templates";
 
 describe("wizard-store", () => {
   beforeEach(() => {
@@ -21,7 +20,6 @@ describe("wizard-store", () => {
       expect(s.editedContent).toBe("");
       expect(s.editedGoals).toEqual([]);
       expect(s.editedConditions).toEqual([]);
-      expect(s.selectedTemplate).toBeNull();
     });
   });
 
@@ -67,34 +65,6 @@ describe("wizard-store", () => {
     });
   });
 
-  describe("applyTemplate", () => {
-    it("should apply template and populate all fields", () => {
-      const template = BUILT_IN_TEMPLATES[0]; // bugfix
-      useWizardStore.getState().applyTemplate(template);
-
-      const s = useWizardStore.getState();
-      expect(s.selectedTemplate).toBe("bugfix");
-      expect(s.editedContent).toBe(template.content);
-      expect(s.editedGoals).toEqual(template.goals);
-      expect(s.editedConditions).toEqual(template.terminationConditions);
-      expect(s.taskParams).toBeTruthy();
-      expect(s.taskParams?.content).toBe(template.content);
-      expect(s.taskParams?.goals).toEqual(template.goals);
-      expect(s.taskParams?.terminationConditions).toEqual(template.terminationConditions);
-      expect(s.isValid).toBe(true);
-      expect(s.errors).toEqual([]);
-    });
-
-    it("should create independent copies of arrays", () => {
-      const template = BUILT_IN_TEMPLATES[0];
-      useWizardStore.getState().applyTemplate(template);
-
-      const s = useWizardStore.getState();
-      s.editedGoals.push("new goal");
-      expect(template.goals).not.toContain("new goal");
-    });
-  });
-
   describe("reset", () => {
     it("should restore all fields to initial state", () => {
       const store = useWizardStore.getState();
@@ -103,7 +73,6 @@ describe("wizard-store", () => {
       store.setWorkingDir("/test");
       store.setQuickContent("content");
       store.setEditedGoals(["g1"]);
-      store.applyTemplate(BUILT_IN_TEMPLATES[1]);
       store.addMessage({ role: "user", content: "hi", timestamp: 1 });
 
       store.reset();
@@ -117,7 +86,6 @@ describe("wizard-store", () => {
       expect(s.editedConditions).toEqual([]);
       expect(s.messages).toEqual([]);
       expect(s.taskParams).toBeNull();
-      expect(s.selectedTemplate).toBeNull();
     });
   });
 });

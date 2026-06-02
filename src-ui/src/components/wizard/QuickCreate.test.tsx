@@ -58,8 +58,7 @@ function renderQuickCreate() {
 describe("QuickCreate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCall.mockImplementation((method: string) => {
-      if (method === "template.list") return Promise.resolve([]);
+    mockCall.mockImplementation((_method: string) => {
       return Promise.resolve(undefined);
     });
   });
@@ -67,34 +66,10 @@ describe("QuickCreate", () => {
   it("should render form fields", () => {
     renderQuickCreate();
     expect(screen.getByText("项目目录")).toBeInTheDocument();
-    expect(screen.getByText("快速模板")).toBeInTheDocument();
     expect(screen.getByText("任务描述")).toBeInTheDocument();
     expect(screen.getByText("目标")).toBeInTheDocument();
     expect(screen.getByText("创建任务")).toBeInTheDocument();
     expect(screen.getByText("创建并开始")).toBeInTheDocument();
-  });
-
-  it("should render 5 template buttons", () => {
-    renderQuickCreate();
-    expect(screen.getByText("修复 Bug")).toBeInTheDocument();
-    expect(screen.getByText("新功能")).toBeInTheDocument();
-    expect(screen.getByText("重构")).toBeInTheDocument();
-    expect(screen.getByText("写测试")).toBeInTheDocument();
-    expect(screen.getByText("代码审查")).toBeInTheDocument();
-  });
-
-  it("should prefill content and goals when template selected", async () => {
-    const user = userEvent.setup();
-    renderQuickCreate();
-
-    await user.click(screen.getByText("修复 Bug"));
-
-    const textarea = screen.getByPlaceholderText("你想让 AI 做什么？");
-    expect(textarea).toHaveValue("修复以下 bug: [请描述 bug 表现]");
-
-    // Goals should be prefilled
-    const goalInput = screen.getByDisplayValue("Bug 已修复且无回归");
-    expect(goalInput).toBeInTheDocument();
   });
 
   it("should show validation error for empty content", async () => {
@@ -110,7 +85,6 @@ describe("QuickCreate", () => {
     const user = userEvent.setup();
     const run = makeRun();
     mockCall.mockImplementation((method: string) => {
-      if (method === "template.list") return Promise.resolve([]);
       if (method === "run.create") return Promise.resolve(run);
       return Promise.resolve(undefined);
     });
@@ -137,7 +111,6 @@ describe("QuickCreate", () => {
     const user = userEvent.setup();
     const run = makeRun();
     mockCall.mockImplementation((method: string) => {
-      if (method === "template.list") return Promise.resolve([]);
       if (method === "run.create") return Promise.resolve(run);
       if (method === "task.start") return Promise.resolve(undefined);
       return Promise.resolve(undefined);
@@ -159,7 +132,6 @@ describe("QuickCreate", () => {
   it("should handle creation failure gracefully", async () => {
     const user = userEvent.setup();
     mockCall.mockImplementation((method: string) => {
-      if (method === "template.list") return Promise.resolve([]);
       if (method === "run.create") return Promise.reject(new Error("Engine error"));
       return Promise.resolve(undefined);
     });

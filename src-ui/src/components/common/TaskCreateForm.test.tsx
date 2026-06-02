@@ -40,36 +40,9 @@ describe("TaskCreateForm", () => {
     expect(screen.queryByText("取消")).not.toBeInTheDocument();
   });
 
-  it("should show template selector when templates provided", () => {
-    const templates = [
-      { id: "t1", name: "Bug Fix", content: "Fix bug", priority: 3, timeoutMinutes: 30, isBuiltIn: false, createdAt: 1, updatedAt: 1 },
-    ];
-    render(<TaskCreateForm onSubmit={mockOnSubmit} templates={templates} />);
-    expect(screen.getByText("使用模板")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("使用模板"));
-    expect(screen.getByText("Bug Fix")).toBeInTheDocument();
-  });
-
-  it("should apply template on click", () => {
-    const templates = [
-      { id: "t1", name: "Bug Fix", content: "Fix the bug", priority: 7, timeoutMinutes: 90, isBuiltIn: false, createdAt: 1, updatedAt: 1 },
-    ];
-    render(<TaskCreateForm onSubmit={mockOnSubmit} templates={templates} />);
-    fireEvent.click(screen.getByText("使用模板"));
-    fireEvent.click(screen.getByText("Bug Fix"));
-    expect(screen.getByPlaceholderText("描述你的任务...")).toHaveValue("Fix the bug");
-    fireEvent.click(screen.getByText("确认"));
-    expect(mockOnSubmit).toHaveBeenCalledWith({ content: "Fix the bug", priority: 7, timeoutMinutes: 90 });
-  });
-
   it("should use custom submit label", () => {
     render(<TaskCreateForm onSubmit={mockOnSubmit} submitLabel="添加" />);
     expect(screen.getByText("添加")).toBeInTheDocument();
-  });
-
-  it("should not show template button when no templates", () => {
-    render(<TaskCreateForm onSubmit={mockOnSubmit} templates={[]} />);
-    expect(screen.queryByText("使用模板")).not.toBeInTheDocument();
   });
 
   // ─── dependsOn tests ─────────────────────────────────

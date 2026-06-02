@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface ExistingTask {
   id: string;
@@ -11,7 +10,6 @@ interface TaskCreateFormProps {
   onCancel?: () => void;
   defaultPriority?: number;
   defaultTimeout?: number;
-  templates?: UserTaskTemplate[];
   submitLabel?: string;
   autoFocus?: boolean;
   initialContent?: string;
@@ -23,7 +21,6 @@ export function TaskCreateForm({
   onCancel,
   defaultPriority = 5,
   defaultTimeout = 60,
-  templates = [],
   submitLabel = "确认",
   autoFocus = true,
   initialContent = "",
@@ -32,7 +29,6 @@ export function TaskCreateForm({
   const [content, setContent] = useState(initialContent);
   const [priority, setPriority] = useState(defaultPriority);
   const [timeoutMinutes, setTimeoutMinutes] = useState(defaultTimeout);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dependsOn, setDependsOn] = useState<string[]>([]);
 
@@ -43,13 +39,6 @@ export function TaskCreateForm({
   }, [initialContent, defaultPriority, defaultTimeout]);
 
   const canSubmit = content.trim().length > 0;
-
-  const applyTemplate = (tpl: UserTaskTemplate) => {
-    setContent(tpl.content);
-    setPriority(tpl.priority);
-    setTimeoutMinutes(tpl.timeoutMinutes);
-    setShowTemplates(false);
-  };
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -75,34 +64,6 @@ export function TaskCreateForm({
         }}
         data-testid="task-content-input"
       />
-
-      {(templates?.length ?? 0) > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowTemplates(!showTemplates)}
-            className="text-[10px] px-2 py-1 rounded"
-            style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}
-          >
-            {showTemplates ? "收起模板" : "使用模板"}
-          </button>
-          {showTemplates && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {templates.map((tpl) => (
-                <button
-                  type="button"
-                  key={tpl.id}
-                  onClick={() => applyTemplate(tpl)}
-                  className="px-2 py-1 rounded text-[10px]"
-                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-                >
-                  {tpl.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="flex items-center gap-4 text-[10px]" style={{ color: "var(--text-secondary)" }}>
         <div className="flex items-center gap-1">

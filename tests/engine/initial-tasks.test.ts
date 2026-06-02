@@ -363,10 +363,6 @@ describe("run.create without initial tasks (RPC integration)", () => {
       const actual = await importOriginal<typeof import("../../src-engine/src/db/subscription-store.js")>();
       return { SubscriptionStore: vi.fn(function (this: unknown) { return new actual.SubscriptionStore(testDir); }) };
     });
-    vi.doMock("../../src-engine/src/db/template-store.js", async (importOriginal) => {
-      const actual = await importOriginal<typeof import("../../src-engine/src/db/template-store.js")>();
-      return { TemplateStore: vi.fn(function (this: unknown) { return new actual.TemplateStore(testDir); }) };
-    });
     vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
       CCClient: vi.fn(() => ({
         executeTask: vi.fn(async () => ({

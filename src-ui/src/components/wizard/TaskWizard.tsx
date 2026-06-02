@@ -12,7 +12,6 @@ import { Spinner } from "../common/Spinner";
 import { pageEnterStyle } from "../../hooks/useAnimations";
 import { open } from "@tauri-apps/plugin-dialog";
 import { marked } from "marked";
-import { BUILT_IN_TEMPLATES } from "../../lib/task-templates";
 
 function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) {
   const [displayed, setDisplayed] = useState("");
@@ -61,7 +60,6 @@ export function TaskWizard() {
     editedContent, editedGoals, editedConditions,
     setStep, setMode, setWorkingDir, setSessionId, addMessage, setTaskParams, setValidation, reset,
     setEditedContent, setEditedGoals, setEditedConditions,
-    applyTemplate,
   } = useWizardStore();
 
   const addTask = useTaskStore((s) => s.addTask);
@@ -304,11 +302,6 @@ export function TaskWizard() {
     return `${msg.role}-${msg.timestamp}-${idx}`;
   };
 
-  const handleTemplateSelect = (t: typeof BUILT_IN_TEMPLATES[number]) => {
-    applyTemplate(t);
-    setStep(2);
-  };
-
   const renderStepIndicator = () => (
     <>
       {STEP_LABELS.map((label, i) => (
@@ -501,20 +494,6 @@ export function TaskWizard() {
             {messages.length === 0 && (
               <div className="text-center py-10">
                 <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>告诉我你想要完成什么，我会帮你规划。</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {BUILT_IN_TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleTemplateSelect(t)}
-                      className="px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
-                      style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-                    >
-                      <span>{t.icon}</span>
-                      <span>{t.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] mt-3" style={{ color: "var(--text-muted)" }}>选择模板可跳过对话，直接确认任务</p>
               </div>
             )}
             {messages.map((msg, i) => {

@@ -1,12 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEngine } from "../../hooks/useEngine";
 import { useTaskStore } from "../../stores/task-store";
 import { usePersistedDir } from "../../hooks/usePersistedDir";
 import { useToast } from "../common/Toast";
-import { BUILT_IN_TEMPLATES, type TaskTemplate } from "../../lib/task-templates";
 import { pageEnterStyle } from "../../hooks/useAnimations";
-import type { ExecutionRun, UserTaskTemplate } from "@ai-workbench/shared";
+import type { ExecutionRun } from "@ai-workbench/shared";
 import { open } from "@tauri-apps/plugin-dialog";
 
 export function QuickCreate() {
@@ -21,8 +20,6 @@ export function QuickCreate() {
   const [goalsText, setGoalsText] = useState("");
   const [priority, setPriority] = useState(5);
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [userTemplates, setUserTemplates] = useState<UserTaskTemplate[]>([]);
   const [creating, setCreating] = useState(false);
   const [autonomyLevel, setAutonomyLevel] = useState<"assisted" | "supervised" | "autonomous">("assisted");
   const [maxConcurrent, setMaxConcurrent] = useState(1);
@@ -34,10 +31,6 @@ export function QuickCreate() {
     if (!connected) return;
     let cancelled = false;
     (async () => {
-      try {
-        const list = (await call("template.list", {}) as UserTaskTemplate[] | null) ?? [];
-        if (!cancelled) setUserTemplates(list);
-      } catch { /* ignore */ }
       try {
         const res = await call("config.get", { key: "defaultTimeout" }) as Record<string, unknown>;
         if (!cancelled && typeof res?.value === "number") setTimeoutMinutes(res.value);
@@ -69,23 +62,6 @@ export function QuickCreate() {
     setShowDirInput(true);
   };
 
-  const applyBuiltInTemplate = useCallback((t: TaskTemplate) => {
-    setSelectedTemplate(t.id);
-    setContent(t.content);
-    setGoalsText(t.goals.join(", "));
-    setPriority(5);
-    setTimeoutMinutes(60);
-    setContentError("");
-  }, []);
-
-  const applyUserTemplate = useCallback((t: UserTaskTemplate) => {
-    setSelectedTemplate(t.id);
-    setContent(t.content);
-    setPriority(t.priority);
-    setTimeoutMinutes(t.timeoutMinutes);
-    setContentError("");
-  }, []);
-
   const handleCreate = async (autoStart: boolean) => {
     if (!validateDir(workingDir)) return;
     if (!content.trim()) { setContentError("请填写任务描述"); return; }
@@ -99,9 +75,7 @@ export function QuickCreate() {
         ? goalsText.split(/[,，]/).map((g) => g.trim()).filter(Boolean)
         : [`完成: ${content.trim()}`];
 
-      const conditions = selectedTemplate
-        ? BUILT_IN_TEMPLATES.find((t) => t.id === selectedTemplate)?.terminationConditions ?? ["所有目标均已达成"]
-        : ["所有目标均已达成并验证通过"];
+      const conditions = ["所有目标均已达成并验证通过"];
 
       const run = (await call("run.create", {
         workingDir: workingDir.trim(),
@@ -168,42 +142,6 @@ export function QuickCreate() {
               上次使用: {lastDir}
             </button>
           )}
-        </div>
-
-        {/* Templates */}
-        <div>
-          <h3 className="text-xs font-bold mb-2" style={{ color: "var(--text-secondary)" }}>快速模板</h3>
-          <div className="flex flex-wrap gap-2">
-            {BUILT_IN_TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => applyBuiltInTemplate(t)}
-                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
-                style={{
-                  background: selectedTemplate === t.id ? "rgba(77, 107, 254, 0.15)" : "var(--bg-tertiary)",
-                  color: "var(--text-primary)",
-                  border: selectedTemplate === t.id ? "1px solid var(--blue)" : "1px solid var(--border)",
-                }}
-              >
-                <span>{t.icon}</span>
-                <span>{t.label}</span>
-              </button>
-            ))}
-            {userTemplates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => applyUserTemplate(t)}
-                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200"
-                style={{
-                  background: selectedTemplate === t.id ? "rgba(77, 107, 254, 0.15)" : "var(--bg-tertiary)",
-                  color: "var(--text-primary)",
-                  border: selectedTemplate === t.id ? "1px solid var(--blue)" : "1px solid var(--border)",
-                }}
-              >
-                <span>{t.name}</span>
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Task description */}

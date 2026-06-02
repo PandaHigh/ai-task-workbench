@@ -3,7 +3,6 @@ import { Store } from "../db/store.js";
 import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
 import { SkillStore } from "../db/skill-store.js";
-import { TemplateStore } from "../db/template-store.js";
 import { SkillManager } from "../skills/skill-manager.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/omx-executor.js";
@@ -26,11 +25,10 @@ const store = new Store();
 const shareStore = new ShareStore();
 const subscriptionStore = new SubscriptionStore();
 const skillStore = new SkillStore();
-const templateStore = new TemplateStore();
 const queueManager = new QueueManager();
 let skillManager: SkillManager;
 
-export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager, templateStore };
+export { store, shareStore, subscriptionStore, queueManager, skillStore, skillManager };
 const sessionManager = new SessionManager(store);
 const activeExecutors = new Map<string, Executor>();
 const pluginRegistry = new PluginRegistry(getDataDir());
@@ -544,41 +542,6 @@ export const methodHandlers: Record<string, MethodHandler> = {
       notify("queue.updated", { runId, queue: queueManager.list(runId) });
     }
     return store.getTask(runId, taskId);
-  },
-
-  "template.create": async (params) => {
-    const name = requireNonEmptyString(params, "name");
-    const content = requireNonEmptyString(params, "content");
-    return templateStore.create({
-      name,
-      content,
-      priority: typeof params.priority === "number" ? params.priority : undefined,
-      timeoutMinutes: typeof params.timeoutMinutes === "number" ? params.timeoutMinutes : undefined,
-    });
-  },
-
-  "template.list": async () => {
-    return templateStore.list();
-  },
-
-  "template.update": async (params) => {
-    const id = requireString(params, "id");
-    const updates: Partial<Pick<import("@ai-workbench/shared").UserTaskTemplate, "name" | "content" | "priority" | "timeoutMinutes">> = {};
-    if (typeof params.name === "string" && params.name.trim()) updates.name = params.name.trim();
-    if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
-    if (typeof params.priority === "number" && Number.isFinite(params.priority) && params.priority >= 1 && params.priority <= 10) updates.priority = params.priority;
-    if (typeof params.timeoutMinutes === "number" && Number.isFinite(params.timeoutMinutes) && params.timeoutMinutes >= 1 && params.timeoutMinutes <= 1440) updates.timeoutMinutes = params.timeoutMinutes;
-    if (Object.keys(updates).length === 0) throw new RpcValidationError("No valid fields to update");
-    const result = templateStore.update(id, updates);
-    if (!result) throw new RpcValidationError("Template not found");
-    return result;
-  },
-
-  "template.delete": async (params) => {
-    const id = requireString(params, "id");
-    const deleted = templateStore.delete(id);
-    if (!deleted) throw new RpcValidationError("Template not found");
-    return { deleted: true };
   },
 
   "queue.list": async (params) => {

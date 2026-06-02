@@ -23,7 +23,7 @@ export function cleanupTestDir(dir: string): void {
 }
 
 /**
- * Mock all engine stores (Store, ShareStore, SubscriptionStore, TemplateStore)
+ * Mock all engine stores (Store, ShareStore, SubscriptionStore)
  * to use a temporary directory. Returns vi.doMock calls and the testDir.
  *
  * Usage:
@@ -56,15 +56,6 @@ export function mockEngineStores() {
     return {
       SubscriptionStore: vi.fn(function (this: unknown) {
         return new actual.SubscriptionStore(testDir);
-      }),
-    };
-  });
-
-  vi.doMock("../../src-engine/src/db/template-store.js", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("../../src-engine/src/db/template-store.js")>();
-    return {
-      TemplateStore: vi.fn(function (this: unknown) {
-        return new actual.TemplateStore(testDir);
       }),
     };
   });

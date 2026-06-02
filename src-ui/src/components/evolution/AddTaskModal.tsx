@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
 import { TaskCreateForm } from "../common/TaskCreateForm";
-import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface ExistingTask {
   id: string;
@@ -17,21 +15,7 @@ interface AddTaskModalProps {
   existingTasks?: ExistingTask[];
 }
 
-export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60, call, existingTasks = [] }: AddTaskModalProps) {
-  const [templates, setTemplates] = useState<UserTaskTemplate[]>([]);
-
-  const loadTemplates = useCallback(async () => {
-    if (!call) return;
-    try {
-      const list = await call("template.list", {}) as UserTaskTemplate[];
-      setTemplates(list);
-    } catch (err) { console.warn("[AddTaskModal] loadTemplates failed:", err instanceof Error ? err.message : err); }
-  }, [call]);
-
-  useEffect(() => {
-    if (open) loadTemplates();
-  }, [open, loadTemplates]);
-
+export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60, existingTasks = [] }: AddTaskModalProps) {
   if (!open) return null;
 
   return (
@@ -65,7 +49,6 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
           onCancel={onClose}
           defaultPriority={defaultPriority}
           defaultTimeout={defaultTimeout}
-          templates={templates}
           existingTasks={existingTasks}
           submitLabel="确认添加"
           autoFocus
