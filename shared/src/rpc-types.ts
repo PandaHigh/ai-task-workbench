@@ -34,29 +34,6 @@ export const RPC_ERRORS = {
   INTERNAL_ERROR: { code: -32603, message: "Internal error" },
 } as const;
 
-// ─── Tracing types ──────────────────────────────────────────────────────────
-
-export interface TraceSpan {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  operation: string;
-  status: "running" | "ok" | "error";
-  startTime: number;
-  endTime?: number;
-  durationMs?: number;
-  attributes: Record<string, unknown>;
-}
-
-export interface AgentDecision {
-  traceId: string;
-  spanId: string;
-  agentRole: string;
-  decision: string;
-  reasoning: string;
-  files?: string[];
-}
-
 export type EngineMethod =
   | "task.create"
   | "task.start"
@@ -104,7 +81,6 @@ export type EngineMethod =
   | "skill.delete"
   | "crew.list"
   | "crew.configure"
-  | "trace.list"
   | "plugin.list"
   | "plugin.install"
   | "plugin.remove"
@@ -114,30 +90,18 @@ export type EngineMethod =
   | "profile.get"
   | "profile.set"
   | "profile.delete"
-  | "suggestion.list"
-  | "error.history"
   | "template.create"
   | "template.list"
   | "template.update"
   | "template.delete"
   | "metrics.snapshot"
-  | "schedule.create"
-  | "schedule.list"
-  | "schedule.delete"
-  | "schedule.toggle"
   | "git.push"
   | "git.pull"
   | "git.fetch"
   | "git.addRemote"
   | "git.listRemotes"
   | "git.currentBranch"
-  | "snapshot.create"
-  | "snapshot.list"
-  | "snapshot.restore"
-  | "task.intervene"
-  | "task.inject"
-  | "notification.rules"
-  | "notification.configure";
+;
 
 export type EngineNotification =
   | "task.progress"
@@ -151,18 +115,12 @@ export type EngineNotification =
   | "approval.requested"
   | "approval.resolved"
   | "task.stream"
-  | "features.generated"
-  | "features.updated"
   | "presence.joined"
   | "presence.left"
   | "activity.created"
   | "comment.created"
   | "skill.added"
   | "skill.removed"
-  | "trace.span"
-  | "agent.decision"
   | "plugin.updated"
   | "agent.progress"
-  | "review.suggestion"
-  | "error.detected"
-  | "task.autoFix";
+;

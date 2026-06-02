@@ -74,9 +74,6 @@ export interface ExecutionRun {
   autonomyLevel?: AutonomyLevel;
   maxConcurrentTasks?: number;
 
-  // Feature tracking
-  features?: FeatureItem[];
-  featuresGeneratedAt?: number;
 }
 
 export interface ShareToken {
@@ -280,19 +277,6 @@ export interface PhaseRecord {
   iteration: number;
 }
 
-// ─── Feature tracking ────────────────────────────────────────────────────
-
-export interface FeatureItem {
-  id: string;
-  category: "functional" | "non_functional" | "edge_case";
-  description: string;
-  steps: string[];
-  passes: boolean;
-  priority: number;
-  verifiedAt?: number;
-  verifiedBy?: string;
-}
-
 // ─── Agent Progress ──────────────────────────────────────────
 
 export interface AgentProgress {
@@ -304,36 +288,6 @@ export interface AgentProgress {
   files: string[];
   message: string;
   timestamp: number;
-}
-
-// ─── Background Review ──────────────────────────────────────
-
-export interface ReviewSuggestion {
-  id: string;
-  runId: string;
-  taskId: string;
-  issues: ReviewIssue[];
-  summary: string;
-  score: number;
-  status: "pending" | "dismissed" | "fix_created";
-  createdAt: number;
-}
-
-// ─── Error Detection ────────────────────────────────────────
-
-export type ErrorSeverity = "critical" | "warning" | "info";
-
-export interface DetectedError {
-  id: string;
-  runId: string;
-  taskId?: string;
-  severity: ErrorSeverity;
-  category: "syntax" | "type" | "runtime" | "import" | "test_failure" | "unknown";
-  message: string;
-  file?: string;
-  line?: number;
-  timestamp: number;
-  fixTaskId?: string;
 }
 
 // ─── Orchestrator Profile ───────────────────────────────────
@@ -381,15 +335,6 @@ export interface ClientSession {
   connectedAt: number;
   lastActiveAt: number;
   currentPage?: string;
-}
-
-export interface ActivityEvent {
-  id: string;
-  timestamp: number;
-  userId: string;
-  action: string;
-  details: Record<string, unknown>;
-  runId: string;
 }
 
 export interface TaskComment {
