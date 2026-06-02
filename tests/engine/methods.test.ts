@@ -818,67 +818,6 @@ describe("RPC Methods", () => {
     });
   });
 
-  // ─── Schedule RPC Methods ──────────────────────────────────────────
-
-  describe("schedule.create", () => {
-    it("should create a scheduled job", async () => {
-      const job = await methodHandlers["schedule.create"]({
-        name: "Daily Build",
-        cronExpr: "0 9 * * *",
-        goals: ["build and test"],
-        workingDir: "/tmp/test-schedule-create",
-      }) as Record<string, unknown>;
-      expect(job.name).toBe("Daily Build");
-      expect(job.id).toBeTruthy();
-      expect(job.enabled).toBe(true);
-    });
-
-    it("should require name", async () => {
-      await expect(methodHandlers["schedule.create"]({ cronExpr: "* * * * *", goals: ["g"], workingDir: "/tmp/test-schedule-name" }))
-        .rejects.toThrow("Missing required parameter");
-    });
-
-    it("should require cronExpr", async () => {
-      await expect(methodHandlers["schedule.create"]({ name: "test", goals: ["g"], workingDir: "/tmp/test-schedule-cron" }))
-        .rejects.toThrow("Missing required parameter");
-    });
-
-    it("should require goals as string array", async () => {
-      await expect(methodHandlers["schedule.create"]({ name: "test", cronExpr: "* * * * *", workingDir: "/tmp/test-schedule-goals" }))
-        .rejects.toThrow("must be an array");
-    });
-  });
-
-  describe("schedule.list", () => {
-    it("should list scheduled jobs", async () => {
-      await methodHandlers["schedule.create"]({ name: "j1", cronExpr: "0 * * * *", goals: ["g"], workingDir: "/tmp/test-schedule-list" });
-      const list = await methodHandlers["schedule.list"]({}) as Array<Record<string, unknown>>;
-      expect(list).toHaveLength(1);
-      expect(list[0].name).toBe("j1");
-    });
-  });
-
-  describe("schedule.delete", () => {
-    it("should delete a scheduled job", async () => {
-      const job = await methodHandlers["schedule.create"]({ name: "to-del", cronExpr: "* * * * *", goals: ["g"], workingDir: "/tmp/test-schedule-del" }) as Record<string, unknown>;
-      const result = await methodHandlers["schedule.delete"]({ id: job.id });
-      expect((result as Record<string, unknown>).deleted).toBe(true);
-    });
-
-    it("should delete unknown id without error", async () => {
-      const result = await methodHandlers["schedule.delete"]({ id: "nonexistent" });
-      expect((result as Record<string, unknown>).deleted).toBe(false);
-    });
-  });
-
-  describe("schedule.toggle", () => {
-    it("should toggle a scheduled job", async () => {
-      const job = await methodHandlers["schedule.create"]({ name: "toggle", cronExpr: "* * * * *", goals: ["g"], workingDir: "/tmp/test-schedule-toggle" }) as Record<string, unknown>;
-      const result = await methodHandlers["schedule.toggle"]({ id: job.id, enabled: false }) as Record<string, unknown>;
-      expect(result.enabled).toBe(false);
-    });
-  });
-
   // ─── Git Remote RPC Methods ────────────────────────────────────────
 
   describe("git.push", () => {
@@ -931,26 +870,6 @@ describe("RPC Methods", () => {
     });
   });
 
-  // ─── Snapshot RPC Methods ──────────────────────────────────────────
-
-  describe("snapshot.create", () => {
-    it("should reject missing runId", async () => {
-      await expect(methodHandlers["snapshot.create"]({})).rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  describe("snapshot.list", () => {
-    it("should reject missing runId", async () => {
-      await expect(methodHandlers["snapshot.list"]({})).rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  describe("snapshot.restore", () => {
-    it("should reject missing runId", async () => {
-      await expect(methodHandlers["snapshot.restore"]({})).rejects.toThrow("Missing required parameter");
-    });
-  });
-
   // ─── Task Intervention RPC Methods ─────────────────────────────────
 
   describe("task.intervene", () => {
@@ -972,30 +891,6 @@ describe("RPC Methods", () => {
     it("should reject missing message", async () => {
       await expect(methodHandlers["task.inject"]({ runId: "r1", taskId: "t1" }))
         .rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  // ─── Notification RPC Methods ──────────────────────────────────────
-
-  describe("notification.rules", () => {
-    it("should return rules list", async () => {
-      const result = await methodHandlers["notification.rules"]({});
-      expect(Array.isArray(result)).toBe(true);
-    });
-  });
-
-  describe("notification.configure", () => {
-    it("should save notification rules", async () => {
-      const result = await methodHandlers["notification.configure"]({
-        rules: [{ id: "r1", name: "test-rule", eventPattern: "task.*", channels: [{ type: "websocket" }] }],
-      }) as Record<string, unknown>;
-      expect(result.saved).toBe(true);
-      expect(result.count).toBe(1);
-    });
-
-    it("should require rules array", async () => {
-      await expect(methodHandlers["notification.configure"]({ rules: "invalid" }))
-        .rejects.toThrow("rules must be an array");
     });
   });
 

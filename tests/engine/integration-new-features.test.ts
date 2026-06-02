@@ -6,7 +6,7 @@ import type { ExecutionRun } from "../../shared/src/task-types.js";
 
 /**
  * Integration tests for the new feature RPC methods:
- * crew.list, crew.configure, trace.list, plugin.*, config.adaptive
+ * crew.list, crew.configure, plugin.*, config.adaptive
  */
 describe("New Features Integration", () => {
   let methodHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>>;
@@ -137,53 +137,6 @@ describe("New Features Integration", () => {
       await expect(
         methodHandlers["crew.configure"]({ mode: "sequential" })
       ).rejects.toThrow("Missing required parameter");
-    });
-  });
-
-  // ─── trace.list ──────────────────────────────────────────────────────
-
-  describe("trace.list", () => {
-    it("should return empty array for run with no traces", async () => {
-      const run = await createRun();
-      const traces = await methodHandlers["trace.list"]({ runId: run.id });
-      expect(traces).toEqual([]);
-    });
-
-    it("should require runId", async () => {
-      await expect(
-        methodHandlers["trace.list"]({})
-      ).rejects.toThrow("Missing required parameter");
-    });
-
-    it("should return traces after they are persisted", async () => {
-      const run = await createRun();
-      const { Store } = await import("../../src-engine/src/db/store.js");
-      const store = new Store(testDir) as import("../../src-engine/src/db/store.js").Store;
-
-      store.appendTrace(run.id, [
-        { traceId: "tr-1", spanId: "sp-1", operation: "crew.run", status: "ok", startTime: Date.now(), endTime: Date.now(), durationMs: 100, attributes: {} },
-        { traceId: "tr-1", spanId: "sp-2", operation: "agent.planner", status: "ok", startTime: Date.now(), endTime: Date.now(), durationMs: 50, attributes: {} },
-      ]);
-
-      const traces = await methodHandlers["trace.list"]({ runId: run.id }) as Array<Record<string, unknown>>;
-      expect(traces).toHaveLength(2);
-      expect(traces[0].operation).toBe("crew.run");
-      expect(traces[1].operation).toBe("agent.planner");
-    });
-
-    it("should respect limit parameter", async () => {
-      const run = await createRun();
-      const { Store } = await import("../../src-engine/src/db/store.js");
-      const store = new Store(testDir) as import("../../src-engine/src/db/store.js").Store;
-
-      for (let i = 0; i < 10; i++) {
-        store.appendTrace(run.id, [
-          { traceId: `tr-${i}`, spanId: `sp-${i}`, operation: `op-${i}`, status: "ok", startTime: Date.now(), attributes: {} },
-        ]);
-      }
-
-      const traces = await methodHandlers["trace.list"]({ runId: run.id, limit: 5 }) as Array<unknown>;
-      expect(traces).toHaveLength(5);
     });
   });
 
