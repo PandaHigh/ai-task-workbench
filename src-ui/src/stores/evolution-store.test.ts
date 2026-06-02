@@ -10,7 +10,7 @@ describe("evolution-store", () => {
     it("should have default values", () => {
       const s = useEvolutionStore.getState();
       expect(s.queue).toEqual([]);
-      expect(s.activeTaskId).toBeNull();
+      expect(s.activeTaskIds).toEqual([]);
       expect(s.logs).toEqual([]);
       expect(s.commits).toEqual([]);
       expect(s.lessons).toEqual([]);

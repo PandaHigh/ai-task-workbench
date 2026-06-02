@@ -39,14 +39,14 @@ export function EvolutionDashboard() {
   const commits = useEvolutionStore((s) => s.commits);
   const lessons = useEvolutionStore((s) => s.lessons);
   const isRunning = useEvolutionStore((s) => s.isRunning);
-  const activeTaskId = useEvolutionStore((s) => s.activeTaskId);
+  const activeTaskIds = useEvolutionStore((s) => s.activeTaskIds);
+  const addActiveTask = useEvolutionStore((s) => s.addActiveTask);
   const setQueue = useEvolutionStore((s) => s.setQueue);
   const addLog = useEvolutionStore((s) => s.addLog);
   const setLogs = useEvolutionStore((s) => s.setLogs);
   const setCommits = useEvolutionStore((s) => s.setCommits);
   const setLessons = useEvolutionStore((s) => s.setLessons);
   const setRunning = useEvolutionStore((s) => s.setRunning);
-  const setActiveTask = useEvolutionStore((s) => s.setActiveTask);
   const reset = useEvolutionStore((s) => s.reset);
 
   const [tab, setTab] = useState<TabType>("logs");
@@ -61,7 +61,7 @@ export function EvolutionDashboard() {
   const [failedTasks, setFailedTasks] = useState<TaskDefinition[]>([]);
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<TaskDefinition[]>([]);
-  const [runningTask, setRunningTask] = useState<TaskDefinition | null>(null);
+  const [runningTasks, setRunningTasks] = useState<TaskDefinition[]>([]);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
   const [stopTarget, setStopTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -139,7 +139,7 @@ export function EvolutionDashboard() {
         if (cancelled) return;
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
-        setRunningTask(allTasks.find((t) => t.status === "running") || null);
+        setRunningTasks(allTasks.filter((t) => t.status === "running"));
       } catch (err) { console.warn("[poll] refresh tasks failed:", err); }
       if (!cancelled) setLoading(false);
     };
@@ -159,7 +159,7 @@ export function EvolutionDashboard() {
         const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
         setCompletedTasks(allTasks.filter((t) => t.status === "completed"));
         setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
-        setRunningTask(allTasks.find((t) => t.status === "running") || null);
+        setRunningTasks(allTasks.filter((t) => t.status === "running"));
         const qRes = await call("queue.list", { runId });
         setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
         const allRuns = (await call("run.list")) as ExecutionRun[];
@@ -281,7 +281,7 @@ export function EvolutionDashboard() {
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       const allTasks = (await call("run.tasks", { runId })) as TaskDefinition[];
       setFailedTasks(allTasks.filter((t) => t.status === "failed" || t.status === "reverted"));
-      setRunningTask(allTasks.find((t) => t.status === "running") || null);
+      setRunningTasks(allTasks.filter((t) => t.status === "running"));
       toast.success("任务已开始");
     } catch (err) { toast.error(`重试出错了: ${err instanceof Error ? err.message : err}`); }
   };
@@ -308,7 +308,7 @@ export function EvolutionDashboard() {
   };
 
   const elapsed = run?.startedAt ? formatDuration((run.completedAt || Date.now()) - run.startedAt) : "--";
-  const runningElapsed = useElapsedTimer(runningTask?.startedAt);
+  const runningElapsed = useElapsedTimer(runningTasks[0]?.startedAt);
 
   return (
     <>
@@ -332,8 +332,8 @@ export function EvolutionDashboard() {
           <DashboardErrorBoundary name="任务队列">
             <TaskQueue
               queue={queue}
-              activeTaskId={activeTaskId}
-              runningTask={runningTask}
+              activeTaskIds={activeTaskIds}
+              runningTasks={runningTasks}
               completedTasks={completedTasks}
               failedTasks={failedTasks}
               runningElapsed={runningElapsed}
@@ -344,7 +344,7 @@ export function EvolutionDashboard() {
               showQueue={showQueue}
               runStatus={run?.status}
               onStart={handleStart}
-              onSetActiveTask={setActiveTask}
+              onSetActiveTask={addActiveTask}
               onMoveTask={moveTask}
               onDeleteTask={handleDeleteTask}
               onEditTask={setEditTarget}
@@ -390,7 +390,7 @@ export function EvolutionDashboard() {
               ) : <>
               {/* Logs Tab */}
               {tab === "logs" && (
-                <LogPanel logs={logs} activeTaskId={activeTaskId} />
+                <LogPanel logs={logs} activeTaskIds={activeTaskIds} />
               )}
 
               {/* Commits Tab */}
@@ -486,10 +486,10 @@ export function EvolutionDashboard() {
           {(!simpleMode || showAdvancedPanel) && <div>
             <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
               超时: {timeoutMinutes}min
-              {activeTaskId && <button
+              {activeTaskIds.length > 0 && <button
                 onClick={async () => {
                   try {
-                    await call("task.setTimeout", { taskId: activeTaskId, runId: run?.id, minutes: timeoutMinutes });
+                    await call("task.setTimeout", { taskId: activeTaskIds[0], runId: run?.id, minutes: timeoutMinutes });
                   } catch (err) {
                     console.warn("Set timeout failed:", err instanceof Error ? err.message : err);
                   }
@@ -536,20 +536,20 @@ export function EvolutionDashboard() {
           )}
 
           {/* Task Intervention & Snapshot */}
-          {isRunning && activeTaskId && (
+          {isRunning && activeTaskIds.length > 0 && (
             <div className="pt-2 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
               <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务干预</h4>
               <div className="flex flex-wrap gap-1.5">
                 <button onClick={async () => {
-                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "pause" }); toast.success("已暂停任务"); }
+                  try { await call("task.intervene", { runId, taskId: activeTaskIds[0], action: "pause" }); toast.success("已暂停任务"); }
                   catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
                 }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--yellow)", color: "#fff" }}>暂停</button>
                 <button onClick={async () => {
-                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "skip" }); toast.success("已跳过任务"); }
+                  try { await call("task.intervene", { runId, taskId: activeTaskIds[0], action: "skip" }); toast.success("已跳过任务"); }
                   catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
                 }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--text-secondary)", color: "#fff" }}>跳过</button>
                 <button onClick={async () => {
-                  try { await call("task.intervene", { runId, taskId: activeTaskId, action: "cancel" }); toast.success("已取消任务"); }
+                  try { await call("task.intervene", { runId, taskId: activeTaskIds[0], action: "cancel" }); toast.success("已取消任务"); }
                   catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
                 }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--red)", color: "#fff" }}>取消</button>
               </div>

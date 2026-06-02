@@ -24,10 +24,10 @@ const MAX_VISIBLE_LOGS = 200;
 
 interface LogPanelProps {
   logs: LogEntry[];
-  activeTaskId: string | null;
+  activeTaskIds: string[];
 }
 
-export function LogPanel({ logs, activeTaskId }: LogPanelProps) {
+export function LogPanel({ logs, activeTaskIds }: LogPanelProps) {
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +48,7 @@ export function LogPanel({ logs, activeTaskId }: LogPanelProps) {
   const hasMore = displayLogs.length > MAX_VISIBLE_LOGS;
   const skippedCount = displayLogs.length - visibleLogs.length;
 
-  if (logs.length === 0 && !activeTaskId) {
+  if (logs.length === 0 && activeTaskIds.length === 0) {
     return (
       <EmptyState
         title="等待任务执行"
@@ -63,13 +63,13 @@ export function LogPanel({ logs, activeTaskId }: LogPanelProps) {
       <div className="mb-2">
         <LogSearchBar logs={logs} onFilteredChange={handleFilteredLogsChange} />
       </div>
-      {activeTaskId && (
+      {activeTaskIds.length > 0 && (
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2">
             <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             <span className="text-blue-400 font-mono text-xs font-bold">实时输出</span>
           </div>
-          <StreamingOutput taskId={activeTaskId} />
+          <StreamingOutput taskId={activeTaskIds[0]} />
         </div>
       )}
       {hasMore && (

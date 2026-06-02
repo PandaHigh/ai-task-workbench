@@ -84,13 +84,14 @@ function makeLesson(overrides: Partial<LessonLearned> = {}): LessonLearned {
 
 const defaultEvolutionStore = {
   queue: [] as TaskDefinition[],
-  activeTaskId: null as string | null,
+  activeTaskIds: [] as string[],
   logs: [] as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>,
   commits: [] as GitCommit[],
   lessons: [] as LessonLearned[],
   isRunning: false,
   setQueue: vi.fn(),
-  setActiveTask: vi.fn(),
+  addActiveTask: vi.fn(),
+  removeActiveTask: vi.fn(),
   addLog: vi.fn(),
   setCommits: vi.fn(),
   setLessons: vi.fn(),

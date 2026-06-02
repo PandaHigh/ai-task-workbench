@@ -48,8 +48,8 @@ const makeTask = (overrides: Partial<TaskDefinition> = {}): TaskDefinition => ({
 
 const defaultProps = {
   queue: [] as TaskDefinition[],
-  activeTaskId: null as string | null,
-  runningTask: null as TaskDefinition | null,
+  activeTaskIds: [] as string[],
+  runningTasks: [] as TaskDefinition[],
   completedTasks: [] as TaskDefinition[],
   failedTasks: [] as TaskDefinition[],
   runningElapsed: null as string | null,
@@ -142,8 +142,8 @@ describe("TaskQueue", () => {
   });
 
   it("should render running task indicator", () => {
-    const runningTask = makeTask({ id: "r1", content: "Running task", status: "running", startedAt: Date.now() });
-    render(<TaskQueue {...defaultProps} runningTask={runningTask} runningElapsed="5s" runId="run-1" />);
+    const runningTasks = [makeTask({ id: "r1", content: "Running task", status: "running", startedAt: Date.now() })];
+    render(<TaskQueue {...defaultProps} runningTasks={runningTasks} runningElapsed="5s" runId="run-1" />);
     expect(screen.getByText("Running task")).toBeInTheDocument();
     expect(screen.getByText("工作中")).toBeInTheDocument();
     expect(screen.getByText("5s")).toBeInTheDocument();

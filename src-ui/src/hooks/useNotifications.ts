@@ -25,11 +25,11 @@ export function useNotifications() {
         }
         case "task.status": {
           const { taskId, status } = params as { taskId: string; status: string };
-          const { setActiveTask } = useEvolutionStore.getState();
+          const { addActiveTask, removeActiveTask } = useEvolutionStore.getState();
           if (status === "running") {
-            setActiveTask(taskId);
+            addActiveTask(taskId);
           } else if (["completed", "failed", "reverted", "cancelled"].includes(status)) {
-            setActiveTask(null);
+            removeActiveTask(taskId);
           }
           addLog({
             timestamp: Date.now(),

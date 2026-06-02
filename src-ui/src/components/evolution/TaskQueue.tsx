@@ -7,8 +7,8 @@ import { TaskComments } from "./TaskComments";
 
 interface TaskQueueProps {
   queue: TaskDefinition[];
-  activeTaskId: string | null;
-  runningTask: TaskDefinition | null;
+  activeTaskIds: string[];
+  runningTasks: TaskDefinition[];
   completedTasks: TaskDefinition[];
   failedTasks: TaskDefinition[];
   runningElapsed: string | null;
@@ -30,8 +30,8 @@ interface TaskQueueProps {
 
 export function TaskQueue({
   queue,
-  activeTaskId,
-  runningTask,
+  activeTaskIds,
+  runningTasks,
   completedTasks,
   failedTasks,
   runningElapsed,
@@ -126,8 +126,8 @@ export function TaskQueue({
               onFocus={() => setFocusIdx(i)}
               className="group px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
               style={{
-                background: task.id === activeTaskId ? "rgba(77, 107, 254, 0.1)" : dragIdx === i ? "rgba(77, 107, 254, 0.05)" : "var(--bg-tertiary)",
-                border: task.id === activeTaskId ? "1px solid var(--blue)" : "1px solid transparent",
+                background: activeTaskIds.includes(task.id) ? "rgba(77, 107, 254, 0.1)" : dragIdx === i ? "rgba(77, 107, 254, 0.05)" : "var(--bg-tertiary)",
+                border: activeTaskIds.includes(task.id) ? "1px solid var(--blue)" : "1px solid transparent",
                 opacity: dragIdx !== null && dragIdx !== i ? 0.7 : dragIdx === i ? 1 : undefined,
                 transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
                 boxShadow: dragIdx === i ? "0 4px 16px rgba(0,0,0,0.4)" : undefined,
@@ -176,25 +176,29 @@ export function TaskQueue({
         )}
 
         {/* Running task indicator */}
-        {runningTask && (
+        {runningTasks.length > 0 && (
           <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
-            <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}>
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>&#9679;</span>
-                <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{runningTask.content}</span>
+            {runningTasks.map((task) => (
+              <div key={task.id} className="mb-1.5 last:mb-0">
+                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>&#9679;</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
+                  </div>
+                  <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                    <span style={{ color: "var(--blue)" }}>工作中</span>
+                    {runningElapsed && <span>{runningElapsed}</span>}
+                    <span>{task.type === "user_defined" ? "用户" : "AI"}</span>
+                    {task.startedAt && <span>{new Date(task.startedAt).toLocaleTimeString()}</span>}
+                  </div>
+                </div>
+                {runId && (
+                  <div className="mt-1.5 px-1">
+                    <TaskComments runId={runId} taskId={task.id} />
+                  </div>
+                )}
               </div>
-              <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                <span style={{ color: "var(--blue)" }}>工作中</span>
-                {runningElapsed && <span>{runningElapsed}</span>}
-                <span>{runningTask.type === "user_defined" ? "用户" : "AI"}</span>
-                {runningTask.startedAt && <span>{new Date(runningTask.startedAt).toLocaleTimeString()}</span>}
-              </div>
-            </div>
-            {runId && (
-              <div className="mt-1.5 px-1">
-                <TaskComments runId={runId} taskId={runningTask.id} />
-              </div>
-            )}
+            ))}
           </div>
         )}
 

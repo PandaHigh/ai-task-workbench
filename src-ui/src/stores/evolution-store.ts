@@ -13,7 +13,7 @@ let _nextLogId = 1;
 
 interface EvolutionStore {
   queue: TaskDefinition[];
-  activeTaskId: string | null;
+  activeTaskIds: string[];
   logs: LogEntry[];
   commits: GitCommit[];
   lessons: LessonLearned[];
@@ -21,7 +21,8 @@ interface EvolutionStore {
   agentProgress: Record<string, AgentProgress>;
 
   setQueue: (queue: TaskDefinition[]) => void;
-  setActiveTask: (id: string | null) => void;
+  addActiveTask: (id: string) => void;
+  removeActiveTask: (id: string) => void;
   addLog: (log: Omit<LogEntry, "id">) => void;
   setLogs: (logs: LogEntry[]) => void;
   setCommits: (commits: GitCommit[]) => void;
@@ -33,7 +34,7 @@ interface EvolutionStore {
 
 export const useEvolutionStore = create<EvolutionStore>((set) => ({
   queue: [],
-  activeTaskId: null,
+  activeTaskIds: [],
   logs: [],
   commits: [],
   lessons: [],
@@ -41,7 +42,14 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
   agentProgress: {},
 
   setQueue: (queue) => set({ queue }),
-  setActiveTask: (id) => set({ activeTaskId: id }),
+  addActiveTask: (id) =>
+    set((state) => ({
+      activeTaskIds: state.activeTaskIds.includes(id) ? state.activeTaskIds : [...state.activeTaskIds, id],
+    })),
+  removeActiveTask: (id) =>
+    set((state) => ({
+      activeTaskIds: state.activeTaskIds.filter((tid) => tid !== id),
+    })),
   addLog: (log) =>
     set((state) => ({ logs: [...state.logs, { ...log, id: _nextLogId++ }].slice(-500) })),
   setLogs: (logs) => set({ logs: logs.slice(-500) }),
@@ -52,6 +60,6 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
     set((state) => ({ agentProgress: { ...state.agentProgress, [role]: progress } })),
   reset: () => {
     _nextLogId = 1;
-    set({ queue: [], activeTaskId: null, logs: [], commits: [], lessons: [], isRunning: false, agentProgress: {} });
+    set({ queue: [], activeTaskIds: [], logs: [], commits: [], lessons: [], isRunning: false, agentProgress: {} });
   },
 }));
