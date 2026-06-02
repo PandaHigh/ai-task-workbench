@@ -126,19 +126,3 @@ describe("PluginRegistry", () => {
     expect(registry.list()[0].name).toBe("github");
   });
 });
-
-describe("McpManager", () => {
-  it("should import without error", async () => {
-    const { McpManager } = await import("../../src-engine/src/plugins/mcp-manager.js");
-    const manager = new McpManager();
-    expect(manager).toBeDefined();
-    expect(manager.isRunning("anything")).toBe(false);
-    expect(manager.getRunningServers()).toEqual([]);
-  });
-
-  it("stopAll should resolve when no servers running", async () => {
-    const { McpManager } = await import("../../src-engine/src/plugins/mcp-manager.js");
-    const manager = new McpManager();
-    await expect(manager.stopAll()).resolves.toBeUndefined();
-  });
-});

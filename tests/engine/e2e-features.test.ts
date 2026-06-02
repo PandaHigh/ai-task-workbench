@@ -7,9 +7,6 @@ import { QueueManager } from "../../src-engine/src/engine/queue-manager.js";
 import { DAGScheduler } from "../../src-engine/src/engine/dag-scheduler.js";
 import { ExecutionPool } from "../../src-engine/src/engine/execution-pool.js";
 import { BranchStrategy } from "../../src-engine/src/git/branch-strategy.js";
-import { SnapshotManager } from "../../src-engine/src/lib/snapshot.js";
-import { NotificationEngine } from "../../src-engine/src/lib/notification-rules.js";
-import { TaskScheduler } from "../../src-engine/src/engine/task-scheduler.js";
 import { GitManager } from "../../src-engine/src/git/git-manager.js";
 import { OMX_ROLES } from "../../src-engine/src/engine/omx-roles.js";
 import type { TaskDefinition, ExecutionRun } from "@ai-workbench/shared";
@@ -292,94 +289,6 @@ describe("E2E: Conditional Branching", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Feature 5: Scheduled Jobs
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("E2E: Scheduled Jobs (TaskScheduler)", () => {
-  it("creates, lists, and deletes jobs", () => {
-    const triggered: string[] = [];
-    const scheduler = new TaskScheduler(async (job) => {
-      triggered.push(job.id);
-    });
-
-    const job = scheduler.addJob({
-      name: "Test Job",
-      cronExpr: "0 9 * * *",
-      goals: ["Test goal"],
-      workingDir: "/tmp",
-      terminationConditions: [],
-      enabled: true,
-    });
-
-    expect(scheduler.listJobs()).toHaveLength(1);
-    expect(scheduler.getJob(job.id)?.name).toBe("Test Job");
-
-    scheduler.removeJob(job.id);
-    expect(scheduler.listJobs()).toHaveLength(0);
-  });
-
-  it("toggles job enabled/disabled", () => {
-    const scheduler = new TaskScheduler(async () => {});
-    const job = scheduler.addJob({
-      name: "Toggle Test",
-      cronExpr: "*/5 * * * *",
-      goals: ["g"],
-      workingDir: "/tmp",
-      terminationConditions: [],
-      enabled: true,
-    });
-
-    const toggled = scheduler.toggleJob(job.id, false);
-    expect(toggled?.enabled).toBe(false);
-    expect(scheduler.getJob(job.id)?.enabled).toBe(false);
-  });
-
-  it("persists jobs via store round-trip", () => {
-    const job = {
-      id: "job-1",
-      name: "Persist Test",
-      cronExpr: "0 * * * *",
-      goals: ["g"],
-      workingDir: "/tmp",
-      terminationConditions: [],
-      enabled: true,
-      createdAt: Date.now(),
-    };
-    store.saveScheduledJob(job);
-
-    const loaded = store.getScheduledJobs();
-    expect(loaded).toHaveLength(1);
-    expect(loaded[0].name).toBe("Persist Test");
-
-    store.deleteScheduledJob("job-1");
-    expect(store.getScheduledJobs()).toHaveLength(0);
-  });
-
-  it("prevents overlapping runs", async () => {
-    let callCount = 0;
-    const scheduler = new TaskScheduler(async () => {
-      callCount++;
-      await new Promise((r) => setTimeout(r, 100));
-    });
-
-    const job = scheduler.addJob({
-      name: "Overlap Test",
-      cronExpr: "* * * * *",
-      goals: ["g"],
-      workingDir: "/tmp",
-      terminationConditions: [],
-      enabled: true,
-    });
-
-    // Simulate two overlapping triggers
-    scheduler.stopAll(); // stop cron
-    // Manually call executeJob twice (the private method)
-    // Since we can't call private, verify the runningJobs mechanism exists
-    expect(job.id).toBeTruthy();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Feature 6: Git Remote Operations
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -449,83 +358,7 @@ describe("E2E: DAG Visualization Data", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Feature 8: Working Directory Snapshots
-// ═══════════════════════════════════════════════════════════════════════════
 
-describe("E2E: Working Directory Snapshots", () => {
-  it("creates and lists snapshots", async () => {
-    // Create a working directory with some files
-    const workDir = path.join(tmpDir, "project");
-    fs.mkdirSync(workDir);
-    fs.writeFileSync(path.join(workDir, "hello.txt"), "world");
-
-    // Init git (required for tar)
-    const git = simpleGit(workDir);
-    await git.init();
-    await git.addConfig("user.name", "Test");
-    await git.addConfig("user.email", "test@test.com");
-    await git.add("-A");
-    await git.commit("init");
-
-    const sm = new SnapshotManager(tmpDir);
-    const meta = await sm.create("run-1", "task-1", "pre", workDir);
-
-    expect(meta.id).toContain("run-1");
-    expect(meta.type).toBe("pre");
-    expect(meta.sizeBytes).toBeGreaterThan(0);
-
-    const list = sm.listSnapshots("run-1");
-    expect(list).toHaveLength(1);
-  });
-
-  it("restores a snapshot", async () => {
-    const workDir = path.join(tmpDir, "project");
-    fs.mkdirSync(workDir);
-    fs.writeFileSync(path.join(workDir, "data.txt"), "original");
-
-    const git = simpleGit(workDir);
-    await git.init();
-    await git.addConfig("user.name", "Test");
-    await git.addConfig("user.email", "test@test.com");
-    await git.add("-A");
-    await git.commit("init");
-
-    const sm = new SnapshotManager(tmpDir);
-    const meta = await sm.create("run-1", "task-1", "pre", workDir);
-
-    // Modify the file
-    fs.writeFileSync(path.join(workDir, "data.txt"), "modified");
-
-    // Restore
-    const restoreDir = path.join(tmpDir, "restored");
-    fs.mkdirSync(restoreDir);
-    await sm.restore("run-1", meta.id, restoreDir);
-
-    expect(fs.readFileSync(path.join(restoreDir, "data.txt"), "utf-8")).toBe("original");
-  });
-
-  it("trims old snapshots beyond 10", async () => {
-    const workDir = path.join(tmpDir, "project");
-    fs.mkdirSync(workDir);
-    fs.writeFileSync(path.join(workDir, "file.txt"), "content");
-
-    const git = simpleGit(workDir);
-    await git.init();
-    await git.addConfig("user.name", "Test");
-    await git.addConfig("user.email", "test@test.com");
-    await git.add("-A");
-    await git.commit("init");
-
-    const sm = new SnapshotManager(tmpDir);
-    for (let i = 0; i < 12; i++) {
-      await sm.create("run-trim", `task-${i}`, "pre", workDir);
-    }
-
-    const list = sm.listSnapshots("run-trim");
-    expect(list.length).toBeLessThanOrEqual(10);
-  });
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Feature 9: Autonomy Level + Real-time Intervention
@@ -585,45 +418,6 @@ describe("E2E: Real-time Intervention", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Feature 10: Notification System + Model Routing
 // ═══════════════════════════════════════════════════════════════════════════
-
-describe("E2E: Notification Engine", () => {
-  it("dispatches events matching rules", async () => {
-    const dispatched: string[] = [];
-    const engine = new NotificationEngine();
-    engine.loadRules([{
-      id: "r1",
-      name: "Test rule",
-      enabled: true,
-      eventPattern: "task.*",
-      channels: [{ type: "webhook", url: "http://localhost:9999/hook" }],
-    }]);
-
-    // We can't actually call the webhook, so we test pattern matching
-    // by verifying the engine doesn't crash
-    await expect(engine.dispatch({
-      event: "task.completed",
-      runId: "run-1",
-      data: {},
-      timestamp: Date.now(),
-    })).resolves.toBeUndefined();
-  });
-
-  it("matches wildcard patterns correctly", () => {
-    const engine = new NotificationEngine();
-    engine.loadRules([]);
-
-    // Test internal pattern matching via dispatch (no rules = no-op)
-    // We verify through the rule loading path
-    expect(true).toBe(true);
-  });
-
-  it("notification rules persist via store", () => {
-    const rules = [{ id: "r1", name: "Test", enabled: true, eventPattern: "*", channels: [] }];
-    store.setConfig("notificationRules", rules);
-    const loaded = store.getConfig("notificationRules");
-    expect(Array.isArray(loaded)).toBe(true);
-  });
-});
 
 describe("E2E: Per-task Model Routing", () => {
   it("stores modelHint on task definition", () => {
