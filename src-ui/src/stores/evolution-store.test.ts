@@ -16,8 +16,6 @@ describe("evolution-store", () => {
       expect(s.lessons).toEqual([]);
       expect(s.isRunning).toBe(false);
       expect(s.agentProgress).toEqual({});
-      expect(s.errors).toEqual([]);
-      expect(s.suggestions).toEqual([]);
     });
   });
 
@@ -47,41 +45,6 @@ describe("evolution-store", () => {
     });
   });
 
-  describe("errors", () => {
-    it("should add errors", () => {
-      const error = { id: "e1", message: "err", severity: "critical" as const, category: "runtime" as const, runId: "r1", timestamp: 1 };
-      useEvolutionStore.getState().addError(error);
-      expect(useEvolutionStore.getState().errors).toHaveLength(1);
-      expect(useEvolutionStore.getState().errors[0].id).toBe("e1");
-    });
-
-    it("should set errors", () => {
-      const errors = [
-        { id: "e1", message: "err1", severity: "critical" as const, category: "runtime" as const, runId: "r1", timestamp: 1 },
-        { id: "e2", message: "err2", severity: "warning" as const, category: "syntax" as const, runId: "r1", timestamp: 2 },
-      ];
-      useEvolutionStore.getState().setErrors(errors);
-      expect(useEvolutionStore.getState().errors).toHaveLength(2);
-    });
-  });
-
-  describe("suggestions", () => {
-    it("should add suggestions", () => {
-      const suggestion = { id: "s1", summary: "review", score: 0.8, issues: [], status: "pending" as const, runId: "r1", taskId: "t1", createdAt: 1 };
-      useEvolutionStore.getState().addSuggestion(suggestion);
-      expect(useEvolutionStore.getState().suggestions).toHaveLength(1);
-    });
-
-    it("should set suggestions", () => {
-      const suggestions = [
-        { id: "s1", summary: "review 1", score: 0.7, issues: [], status: "pending" as const, runId: "r1", taskId: "t1", createdAt: 1 },
-        { id: "s2", summary: "review 2", score: 0.9, issues: [], status: "fix_created" as const, runId: "r1", taskId: "t2", createdAt: 2 },
-      ];
-      useEvolutionStore.getState().setSuggestions(suggestions);
-      expect(useEvolutionStore.getState().suggestions).toHaveLength(2);
-    });
-  });
-
   describe("agentProgress", () => {
     it("should update agent progress", () => {
       const progress = { runId: "r1", taskId: "t1", role: "developer", progress: 50, phase: "coding", files: [], message: "working", timestamp: 1 };
@@ -94,8 +57,6 @@ describe("evolution-store", () => {
     it("should clear all state", () => {
       const store = useEvolutionStore.getState();
       store.addLog({ timestamp: 1, level: "info", source: "engine", message: "msg" });
-      store.addError({ id: "e1", message: "err", severity: "critical", category: "runtime", runId: "r1", timestamp: 1 });
-      store.addSuggestion({ id: "s1", summary: "rev", score: 0.5, issues: [], status: "pending", runId: "r1", taskId: "t1", createdAt: 1 });
       store.setRunning(true);
       store.setQueue([{ id: "t1", content: "task", type: "user_defined", priority: 5, status: "pending", timeoutMinutes: 60, runId: "r1", promptJson: "", createdAt: Date.now() }]);
 
@@ -103,8 +64,6 @@ describe("evolution-store", () => {
 
       const s = useEvolutionStore.getState();
       expect(s.logs).toEqual([]);
-      expect(s.errors).toEqual([]);
-      expect(s.suggestions).toEqual([]);
       expect(s.isRunning).toBe(false);
       expect(s.queue).toEqual([]);
     });

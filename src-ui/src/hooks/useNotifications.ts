@@ -3,7 +3,7 @@ import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
-import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress, DetectedError } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -152,44 +152,6 @@ export function useNotifications() {
           appendStreamMessage(taskId, message);
           break;
         }
-        case "features.generated": {
-          addLog({
-            timestamp: Date.now(),
-            level: "info",
-            source: "engine",
-            message: "Feature list generated",
-          });
-          break;
-        }
-        case "features.updated": {
-          const { passed, total } = params as { passed: number; total: number };
-          addLog({
-            timestamp: Date.now(),
-            level: "info",
-            source: "engine",
-            message: `Features: ${passed}/${total} passed`,
-          });
-          break;
-        }
-        case "presence.joined": {
-          const { displayName } = params as { displayName: string };
-          addLog({
-            timestamp: Date.now(), level: "info", source: "engine",
-            message: `${displayName} 已连接`,
-          });
-          break;
-        }
-        case "presence.left": {
-          const { displayName } = params as { displayName: string };
-          addLog({
-            timestamp: Date.now(), level: "info", source: "engine",
-            message: `${displayName} 已断开`,
-          });
-          break;
-        }
-        case "activity.created": {
-          break;
-        }
         case "comment.created": {
           const { userId, taskId } = params as { userId: string; taskId: string };
           addLog({
@@ -202,61 +164,6 @@ export function useNotifications() {
           const progress = params as unknown as AgentProgress;
           const { updateAgentProgress } = useEvolutionStore.getState();
           updateAgentProgress(progress.role, progress);
-          break;
-        }
-        case "error.detected": {
-          const error = params as { id?: string; message: string; severity: string; category: string; file?: string; line?: number; fixTaskId?: string; timestamp?: number };
-          const { addError } = useEvolutionStore.getState();
-          addError({
-            id: error.id || `err-${Date.now()}`,
-            message: error.message,
-            severity: error.severity as "critical" | "warning" | "info",
-            category: error.category as DetectedError["category"],
-            file: error.file,
-            line: error.line,
-            fixTaskId: error.fixTaskId,
-            timestamp: error.timestamp || Date.now(),
-            runId: "",
-          });
-          addLog({
-            timestamp: Date.now(),
-            level: error.severity === "critical" ? "error" : "warn",
-            source: "engine",
-            message: `检测到错误: ${error.message.substring(0, 100)}${error.fixTaskId ? " (已创建修复任务)" : ""}`,
-          });
-          break;
-        }
-        case "review.suggestion": {
-          const suggestion = params as { id?: string; summary: string; score: number; issues?: Array<{ severity: string; description: string; file?: string; line?: number; suggestion?: string }>; status?: string; timestamp?: number; runId?: string; taskId?: string };
-          const { addSuggestion } = useEvolutionStore.getState();
-          addSuggestion({
-            id: suggestion.id || `rev-${Date.now()}`,
-            summary: suggestion.summary,
-            score: suggestion.score,
-            issues: (suggestion.issues || []).map((i) => ({
-              severity: i.severity as "critical" | "major" | "minor",
-              file: i.file || "",
-              line: i.line,
-              description: i.description,
-              suggestion: i.suggestion || "",
-            })),
-            status: (suggestion.status || "pending") as "pending" | "dismissed" | "fix_created",
-            createdAt: suggestion.timestamp || Date.now(),
-            runId: suggestion.runId || "",
-            taskId: suggestion.taskId || "",
-          });
-          addLog({
-            timestamp: Date.now(), level: "info", source: "engine",
-            message: `后台审查完成: ${suggestion.summary} (评分: ${(suggestion.score * 100).toFixed(0)}%)`,
-          });
-          break;
-        }
-        case "task.autoFix": {
-          const { originalError } = params as { taskId: string; originalError: string };
-          addLog({
-            timestamp: Date.now(), level: "info", source: "engine",
-            message: `自动修复任务已创建: ${originalError}`,
-          });
           break;
         }
       }

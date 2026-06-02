@@ -10,13 +10,7 @@ import { useToast } from "../common/Toast";
 import { formatDuration, formatTimestamp } from "../../lib/utils";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 import { ApprovalPanel } from "./ApprovalPanel";
-import { FeatureBoard } from "./FeatureBoard";
-import { PresencePanel } from "./PresencePanel";
-import { ActivityTimeline } from "./ActivityTimeline";
-import { TraceTimeline } from "./TraceTimeline";
 import { AgentProgressPanel } from "./AgentProgressPanel";
-import { ErrorStream } from "./ErrorStream";
-import { ReviewSuggestions } from "./ReviewSuggestions";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { GitRemotePanel } from "../settings/GitRemotePanel";
 import { DashboardErrorBoundary } from "./DashboardErrorBoundary";
@@ -29,9 +23,8 @@ import { TaskQueue } from "./TaskQueue";
 import { GoalPanel } from "./GoalPanel";
 import { LogPanel } from "./LogPanel";
 import { ReportTab } from "./ReportTab";
-import { ExecutionGraph } from "./ExecutionGraph";
 
-type TabType = "logs" | "commits" | "lessons" | "features" | "activity" | "trace" | "errors" | "suggestions" | "graph" | "report";
+type TabType = "logs" | "commits" | "lessons" | "report";
 
 export function EvolutionDashboard() {
   const { runId } = useParams<{ runId: string }>();
@@ -57,7 +50,7 @@ export function EvolutionDashboard() {
   const setActiveTask = useEvolutionStore((s) => s.setActiveTask);
   const reset = useEvolutionStore((s) => s.reset);
 
-  const [tab, setTab] = useState<TabType>("activity");
+  const [tab, setTab] = useState<TabType>("logs");
   const [simpleMode, setSimpleMode] = useState(() => localStorage.getItem("ui-mode") !== "detailed");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [loading, setLoading] = useState(true);
@@ -199,8 +192,8 @@ export function EvolutionDashboard() {
   };
 
   const allTabs: TabType[] = simpleMode
-    ? (["activity" as const, "trace" as const, "errors" as const, "suggestions" as const, "graph" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
-    : (["logs" as const, "commits" as const, "lessons" as const, ...(run?.features && run.features.length > 0 ? ["features" as const] : []), "activity" as const, "trace" as const, "errors" as const, "suggestions" as const, "graph" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]);
+    ? (["logs" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[])
+    : (["logs" as const, "commits" as const, "lessons" as const, ...(run?.finalReport ? ["report" as const] : [])] as TabType[]);
 
   const handleTabKeyDown = (e: React.KeyboardEvent) => {
     const idx = allTabs.indexOf(tab);
@@ -375,7 +368,7 @@ export function EvolutionDashboard() {
                   fontWeight: tab === t ? 600 : 400,
                   cursor: "pointer",
                 }} onMouseEnter={(e) => { if (tab !== t) e.currentTarget.style.background = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (tab !== t) e.currentTarget.style.background = "transparent"; }}>
-                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, features: `检查项 (${run?.features?.filter(f => f.passes).length ?? 0}/${run?.features?.length ?? 0})`, activity: "动态", trace: "追踪", errors: "错误", suggestions: "审查", graph: "流程图", report: "报告" }[t]}
+                  {{ logs: `记录 (${logs.length})`, commits: `保存 (${commits.length})`, lessons: `经验 (${lessons.length})`, report: "报告" }[t]}
                 </button>
               ))}
               </div>
@@ -453,40 +446,6 @@ export function EvolutionDashboard() {
                     ))}
                   </div>
                 )
-              )}
-
-              {/* Features Tab */}
-              {tab === "features" && (
-                run?.features ? (
-                  <FeatureBoard features={run.features} />
-                ) : (
-                  <EmptyState title="还没有检查项" description="任务执行后会自动生成" variant="logs" />
-                )
-              )}
-
-              {/* Activity Tab */}
-              {tab === "activity" && (
-                <ActivityTimeline runId={runId ?? ""} />
-              )}
-
-              {/* Trace Tab */}
-              {tab === "trace" && (
-                <TraceTab runId={runId ?? ""} call={call} />
-              )}
-
-              {/* Errors Tab */}
-              {tab === "errors" && (
-                <ErrorStream runId={runId ?? ""} />
-              )}
-
-              {/* Review Suggestions Tab */}
-              {tab === "suggestions" && (
-                <ReviewSuggestions runId={runId ?? ""} />
-              )}
-
-              {/* DAG Graph Tab */}
-              {tab === "graph" && (
-                <ExecutionGraph tasks={queue} />
               )}
 
               {/* Report Tab -- rendered as markdown */}
@@ -572,7 +531,6 @@ export function EvolutionDashboard() {
                 }).catch((err) => { console.warn("[EvolutionDashboard] clearGoal failed:", err instanceof Error ? err.message : err); })}
                 onPauseGoal={(id) => call("run.pauseGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] pauseGoal failed:", err instanceof Error ? err.message : err); })}
                 onResumeGoal={(id) => call("run.resumeGoal", { runId: id }).catch((err) => { console.warn("[EvolutionDashboard] resumeGoal failed:", err instanceof Error ? err.message : err); })}
-                presenceSlot={<PresencePanel />}
               />
             </div>
           )}
@@ -604,22 +562,6 @@ export function EvolutionDashboard() {
                   try { await call("task.intervene", { runId, taskId: activeTaskId, action: "cancel" }); toast.success("已取消任务"); }
                   catch (err) { toast.error(`操作失败: ${err instanceof Error ? err.message : err}`); }
                 }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--red)", color: "#fff" }}>取消</button>
-              </div>
-              <h4 className="text-xs font-bold mt-2" style={{ color: "var(--text-secondary)" }}>快照</h4>
-              <div className="flex flex-wrap gap-1.5">
-                <button onClick={async () => {
-                  try { await call("snapshot.create", { runId, type: "manual" }); toast.success("快照已创建"); }
-                  catch (err) { toast.error(`创建失败: ${err instanceof Error ? err.message : err}`); }
-                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--purple)", color: "#fff" }}>创建快照</button>
-                <button onClick={async () => {
-                  try {
-                    const list = await call("snapshot.list", { runId }) as Array<{ id: string; createdAt: number }>;
-                    if (list.length > 0) {
-                      await call("snapshot.restore", { runId, snapshotId: list[list.length - 1].id });
-                      toast.success("已恢复最新快照");
-                    } else { toast.info("暂无快照"); }
-                  } catch (err) { toast.error(`恢复失败: ${err instanceof Error ? err.message : err}`); }
-                }} className="px-2 py-1 rounded text-[10px]" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>恢复快照</button>
               </div>
             </div>
           )}
@@ -727,23 +669,4 @@ export function EvolutionDashboard() {
     </div>
     </>
   );
-}
-
-function TraceTab({ runId, call }: { runId: string; call: (method: string, params?: Record<string, unknown>) => Promise<unknown> }) {
-  const [spans, setSpans] = useState<import("@ai-workbench/shared").TraceSpan[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!runId) return;
-    setLoading(true);
-    call("trace.list", { runId, limit: 200 })
-      .then((data) => { setSpans(data as import("@ai-workbench/shared").TraceSpan[]); })
-      .catch((err) => { console.warn("Failed to load traces:", err); })
-      .finally(() => setLoading(false));
-  }, [runId, call]);
-
-  if (loading) return <div className="p-4"><Skeleton /></div>;
-  if (spans.length === 0) return <EmptyState title="暂无 Trace 数据" description="任务执行后将显示 Agent 执行时间线" />;
-
-  return <TraceTimeline spans={spans} />;
 }

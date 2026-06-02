@@ -6,7 +6,6 @@ import { pageEnterStyle } from "../../hooks/useAnimations";
 import { SkillsManager } from "./SkillsManager";
 import { PluginManager } from "./PluginManager";
 import { ProfileManager } from "./ProfileManager";
-import { ScheduleManager } from "./ScheduleManager";
 import type { UserTaskTemplate } from "@ai-workbench/shared";
 
 interface OrigValues {
@@ -225,12 +224,6 @@ export function SettingsPage() {
         <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
           <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>任务模板</h3>
           <TemplateSection />
-        </div>
-
-        {/* Scheduled Jobs */}
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>定时任务</h3>
-          <ScheduleManager />
         </div>
 
         {/* Advanced settings */}
