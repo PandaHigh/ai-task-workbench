@@ -12,7 +12,6 @@ import type {
   OrchestratorProfile,
   ReviewSuggestion,
   DetectedError,
-  ScheduledJob,
 } from "@ai-workbench/shared";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile, cleanupTmpFiles } from "./store-utils.js";
 
@@ -466,35 +465,4 @@ export class Store {
     return taskId ? errors.filter((e) => e.taskId === taskId) : errors;
   }
 
-  // ---- Scheduled Jobs ----
-
-  getScheduledJobs(): ScheduledJob[] {
-    const file = path.join(this.dataDir, "scheduled-jobs.json");
-    return readJsonFile<ScheduledJob[]>(file, []);
-  }
-
-  saveScheduledJobs(jobs: ScheduledJob[]): void {
-    const file = path.join(this.dataDir, "scheduled-jobs.json");
-    writeJsonFile(file, jobs);
-  }
-
-  saveScheduledJob(job: ScheduledJob): void {
-    const jobs = this.getScheduledJobs();
-    const idx = jobs.findIndex((j) => j.id === job.id);
-    if (idx >= 0) {
-      jobs[idx] = job;
-    } else {
-      jobs.push(job);
-    }
-    this.saveScheduledJobs(jobs);
-  }
-
-  deleteScheduledJob(id: string): boolean {
-    const jobs = this.getScheduledJobs();
-    const idx = jobs.findIndex((j) => j.id === id);
-    if (idx < 0) return false;
-    jobs.splice(idx, 1);
-    this.saveScheduledJobs(jobs);
-    return true;
-  }
 }

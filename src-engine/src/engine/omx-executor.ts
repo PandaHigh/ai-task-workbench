@@ -7,8 +7,6 @@
  * All other logic (handleEmptyQueue, evaluateGoal, scoreTask, etc.) is preserved.
  */
 
-import fs from "fs";
-import path from "path";
 import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus, CheckpointType } from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
@@ -18,9 +16,8 @@ import { SkillManager } from "../skills/skill-manager.js";
 import { generateClaudeMd } from "../skills/claude-md-generator.js";
 import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
-import { OmxAmpPipeline, type OmxAmpPipelineResult } from "./omx-pipeline.js";
+import { OmxAmpPipeline } from "./omx-pipeline.js";
 import { OmxAmpTeamOrchestrator, type TeamConfig } from "./omx-team/team-orchestrator.js";
-import { OmxAmpExperimentRunner, type ExperimentConfig } from "./omx-research/experiment-runner.js";
 
 // AgentExecutor removed — OMX pipeline uses OmxAmpPipeline instead
 import { BranchStrategy } from "../git/branch-strategy.js";
@@ -30,7 +27,6 @@ import { errorToMessage } from "../lib/error-utils.js";
 import { classifyError, getRetryStrategy, TaskError } from "../lib/error-types.js";
 import { extractJson } from "../lib/json-extract.js";
 import { serializeGoalState } from "../lib/goal-utils.js";
-import { Tracer } from "../lib/tracer.js";
 
 const DEFAULT_QUALITY_THRESHOLD = 0.6;
 const DEFAULT_MAX_EVALUATION_CYCLES = 1000;
@@ -61,7 +57,6 @@ export class Executor {
   private progressHistory: number[] = [];
   private stopController: AbortController | null = null;
   private approvalGate: ApprovalGate | null = null;
-  private tracer: Tracer;
   private cachedCost: number | null = null;
   private maxConcurrency: number = 1;
   private config: {
@@ -84,9 +79,6 @@ export class Executor {
     this.store = store;
     this.ccClient = new CCClient((store.getConfig("claudePath") as string) || undefined);
     this.skillManager = new SkillManager(new SkillStore(), () => {});
-    this.tracer = new Tracer(notify, (spans) => {
-      this.store.syncTraces(this.runId, spans);
-    });
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
       maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,
@@ -274,50 +266,6 @@ export class Executor {
     this.cachedCost = null;
   }
 
-  private isResearchTask(task: TaskDefinition, run: ExecutionRun): boolean {
-    const researchKeywords = ["experiment", "benchmark", "hypothesis", "compare", "optimize", "ablation", "tune"];
-    const content = task.content.toLowerCase();
-    const goals = run.goals.join(" ").toLowerCase();
-    return researchKeywords.some(kw => content.includes(kw) || goals.includes(kw));
-  }
-
-  private async executeAsResearch(
-    task: TaskDefinition,
-    run: ExecutionRun,
-    workingDir: string,
-    abortSignal?: AbortSignal,
-  ): Promise<OmxAmpPipelineResult> {
-    const notifyFn = (method: string, params: unknown) => this.broadcast(method, params as Record<string, unknown>);
-    const runner = new OmxAmpExperimentRunner(this.ccClient, notifyFn);
-
-    const config: ExperimentConfig = {
-      hypothesis: task.content,
-      workingDir,
-      maxIterations: 5,
-      keepPolicy: "score_improvement",
-    };
-
-    this.log(run.id, "research", "info", `[research] Starting experiment: ${task.content.substring(0, 80)}`);
-
-    const result = await runner.run(config, abortSignal);
-
-    this.log(run.id, "research", "info",
-      `[research] Experiment completed: ${result.iterations} iterations, kept=${result.kept}, bestScore=${result.bestScore.toFixed(2)}, cost=$${result.totalCostUsd.toFixed(4)}`);
-
-    return {
-      finalOutput: result.kept
-        ? `Experiment succeeded after ${result.iterations} iterations (best score: ${result.bestScore.toFixed(2)})`
-        : `Experiment did not improve after ${result.iterations} iterations`,
-      sessionId: "",
-      totalCostUsd: result.totalCostUsd,
-      durationMs: result.totalDurationMs,
-      numTurns: result.iterations,
-      messages: [],
-      phases: [],
-      iterations: result.iterations,
-    };
-  }
-
   private async handleEmptyQueue(run: ExecutionRun): Promise<boolean> {
     this.evaluationCycles++;
     this.log(run.id, "engine", "info", `Queue empty — evaluating goals (cycle ${this.evaluationCycles}/${this.config.maxEvaluationCycles})`);
@@ -429,19 +377,6 @@ export class Executor {
     this.store.saveRun(run);
     this.store.saveReport(run.id, run.finalReport);
 
-    try {
-      const tasks = this.store.listTasks(run.id);
-      const commits = this.store.getCommits(run.id);
-      const lessons = this.store.getLessons(run.id);
-      const totalCost = this.recalculateCost(run.id);
-      const { generateReadme } = await import("../lib/readme-generator.js");
-      const readmeContent = generateReadme({ run, tasks, commits, lessons, report: run.finalReport, totalCost });
-      fs.writeFileSync(path.join(run.workingDir, "README.md"), readmeContent, "utf-8");
-      this.log(run.id, "engine", "info", "README.md generated in working directory");
-    } catch (readmeErr) {
-      console.warn("[executor] README generation failed:", errorToMessage(readmeErr));
-    }
-
     this.broadcast("run.status", { runId: run.id, status: "completed", report: run.finalReport });
   }
 
@@ -512,30 +447,13 @@ export class Executor {
 
       this.log(run.id, "pipeline", "info", `[OMX] Executing via OmxAmpPipeline: ${task.content.substring(0, 80)}...`);
 
-      this.tracer.startTrace();
-      const taskSpanId = this.tracer.startSpan("task.execute", undefined, { taskId: task.id, content: task.content.substring(0, 100) });
-
-      // ── Check if this task should use Autoresearch mode ──
-      const isResearchTask = this.isResearchTask(task, run);
-      let pipelineResult: OmxAmpPipelineResult;
-
-      if (isResearchTask) {
-        pipelineResult = await this.executeAsResearch(task, run, pipelineWorkingDir, abortController.signal);
-      } else {
-        // ── Standard OMX Pipeline execution ──
-        const pipeline = new OmxAmpPipeline(this.ccClient, this.broadcast.bind(this) as (method: string, params: unknown) => void, pipelineWorkingDir);
-        pipelineResult = await pipeline.run(task, context, abortController.signal);
-      }
+      // ── Standard OMX Pipeline execution ──
+      const pipeline = new OmxAmpPipeline(this.ccClient, this.broadcast.bind(this) as (method: string, params: unknown) => void, pipelineWorkingDir);
+      const pipelineResult = await pipeline.run(task, context, abortController.signal);
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
       run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
       this.cachedCost = null;
-
-      this.tracer.endSpan(taskSpanId, "ok", { costUsd: pipelineResult.totalCostUsd, durationMs: pipelineResult.durationMs });
-      const traceSpans = this.tracer.endTrace();
-      if (traceSpans.length > 0) {
-        this.store.appendTrace(run.id, traceSpans);
-      }
 
       this.store.updateTask(run.id, task.id, {
         status: "scoring",
@@ -657,12 +575,6 @@ export class Executor {
       }
     } catch (err) {
       const taskErr = classifyError(err);
-      try {
-        const traceSpans = this.tracer.endTrace();
-        if (traceSpans.length > 0) {
-          this.store.appendTrace(run.id, traceSpans);
-        }
-      } catch (traceErr) { console.warn("[executor] trace cleanup failed:", traceErr instanceof Error ? traceErr.message : traceErr); }
 
       const detectedErrors = this.store.getDetectedErrors(run.id, task.id);
       if (detectedErrors.filter((e) => e.severity === "critical").length >= 3 && taskErr.retryable) {

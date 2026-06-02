@@ -176,17 +176,6 @@ export class WsServer {
       return;
     }
 
-    // Metrics snapshot
-    if (url === "/api/metrics" && method === "GET") {
-      this.setCorsHeaders(req, res);
-      import("./lib/metrics.js").then(({ metrics }) => {
-        this.sendJson(res, 200, metrics.snapshot());
-      }).catch((err) => {
-        this.sendJson(res, 500, { error: err instanceof Error ? err.message : "Failed to load metrics" });
-      });
-      return;
-    }
-
     // CORS preflight
     if (method === "OPTIONS") {
       this.setCorsHeaders(req, res);

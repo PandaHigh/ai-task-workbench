@@ -1,7 +1,6 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, subscriptionStore, queueManager, skillManager, mcpManager, pluginRegistry } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager, pluginRegistry } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
-import { connectRemoteWS, disconnectRemoteWS } from "./remote/remote-proxy.js";
 import { log } from "./lib/logger.js";
 import { resolvePlaywrightCli } from "./lib/playwright-mcp.js";
 import { platform } from "os";
@@ -27,11 +26,7 @@ async function main() {
     console.log("\nShutting down gracefully...");
 
     await killAllActiveProcesses();
-    await mcpManager.stopAll();
     store.flush();
-    for (const sub of subscriptionStore.list()) {
-      disconnectRemoteWS(sub.runId);
-    }
 
     let shutdownOk = true;
     try {
@@ -59,15 +54,6 @@ async function main() {
   }
 
   wsServer.start();
-
-  // Resume remote subscription WebSocket connections
-  for (const sub of subscriptionStore.list()) {
-    try {
-      connectRemoteWS(sub.runId, sub.remoteUrl, sub.remoteToken, notify);
-    } catch (err) {
-      console.warn(`[engine] Failed to resume remote WS for ${sub.runId}:`, err instanceof Error ? err.message : err);
-    }
-  }
 
   const recovery = recoverStaleRuns();
   if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
