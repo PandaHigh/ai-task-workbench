@@ -44,6 +44,7 @@ export interface TeamResult {
   totalDurationMs: number;
   completedTasks: number;
   failedTasks: number;
+  taskOutputs: Map<string, { success: boolean; output: string }>;
 }
 
 export class OmxAmpTeamOrchestrator {
@@ -178,6 +179,7 @@ export class OmxAmpTeamOrchestrator {
         totalDurationMs: Date.now() - startTime,
         completedTasks: tasks.filter((t) => this.state.results.get(t.id)?.success).length,
         failedTasks: tasks.filter((t) => !this.state.results.get(t.id)?.success).length,
+        taskOutputs: new Map(this.state.results),
       };
     } finally {
       await workerManager.terminate();

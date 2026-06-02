@@ -263,11 +263,14 @@ export class Executor {
       run.totalTasksCompleted += teamResult.completedTasks;
       this.store.saveRun(run);
 
-      // Merge successful task branches back
+      // Score, commit, and record lessons for each completed team task
+      const gitManager = new GitManager({ workingDir: run.workingDir });
+      await gitManager.ensureInit();
+
+      // First, merge all successful branches
       if (useFeatureBranch) {
         for (const task of readyTasks) {
           if (!task.branchName || !task.worktreePath) continue;
-          // Only merge tasks that completed successfully
           const storedTask = this.store.getTask(run.id, task.id);
           if (storedTask?.status === "completed") {
             try {
@@ -281,7 +284,54 @@ export class Executor {
               this.log(run.id, "engine", "warn", `Failed to merge branch ${task.branchName}: ${e instanceof Error ? e.message : String(e)}`);
             }
           }
-          // Cleanup worktree regardless of success/failure
+        }
+      }
+
+      // Then score, commit, and record for each task (sequentially)
+      for (const task of readyTasks) {
+        const storedTask = this.store.getTask(run.id, task.id);
+        if (!storedTask) continue;
+
+        this.log(run.id, "engine", "info", `Task ${task.id.substring(0, 6)} → ${storedTask.status}`);
+
+        if (storedTask.status === "completed") {
+          // Lightweight scoring: trust worker result, no extra CC call
+          const teamData = teamResult.taskOutputs?.get(task.id);
+          const score: ScoreDetails = {
+            overall: 0.85, goalAlignment: 0.85, correctness: 0.85, completeness: 0.85, quality: 0.85,
+            passed: true,
+            reasoning: teamData?.output
+              ? `Team worker completed: ${teamData.output.substring(0, 100)}`
+              : "Team worker completed successfully",
+          };
+
+          this.store.appendScore(run.id, task.id, score);
+          this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score });
+          this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
+
+          // Git commit
+          try {
+            const commitHash = await gitManager.autoCommit(task.id, task.content);
+            this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
+            this.store.appendCommit(run.id, {
+              taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
+              isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
+            });
+            this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
+          } catch (e) {
+            this.log(run.id, "git", "warn", `Commit failed: ${e instanceof Error ? e.message : String(e)}`, task.id);
+          }
+        } else {
+          // Failed task — record lesson
+          this.store.appendLesson(run.id, {
+            runId: run.id, taskId: task.id, category: "failure",
+            lesson: `Team task "${task.content.substring(0, 50)}" failed.`,
+            score: 0, createdAt: Date.now(),
+          });
+        }
+
+        // Cleanup worktree regardless of success/failure
+        if (task.branchName && task.worktreePath) {
           try {
             await BranchStrategy.cleanupBranch(run.workingDir, task.branchName, task.worktreePath);
           } catch (e) {
@@ -377,6 +427,18 @@ export class Executor {
     }
 
     if (evaluation.isComplete) {
+      // Check if user added new pending tasks before finalizing
+      const pendingTasks = this.store.listTasks(run.id).filter(t => t.status === "pending");
+      if (pendingTasks.length > 0) {
+        this.log(run.id, "engine", "info", `Goals complete but ${pendingTasks.length} pending task(s) remain — continuing`);
+        for (const t of pendingTasks) {
+          if (!this.queueManager.list(run.id).some(q => q.id === t.id)) {
+            this.queueManager.restore(run.id, t);
+          }
+        }
+        this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
+        return true;
+      }
       this.log(run.id, "engine", "info", `Goals complete! Progress: ${(evaluation.overallProgress * 100).toFixed(0)}%`);
       await this.finalize(run);
       return false;
@@ -913,6 +975,34 @@ Respond ONLY with valid JSON:
           source: (entry.source as string) ?? "engine",
           message: (entry.message as string) ?? "",
           taskId: (entry.taskId as string) ?? "",
+          runId,
+        });
+      } else if (method === "task.status") {
+        const p = params as { taskId?: string; status?: string };
+        if (p.taskId && p.status) {
+          const updates: Partial<TaskDefinition> = { status: p.status as TaskStatus };
+          if (["completed", "failed", "cancelled"].includes(p.status)) {
+            updates.completedAt = Date.now();
+          }
+          this.store.updateTask(runId, p.taskId, updates);
+          this.store.appendLog(runId, {
+            timestamp: Date.now(),
+            level: p.status === "failed" ? "error" : p.status === "reverted" ? "warn" : "info",
+            source: "engine",
+            message: `Task ${p.taskId.substring(0, 6)} → ${p.status}`,
+            taskId: p.taskId,
+            runId,
+          });
+        }
+      } else if (method === "task.progress") {
+        const p = params as { taskId?: string; phase?: string; message?: string; content?: string };
+        const msg = p.message || p.content || (p.taskId ? `Task ${p.taskId.substring(0, 6)} progress` : "progress");
+        this.store.appendLog(runId, {
+          timestamp: Date.now(),
+          level: "info",
+          source: "cc",
+          message: `[${p.phase || "exec"}] ${msg}`,
+          taskId: p.taskId || "",
           runId,
         });
       }

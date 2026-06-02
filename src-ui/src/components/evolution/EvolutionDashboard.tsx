@@ -91,7 +91,6 @@ export function EvolutionDashboard() {
           const found = allRuns.find((r) => r.id === runId);
           if (found) {
             setFetchedRun(found);
-            setRunning(found.status === "running");
           }
           else { if (!cancelled) navigate("/"); return; }
         } catch (err) {
@@ -99,6 +98,12 @@ export function EvolutionDashboard() {
           if (!cancelled) navigate("/");
           return;
         }
+      }
+
+      // Always sync isRunning from run status after load
+      const currentRun = storeRun || useTaskStore.getState().tasks.find((t) => t.id === runId);
+      if (currentRun) {
+        setRunning(currentRun.status === "running");
       }
 
       try {

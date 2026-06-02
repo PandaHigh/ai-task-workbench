@@ -62,17 +62,23 @@ export function TaskQueue({
         <h3 className="text-sm font-bold" style={{ color: "var(--text-secondary)" }}>
           待办 ({queue.length})
         </h3>
-        {queue.length > 0 && (
-          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}></span>
-        )}
-        <button
-          onClick={onCloseQueue}
-          className="md:hidden text-xs ml-2"
-          style={{ color: "var(--text-secondary)" }}
-          aria-label="关闭队列"
-        >
-          &#10005;
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onShowAddModal}
+            className="text-xs px-2 py-1 rounded font-semibold"
+            style={{ background: "var(--green)", color: "#fff" }}
+          >
+            + 添加
+          </button>
+          <button
+            onClick={onCloseQueue}
+            className="md:hidden text-xs ml-1"
+            style={{ color: "var(--text-secondary)" }}
+            aria-label="关闭队列"
+          >
+            &#10005;
+          </button>
+        </div>
       </div>
 
       <div
@@ -273,22 +279,6 @@ export function TaskQueue({
         )}
       </div>
 
-      {/* Add task button -- always pinned at bottom */}
-      <div className="shrink-0 px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
-        <button
-          onClick={onShowAddModal}
-          className="w-full px-4 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-          style={{
-            background: "var(--green)",
-            color: "#fff",
-            height: "29px",
-            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-            transition: "transform 0.15s, box-shadow 0.15s",
-          }}
-        >
-          + 添加任务
-        </button>
-      </div>
     </div>
   );
 }

@@ -71,7 +71,20 @@ async function executeTask(assignment) {
     });
     let stdout = "";
     let stderr = "";
-    proc.stdout.on("data", (d) => { stdout += d.toString(); });
+    let lineBuffer = "";
+    proc.stdout.on("data", (d) => {
+      const text = d.toString();
+      stdout += text;
+      // Forward output lines as progress messages
+      lineBuffer += text;
+      const lines = lineBuffer.split("\\n");
+      lineBuffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.trim()) {
+          send({ type: "progress", workerId: process.env.WORKER_ID, taskId: assignment.taskId, payload: { line }, timestamp: Date.now() });
+        }
+      }
+    });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
 
     const timeoutMs = (assignment.timeoutMinutes || 10) * 60 * 1000;
@@ -84,6 +97,10 @@ async function executeTask(assignment) {
 
     proc.on("close", (code) => {
       clearTimeout(timer);
+      // Flush remaining buffer
+      if (lineBuffer.trim()) {
+        send({ type: "progress", workerId: process.env.WORKER_ID, taskId: assignment.taskId, payload: { line: lineBuffer }, timestamp: Date.now() });
+      }
       if (timedOut) {
         reject(new Error("Task timed out after " + (timeoutMs / 1000) + "s"));
       } else if (code === 0) {
@@ -181,6 +198,16 @@ export class OmxAmpWorkerManager {
       if (pending) {
         this.pending.delete(msg.taskId);
         pending.reject(new Error((msg.payload as { message: string })?.message ?? "Worker error"));
+      }
+    } else if (msg.type === "progress" && msg.taskId) {
+      const payload = msg.payload as { line?: string };
+      if (payload?.line) {
+        this.notify("log.entry", {
+          level: "info",
+          source: "cc",
+          message: `[worker-${msg.workerId}] ${payload.line}`,
+          taskId: msg.taskId,
+        });
       }
     }
   }

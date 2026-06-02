@@ -364,9 +364,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
       currentRun.completedAt = undefined;
       currentRun.finalReport = undefined;
       store.saveRun(currentRun);
+      notify("run.status", { runId, status: "running" });
       const executor = new Executor(queueManager, notify, runId);
       activeExecutors.set(runId, executor);
-      if (activeExecutors.has(runId)) return task;
       setImmediate(() => executor.start(currentRun).finally(() => { activeExecutors.delete(runId); }));
     }
 

@@ -2,7 +2,7 @@
  * Worker IPC protocol definitions for Team multi-agent parallel execution.
  */
 
-export type WorkerMessageType = "claim" | "dispatch" | "result" | "mbox" | "error" | "heartbeat" | "ready";
+export type WorkerMessageType = "claim" | "dispatch" | "result" | "mbox" | "error" | "heartbeat" | "ready" | "progress";
 
 export interface WorkerMessage {
   type: WorkerMessageType;
