@@ -127,10 +127,6 @@ export class Executor {
     }
 
     try {
-      if (!run.featuresGeneratedAt && run.goals.length > 0) {
-        await this.generateFeatures(run);
-      }
-
       if (this.queueManager.list(run.id).length === 0 && run.goals.length > 0) {
         await this.generateInitialTasks(run);
       }
@@ -603,10 +599,6 @@ export class Executor {
         this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
         this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
-
-        if (run.features && run.features.length > 0) {
-          await this.verifyFeatures(run);
-        }
       } else {
         let revertSucceeded = true;
         try {
@@ -629,14 +621,6 @@ export class Executor {
       }
     } catch (err) {
       const taskErr = classifyError(err);
-
-      const detectedErrors = this.store.getDetectedErrors(run.id, task.id);
-      if (detectedErrors.filter((e) => e.severity === "critical").length >= 3 && taskErr.retryable) {
-        this.log(run.id, "engine", "warn", `3+ critical errors detected — degrading to permanent`, task.id);
-        const degraded = new TaskError(`Too many critical errors: ${taskErr.message}`, "permanent", { cause: taskErr });
-        this.handleFailedTask(run, task, degraded, gitManager);
-        return;
-      }
 
       const strategy = getRetryStrategy(taskErr.category);
       const currentTask = this.store.getTask(run.id, task.id);
@@ -1007,138 +991,4 @@ Respond ONLY with valid JSON:
     return gitManager.getDiffStats();
   }
 
-  private async generateFeatures(run: ExecutionRun): Promise<void> {
-    this.log(run.id, "engine", "info", "Generating feature list for goal tracking...");
-    try {
-      const schema: Record<string, unknown> = {
-        type: "object",
-        properties: {
-          features: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                category: { type: "string", enum: ["functional", "non_functional", "edge_case"] },
-                description: { type: "string" },
-                steps: { type: "array", items: { type: "string" } },
-                priority: { type: "number" },
-              },
-              required: ["id", "category", "description", "steps", "priority"],
-            },
-          },
-        },
-        required: ["features"],
-      };
-
-      const prompt = `Based on these goals and the project at ${run.workingDir}, generate a comprehensive feature checklist.
-Goals: ${run.goals.map(g => sanitizePromptInput(g)).join("; ")}
-Termination conditions: ${run.terminationConditions.map(c => sanitizePromptInput(c)).join("; ")}
-
-Generate 30-100 verifiable features covering:
-1. Functional requirements (core features, API endpoints, data flows)
-2. Non-functional requirements (performance, security, error handling)
-3. Edge cases (error states, boundary conditions, concurrent access)
-
-Each feature should have:
-- A unique id (e.g., "feat-001")
-- category: functional / non_functional / edge_case
-- description: what should work
-- steps: verification steps (array of strings)
-- priority: 1-5 (1=critical, 5=nice-to-have)
-
-Return ONLY the JSON object.`;
-
-      const result = await this.ccClient.executeTask(prompt, {
-        workingDir: run.workingDir,
-        timeoutMinutes: 5,
-        maxTurns: 3,
-        jsonSchema: schema,
-        abortSignal: this.stopController?.signal,
-      });
-
-      const parsed = JSON.parse(extractJson(result.result)) as { features: Array<{
-        id: string; category: "functional" | "non_functional" | "edge_case";
-        description: string; steps: string[]; priority: number;
-      }> };
-
-      const features: import("@ai-workbench/shared").FeatureItem[] = parsed.features.map((f) => ({
-        ...f,
-        passes: false,
-      }));
-
-      run.features = features;
-      run.featuresGeneratedAt = Date.now();
-      this.store.saveRun(run);
-      this.broadcast("features.generated", { runId: run.id, total: features.length });
-      this.log(run.id, "engine", "info", `Generated ${features.length} features for tracking`);
-    } catch (err) {
-      this.log(run.id, "engine", "warn", `Feature generation failed (non-fatal): ${errorToMessage(err)}`);
-    }
-  }
-
-  private async verifyFeatures(run: ExecutionRun): Promise<void> {
-    if (!run.features || run.features.length === 0) return;
-
-    const unverified = run.features.filter((f) => !f.passes);
-    if (unverified.length === 0) return;
-
-    const sample = unverified.slice(0, 10);
-
-    try {
-      const featureList = sample.map((f) =>
-        `[${f.id}] (${f.category}, P${f.priority}) ${f.description}\n  Verify: ${f.steps.join("; ")}`
-      ).join("\n");
-
-      const schema: Record<string, unknown> = {
-        type: "object",
-        properties: {
-          results: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                passes: { type: "boolean" },
-              },
-              required: ["id", "passes"],
-            },
-          },
-        },
-        required: ["results"],
-      };
-
-      const prompt = `Verify these features in the project at ${run.workingDir}:\n\n${featureList}\n\nFor each feature, check if it currently passes by reading the relevant source files and tests.\nReturn a JSON object with "results" array containing { id, passes } for each feature.`;
-
-      const result = await this.ccClient.executeTask(prompt, {
-        workingDir: run.workingDir,
-        timeoutMinutes: 5,
-        maxTurns: 5,
-        jsonSchema: schema,
-        abortSignal: this.stopController?.signal,
-      });
-
-      const parsed = JSON.parse(extractJson(result.result)) as { results: Array<{ id: string; passes: boolean }> };
-
-      let passed = 0;
-      for (const r of parsed.results) {
-        const feature = run.features.find((f) => f.id === r.id);
-        if (feature && r.passes && !feature.passes) {
-          feature.passes = true;
-          feature.verifiedAt = Date.now();
-          feature.verifiedBy = "auto";
-          passed++;
-        }
-      }
-
-      if (passed > 0) {
-        this.store.saveRun(run);
-        const totalPassed = run.features.filter((f) => f.passes).length;
-        this.broadcast("features.updated", { runId: run.id, passed: totalPassed, total: run.features.length });
-        this.log(run.id, "engine", "info", `Features verified: +${passed} passed (${totalPassed}/${run.features.length} total)`);
-      }
-    } catch (err) {
-      this.log(run.id, "engine", "warn", `Feature verification failed (non-fatal): ${errorToMessage(err)}`);
-    }
-  }
 }

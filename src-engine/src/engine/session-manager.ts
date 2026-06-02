@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { ClientSession, ActivityEvent, RunPermission, UserRole } from "@ai-workbench/shared";
+import type { ClientSession, RunPermission, UserRole } from "@ai-workbench/shared";
 import { roleToPermissions } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { errorToMessage } from "../lib/error-utils.js";
@@ -74,8 +74,8 @@ export class SessionManager {
     action: string;
     runId: string;
     details?: Record<string, unknown>;
-  }): ActivityEvent {
-    const event: ActivityEvent = {
+  }): { id: string; timestamp: number; userId: string; action: string; details: Record<string, unknown>; runId: string } {
+    const event = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
       userId: params.userId,
@@ -84,21 +84,13 @@ export class SessionManager {
       runId: params.runId,
     };
 
-    try {
-      this.store.appendActivity(params.runId, event);
-    } catch (err) {
-      console.warn("[session-manager] Failed to persist activity:", err instanceof Error ? err.message : err);
-    }
+    console.log("[session-manager] Activity recorded:", event.action, "by", event.userId, "on run", event.runId);
 
     return event;
   }
 
-  getActivities(runId: string, limit?: number): ActivityEvent[] {
-    try {
-      return this.store.getActivities(runId, limit);
-    } catch (err) { console.warn("[session] Failed to get activities:", errorToMessage(err));
-      return [];
-    }
+  getActivities(_runId: string, _limit?: number): { id: string; timestamp: number; userId: string; action: string; details: Record<string, unknown>; runId: string }[] {
+    return [];
   }
 
   addComment(params: {

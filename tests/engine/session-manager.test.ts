@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const mockStoreInstance = {
-  appendActivity: vi.fn(),
-  getActivities: vi.fn().mockReturnValue([]),
   appendComment: vi.fn(),
   getComments: vi.fn().mockReturnValue([]),
 };
@@ -37,8 +35,6 @@ describe("SessionManager", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStoreInstance.appendActivity.mockReset();
-    mockStoreInstance.getActivities.mockReset().mockReturnValue([]);
     mockStoreInstance.appendComment.mockReset();
     mockStoreInstance.getComments.mockReset().mockReturnValue([]);
     manager = new SessionManager(mockStoreInstance as any);
@@ -152,7 +148,7 @@ describe("SessionManager", () => {
   });
 
   describe("recordActivity", () => {
-    it("persists activity to store", () => {
+    it("returns activity event with correct fields", () => {
       const event = manager.recordActivity({
         userId: "user-1",
         action: "task.created",
@@ -166,15 +162,9 @@ describe("SessionManager", () => {
       expect(event.runId).toBe("run-1");
       expect(event.details).toEqual({ taskId: "t-1" });
       expect(event.timestamp).toBeTypeOf("number");
-
-      expect(mockStoreInstance.appendActivity).toHaveBeenCalledWith("run-1", event);
     });
 
-    it("handles store errors gracefully", () => {
-      mockStoreInstance.appendActivity.mockImplementation(() => {
-        throw new Error("disk full");
-      });
-
+    it("returns event even when no store persistence is available", () => {
       // Should not throw
       const event = manager.recordActivity({
         userId: "user-1",
@@ -189,27 +179,13 @@ describe("SessionManager", () => {
   });
 
   describe("getActivities", () => {
-    it("returns activities from store", () => {
-      const activities = [{ id: "1", action: "test" }];
-      mockStoreInstance.getActivities.mockReturnValue(activities);
-
+    it("returns empty array (activity persistence removed)", () => {
       const result = manager.getActivities("run-1");
-      expect(result).toEqual(activities);
-      expect(mockStoreInstance.getActivities).toHaveBeenCalledWith("run-1", undefined);
+      expect(result).toEqual([]);
     });
 
-    it("passes limit to store", () => {
-      mockStoreInstance.getActivities.mockReturnValue([]);
-      manager.getActivities("run-1", 10);
-      expect(mockStoreInstance.getActivities).toHaveBeenCalledWith("run-1", 10);
-    });
-
-    it("returns [] on error", () => {
-      mockStoreInstance.getActivities.mockImplementation(() => {
-        throw new Error("read error");
-      });
-
-      const result = manager.getActivities("run-1");
+    it("returns empty array even with limit", () => {
+      const result = manager.getActivities("run-1", 10);
       expect(result).toEqual([]);
     });
   });

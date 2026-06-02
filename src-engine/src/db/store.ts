@@ -8,18 +8,12 @@ import type {
   LessonLearned,
   ScoreDetails,
   ApprovalRequest,
-  TraceSpan,
   OrchestratorProfile,
-  ReviewSuggestion,
-  DetectedError,
 } from "@ai-workbench/shared";
 import { getDataDir, ensureDir, readJsonFile, writeJsonFile, cleanupTmpFiles } from "./store-utils.js";
 
 const MAX_LOG_ENTRIES = 1000;
 const MAX_HISTORY_ENTRIES = 500;
-const MAX_TRACE_ENTRIES = 500;
-const MAX_SUGGESTION_ENTRIES = 200;
-const MAX_ERROR_ENTRIES = 500;
 
 export class Store {
   private dataDir: string;
@@ -285,22 +279,6 @@ export class Store {
     writeJsonFile(file, config);
   }
 
-  // ---- Activities ----
-
-  appendActivity(runId: string, event: import("@ai-workbench/shared").ActivityEvent): void {
-    const file = path.join(this.runDir(runId), "activities.json");
-    const activities = readJsonFile<import("@ai-workbench/shared").ActivityEvent[]>(file, []);
-    activities.push(event);
-    const trimmed = activities.length > MAX_HISTORY_ENTRIES ? activities.slice(-MAX_HISTORY_ENTRIES) : activities;
-    this.debouncedWrite(file, trimmed);
-  }
-
-  getActivities(runId: string, limit?: number): import("@ai-workbench/shared").ActivityEvent[] {
-    const file = path.join(this.runDir(runId), "activities.json");
-    const activities = readJsonFile<import("@ai-workbench/shared").ActivityEvent[]>(file, []);
-    return limit ? activities.slice(-limit) : activities;
-  }
-
   // ---- Comments ----
 
   appendComment(runId: string, comment: import("@ai-workbench/shared").TaskComment): void {
@@ -314,35 +292,6 @@ export class Store {
   getComments(runId: string): import("@ai-workbench/shared").TaskComment[] {
     const file = path.join(this.runDir(runId), "comments.json");
     return readJsonFile(file, []);
-  }
-
-  // ---- Traces ----
-
-  appendTrace(runId: string, spans: TraceSpan[]): void {
-    const file = path.join(this.runDir(runId), "traces.json");
-    const existing = readJsonFile<TraceSpan[]>(file, []);
-    existing.push(...spans);
-    const trimmed = existing.length > MAX_TRACE_ENTRIES ? existing.slice(-MAX_TRACE_ENTRIES) : existing;
-    this.debouncedWrite(file, trimmed);
-  }
-
-  /** Upsert spans by spanId — used for real-time trace persistence */
-  syncTraces(runId: string, spans: TraceSpan[]): void {
-    const file = path.join(this.runDir(runId), "traces.json");
-    const existing = readJsonFile<TraceSpan[]>(file, []);
-    const index = new Map(existing.map((s) => [s.spanId, s]));
-    for (const span of spans) {
-      index.set(span.spanId, span);
-    }
-    const merged = [...index.values()];
-    const trimmed = merged.length > MAX_TRACE_ENTRIES ? merged.slice(-MAX_TRACE_ENTRIES) : merged;
-    writeJsonFile(file, trimmed);
-  }
-
-  getTraces(runId: string, limit?: number): TraceSpan[] {
-    const file = path.join(this.runDir(runId), "traces.json");
-    const traces = readJsonFile<TraceSpan[]>(file, []);
-    return limit ? traces.slice(-limit) : traces;
   }
 
   // ---- Final Report ----
@@ -431,38 +380,6 @@ export class Store {
     if (filtered.length === profiles.length) return false;
     writeJsonFile(file, filtered);
     return true;
-  }
-
-  // ---- Review Suggestions ----
-
-  appendSuggestion(runId: string, suggestion: ReviewSuggestion): void {
-    const file = path.join(this.runDir(runId), "suggestions.json");
-    const suggestions = readJsonFile<ReviewSuggestion[]>(file, []);
-    suggestions.push(suggestion);
-    const trimmed = suggestions.length > MAX_SUGGESTION_ENTRIES ? suggestions.slice(-MAX_SUGGESTION_ENTRIES) : suggestions;
-    this.debouncedWrite(file, trimmed);
-  }
-
-  getSuggestions(runId: string, taskId?: string): ReviewSuggestion[] {
-    const file = path.join(this.runDir(runId), "suggestions.json");
-    const suggestions = readJsonFile<ReviewSuggestion[]>(file, []);
-    return taskId ? suggestions.filter((s) => s.taskId === taskId) : suggestions;
-  }
-
-  // ---- Detected Errors ----
-
-  appendDetectedError(runId: string, error: DetectedError): void {
-    const file = path.join(this.runDir(runId), "errors.json");
-    const errors = readJsonFile<DetectedError[]>(file, []);
-    errors.push(error);
-    const trimmed = errors.length > MAX_ERROR_ENTRIES ? errors.slice(-MAX_ERROR_ENTRIES) : errors;
-    this.debouncedWrite(file, trimmed);
-  }
-
-  getDetectedErrors(runId: string, taskId?: string): DetectedError[] {
-    const file = path.join(this.runDir(runId), "errors.json");
-    const errors = readJsonFile<DetectedError[]>(file, []);
-    return taskId ? errors.filter((e) => e.taskId === taskId) : errors;
   }
 
 }
