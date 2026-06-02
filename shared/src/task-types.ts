@@ -304,8 +304,6 @@ export interface OrchestratorProfile {
     maxFixIterations: number;
     qualityThreshold: number;
     timeoutMinutes: number;
-    backgroundReview: boolean;
-    errorWatchEnabled: boolean;
     agents: {
       planner:   { maxTurns: number; enabled: boolean };
       developer: { maxTurns: number; enabled: boolean };

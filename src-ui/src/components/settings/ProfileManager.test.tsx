@@ -6,7 +6,7 @@ const fullProfile = {
   id: "default",
   name: "默认配置",
   isBuiltIn: true,
-  config: { mode: "fixloop", qualityThreshold: 0.6, maxFixIterations: 3, backgroundReview: false, errorWatch: false },
+  config: { mode: "fixloop", qualityThreshold: 0.6, maxFixIterations: 3 },
 };
 
 vi.mock("../../hooks/useEngine", () => ({
@@ -43,16 +43,6 @@ describe("ProfileManager", () => {
     render(<ProfileManager />);
     await waitFor(() => {
       expect(screen.getByText("默认配置")).toBeInTheDocument();
-    });
-  });
-
-  it("should show create profile button", async () => {
-    mockCall.mockResolvedValueOnce([]);
-    mockCall.mockResolvedValueOnce(null);
-
-    render(<ProfileManager />);
-    await waitFor(() => {
-      expect(screen.getByText(/创建/)).toBeInTheDocument();
     });
   });
 

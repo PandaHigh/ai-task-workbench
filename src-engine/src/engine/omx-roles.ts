@@ -1,5 +1,5 @@
 /**
- * OMX-style 28-role agent system adapted for Claude CLI.
+ * OMX-style agent role system adapted for Claude CLI.
  *
  * Each role is described by 5 dimensions:
  * - posture: behavioral orientation
@@ -46,34 +46,23 @@ const ROLES: OmxAmpRole[] = [
   { id: "architect", name: "Architect", description: "Reviews technical designs, validates architecture decisions.", posture: "analytical", modelClass: "frontier", routingRole: "reviewer", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "planning" },
   { id: "debugger", name: "Debugger", description: "Diagnoses and fixes bugs through systematic investigation.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "execution" },
   { id: "executor", name: "Executor", description: "Implements code changes following execution plans.", posture: "constructive", modelClass: "standard", routingRole: "worker", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 40, category: "execution" },
-  { id: "team-executor", name: "Team Executor", description: "Executes tasks in a team context with coordination awareness.", posture: "constructive", modelClass: "standard", routingRole: "worker", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 40, category: "execution" },
   { id: "verifier", name: "Verifier", description: "Verifies implementation correctness against specifications.", posture: "analytical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 20, category: "review" },
 
   // ── Review lane ──
-  { id: "style-reviewer", name: "Style Reviewer", description: "Reviews code style and formatting consistency.", posture: "critical", modelClass: "fast", routingRole: "reviewer", tools: ["Read", "Glob", "Grep"], maxTurns: 10, category: "review" },
   { id: "quality-reviewer", name: "Quality Reviewer", description: "Reviews code quality, patterns, and maintainability.", posture: "critical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 15, category: "review" },
-  { id: "api-reviewer", name: "API Reviewer", description: "Reviews API design, contracts, and backward compatibility.", posture: "analytical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Glob", "Grep"], maxTurns: 15, category: "review" },
   { id: "security-reviewer", name: "Security Reviewer", description: "Reviews for security vulnerabilities and compliance.", posture: "adversarial", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 15, category: "review" },
-  { id: "performance-reviewer", name: "Performance Reviewer", description: "Reviews for performance issues and optimization opportunities.", posture: "analytical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 15, category: "review" },
   { id: "code-reviewer", name: "Code Reviewer", description: "General code review for correctness and completeness.", posture: "critical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 20, category: "review" },
 
   // ── Domain lane ──
-  { id: "dependency-expert", name: "Dependency Expert", description: "Manages package dependencies and version compatibility.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 15, category: "execution" },
   { id: "test-engineer", name: "Test Engineer", description: "Designs and implements test strategies and test suites.", posture: "constructive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "execution" },
-  { id: "quality-strategist", name: "Quality Strategist", description: "Defines quality metrics and gates for the project.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep"], maxTurns: 15, category: "planning" },
-  { id: "build-fixer", name: "Build Fixer", description: "Fixes build errors, CI failures, and toolchain issues.", posture: "constructive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 20, category: "execution" },
   { id: "designer", name: "Designer", description: "Implements UI/UX changes following design specifications.", posture: "creative", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 30, category: "execution" },
-  { id: "writer", name: "Writer", description: "Creates and updates documentation and inline comments.", posture: "constructive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Glob", "Grep"], maxTurns: 20, category: "execution" },
   { id: "qa-tester", name: "QA Tester", description: "End-to-end testing and user-facing quality assurance.", posture: "adversarial", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "review" },
   { id: "git-master", name: "Git Master", description: "Manages git operations, branches, merges, and conflict resolution.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 15, category: "execution" },
   { id: "code-simplifier", name: "Code Simplifier", description: "Simplifies and refactors code for clarity and maintainability.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 20, category: "execution" },
   { id: "researcher", name: "Researcher", description: "Investigates technologies, libraries, and best practices.", posture: "inquisitive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "research" },
 
-  // ── Product lane ──
+  // ── Product lane (used by team orchestrator) ──
   { id: "product-manager", name: "Product Manager", description: "Translates user needs into actionable requirements and priorities.", posture: "inquisitive", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep"], maxTurns: 15, category: "planning" },
-  { id: "ux-researcher", name: "UX Researcher", description: "Analyzes user flows and identifies UX improvement opportunities.", posture: "inquisitive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "research" },
-  { id: "information-architect", name: "Information Architect", description: "Organizes information structure and navigation patterns.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep"], maxTurns: 15, category: "planning" },
-  { id: "product-analyst", name: "Product Analyst", description: "Measures feature impact and tracks quality metrics.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "research" },
 
   // ── Coordination lane (Prometheus) ──
   { id: "metis", name: "Prometheus Metis", description: "Interview agent — clarifies requirements through deep questioning.", posture: "inquisitive", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 20, category: "meta" },
@@ -110,26 +99,18 @@ const ROLE_KEYWORDS: Array<{
 }> = [
   // ── High-specificity specialists (weight 3) ──
   { id: "security-reviewer", keywords: ["security", "vulnerability", "xss", "csrf", "injection", "安全", "漏洞"], patterns: [/\b(auth|jwt|token|encrypt|ssl|tls|oauth)\b/i], weight: 3 },
-  { id: "performance-reviewer", keywords: ["performance", "optimize", "latency", "speed", "性能", "优化"], patterns: [/\b(n\+1|slow|query.*plan|cache|bottleneck)\b/i], weight: 3 },
-  { id: "api-reviewer", keywords: ["api", "endpoint", "rest", "graphql", "contract", "接口"], patterns: [/\b(route|swagger|openapi)\b/i], weight: 3 },
-  { id: "build-fixer", keywords: ["build", "ci", "compile", "webpack", "vite", "tsconfig", "构建", "编译"], patterns: [/\b(eslint|prettier|rollup|tsc|jest\.config)\b/i], weight: 3 },
-  { id: "dependency-expert", keywords: ["dependency", "package", "upgrade", "version", "npm", "依赖", "升级"], patterns: [/\b(pnpm|yarn|semver|lock\s*file|package\.json)\b/i], weight: 3 },
-  { id: "ux-researcher", keywords: ["user flow", "usability", "accessibility", "a11y", "用户体验", "可用性"], patterns: [/\b(wcag|aria|screen\s*reader)\b/i], weight: 3 },
   { id: "qa-tester", keywords: ["e2e", "integration test", "acceptance", "smoke", "回归"], patterns: [/\b(playwright|cypress|selenium|puppeteer)\b/i], weight: 3 },
   { id: "researcher", keywords: ["research", "investigate", "compare", "evaluate", "调研", "分析"], patterns: [/\b(benchmark|hypothesis|ablation|study)\b/i], weight: 3 },
 
   // ── Medium-specificity (weight 2) ──
   { id: "designer", keywords: ["ui", "ux", "css", "style", "layout", "component", "frontend", "界面", "样式", "组件", "页面"], patterns: [/\b(design|figma|tailwind|styled|animation)\b/i], weight: 2 },
   { id: "debugger", keywords: ["bug", "fix", "error", "crash", "debug", "broken", "fail", "异常", "修复", "崩溃"], patterns: [/\b(stack\s*trace|segfault|assertion|panic)\b/i], weight: 2 },
-  { id: "writer", keywords: ["doc", "readme", "comment", "documentation", "guide", "文档", "注释", "说明"], patterns: [/\b(changelog|mdx|storybook|api\s*doc)\b/i], weight: 2 },
   { id: "code-simplifier", keywords: ["refactor", "simplify", "clean", "restructure", "重构", "简化"], patterns: [/\b(dedup|extract|rename|move|dead\s*code)\b/i], weight: 2 },
   { id: "test-engineer", keywords: ["test", "spec", "jest", "vitest", "单元测试"], patterns: [/\b(unit\s*test|coverage|mock|stub|snapshot)\b/i], weight: 2 },
   { id: "git-master", keywords: ["git", "merge", "branch", "conflict", "rebase", "版本", "分支"], patterns: [/\b(cherry.pick|bisect|stash|blame)\b/i], weight: 2 },
 
   // ── Broad catch-alls (weight 1) ──
   { id: "product-manager", keywords: ["requirement", "feature", "user story", "需求", "功能"], patterns: [/\b(backlog|sprint|epic|acceptance)\b/i], weight: 1 },
-  { id: "information-architect", keywords: ["structure", "navigation", "taxonomy", "分类", "导航"], patterns: [/\b(sitemap|menu|breadcrumb)\b/i], weight: 1 },
-  { id: "product-analyst", keywords: ["metric", "analytics", "dashboard", "指标", "分析"], patterns: [/\b(kpi|telemetry|funnel|conversion)\b/i], weight: 1 },
 ];
 
 /**
