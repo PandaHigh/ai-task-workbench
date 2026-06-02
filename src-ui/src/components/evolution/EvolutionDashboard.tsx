@@ -129,7 +129,7 @@ export function EvolutionDashboard() {
       }
 
       try {
-        const historyLogs = (await call("run.logs", { runId })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
+        const historyLogs = (await call("run.logs", { runId, limit: 1000 })) as Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
         if (cancelled) return;
         setLogs(historyLogs);
       } catch (err) { console.warn("[poll] refresh logs failed:", err); }

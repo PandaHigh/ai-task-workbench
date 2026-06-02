@@ -37,11 +37,11 @@ describe("evolution-store", () => {
       expect(logs[0].id).toBe(1);
     });
 
-    it("should cap logs at 500", () => {
-      for (let i = 0; i < 502; i++) {
+    it("should cap logs at 1000", () => {
+      for (let i = 0; i < 1002; i++) {
         useEvolutionStore.getState().addLog({ timestamp: i, level: "info", source: "engine", message: `msg${i}` });
       }
-      expect(useEvolutionStore.getState().logs).toHaveLength(500);
+      expect(useEvolutionStore.getState().logs).toHaveLength(1000);
     });
   });
 

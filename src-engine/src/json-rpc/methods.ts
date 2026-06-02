@@ -279,7 +279,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
   "run.logs": async (params) => {
     const runId = requireString(params, "runId");
     validateRunId(runId);
-    const limit = typeof params.limit === "number" ? params.limit : 200;
+    const limit = typeof params.limit === "number" ? params.limit : 1000;
     return store.getLogs(runId, undefined, limit);
   },
 

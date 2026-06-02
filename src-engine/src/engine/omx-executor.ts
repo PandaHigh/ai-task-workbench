@@ -242,7 +242,7 @@ export class Executor {
     };
 
     try {
-      const team = new OmxAmpTeamOrchestrator(this.ccClient, (method, params) => this.broadcast(method, params as Record<string, unknown>), teamConfig);
+      const team = new OmxAmpTeamOrchestrator(this.ccClient, this.createPersistingNotify(run.id), teamConfig);
       const teamResult = await team.execute(readyTasks, run, context, abortSignal);
 
       this.log(run.id, "engine", "info",
@@ -448,7 +448,7 @@ export class Executor {
       this.log(run.id, "pipeline", "info", `[OMX] Executing via OmxAmpPipeline: ${task.content.substring(0, 80)}...`);
 
       // ── Standard OMX Pipeline execution ──
-      const pipeline = new OmxAmpPipeline(this.ccClient, this.broadcast.bind(this) as (method: string, params: unknown) => void, pipelineWorkingDir);
+      const pipeline = new OmxAmpPipeline(this.ccClient, this.createPersistingNotify(run.id), pipelineWorkingDir);
       const pipelineResult = await pipeline.run(task, context, abortController.signal);
 
       this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
@@ -858,6 +858,28 @@ Respond ONLY with valid JSON:
 
   private broadcast(method: string, params: Record<string, unknown>): void {
     this.notify(method, params);
+  }
+
+  /**
+   * Create a notify function that persists log.entry events to disk before broadcasting.
+   * Used by sub-components (TeamOrchestrator, WorkerManager, OmxAmpGate, OmxAmpPipeline)
+   * so that their log notifications survive browser refresh.
+   */
+  private createPersistingNotify(runId: string): (method: string, params: unknown) => void {
+    return (method: string, params: unknown) => {
+      if (method === "log.entry") {
+        const entry = params as Record<string, unknown>;
+        this.store.appendLog(runId, {
+          timestamp: (entry.timestamp as number) ?? Date.now(),
+          level: (entry.level as string) ?? "info",
+          source: (entry.source as string) ?? "engine",
+          message: (entry.message as string) ?? "",
+          taskId: (entry.taskId as string) ?? "",
+          runId,
+        });
+      }
+      this.broadcast(method, params as Record<string, unknown>);
+    };
   }
 
   isRunning(): boolean {
