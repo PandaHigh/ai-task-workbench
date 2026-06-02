@@ -365,7 +365,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       currentRun.finalReport = undefined;
       store.saveRun(currentRun);
       notify("run.status", { runId, status: "running" });
-      const executor = new Executor(queueManager, notify, runId);
+      const executor = new Executor(queueManager, notify, runId, store);
       activeExecutors.set(runId, executor);
       setImmediate(() => executor.start(currentRun).finally(() => { activeExecutors.delete(runId); }));
     }
@@ -404,7 +404,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
     run.startedAt = run.startedAt || Date.now();
     store.saveRun(run);
 
-    const executor = new Executor(queueManager, notify, runId);
+    const executor = new Executor(queueManager, notify, runId, store);
     activeExecutors.set(runId, executor);
 
     executor.start(run).finally(() => {
@@ -452,7 +452,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       }
       run.status = "running";
       store.saveRun(run);
-      const executor = new Executor(queueManager, notify, runId);
+      const executor = new Executor(queueManager, notify, runId, store);
       activeExecutors.set(runId, executor);
       executor.start(run).finally(() => {
         activeExecutors.delete(runId);
@@ -497,7 +497,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
       run.status = "running";
       run.startedAt = run.startedAt || Date.now();
       store.saveRun(run);
-      const ex = new Executor(queueManager, notify, runId);
+      const ex = new Executor(queueManager, notify, runId, store);
       activeExecutors.set(runId, ex);
       // Defer executor start so the RPC response (queue refresh) is sent first
       setImmediate(() => ex.start(run).finally(() => { activeExecutors.delete(runId); }));

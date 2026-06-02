@@ -74,10 +74,10 @@ export class Executor {
     private queueManager: QueueManager,
     private notify: NotifyFn,
     private runId: string,
+    store?: Store,
   ) {
-    const store = new Store();
-    this.store = store;
-    this.ccClient = new CCClient((store.getConfig("claudePath") as string) || undefined);
+    this.store = store ?? new Store();
+    this.ccClient = new CCClient((this.store.getConfig("claudePath") as string) || undefined);
     this.skillManager = new SkillManager(new SkillStore(), () => {});
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
@@ -769,6 +769,11 @@ export class Executor {
       status: "failed",
       errorMessage: `${taskErr.category}${phaseInfo}: ${taskErr.message}`.substring(0, 500),
       completedAt: Date.now(),
+    });
+    this.store.appendLesson(run.id, {
+      runId: run.id, taskId: task.id, category: "failure",
+      lesson: `Task "${task.content.substring(0, 60)}" failed: ${taskErr.category}${phaseInfo} — ${taskErr.message.substring(0, 120)}`,
+      score: 0, createdAt: Date.now(),
     });
     this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: taskErr.message });
   }

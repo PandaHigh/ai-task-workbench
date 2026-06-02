@@ -34,8 +34,8 @@ export interface OmxAmpPipelineConfig {
 }
 
 const DEFAULT_CONFIG: OmxAmpPipelineConfig = {
-  maxRalplanIterations: 10,
-  maxGateRetries: 10,
+  maxRalplanIterations: 3,
+  maxGateRetries: 2,
   gateThresholds: {
     "deep-interview": 0.6,
     "ralplan": 0.7,
