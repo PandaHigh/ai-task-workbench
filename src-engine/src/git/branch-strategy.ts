@@ -21,24 +21,31 @@ export class BranchStrategy {
     const branchName = `task/${shortId}-${timestamp}`;
     const worktreePath = path.join(workingDir, ".worktrees", branchName.replace(/\//g, "-"));
 
-    // Create branch from current HEAD
-    await git.checkoutLocalBranch(branchName);
+    // Get current branch to restore later
+    const status = await git.status();
+    const currentBranch = status.current || "main";
+
+    // Create branch from current HEAD without checking it out
+    await git.raw(["branch", branchName]);
 
     // Create worktree directory
     const fs = await import("fs");
     fs.mkdirSync(path.dirname(worktreePath), { recursive: true });
 
-    // Use git worktree add
+    // Use git worktree add --checkout so the worktree checks out the branch
     try {
-      await git.raw(["worktree", "add", worktreePath, branchName]);
-    } catch {
-      // Fallback: just use the branch directly without worktree
+      await git.raw(["worktree", "add", "--checkout", worktreePath, branchName]);
+    } catch (e) {
+      // Cleanup the branch we just created
+      try { await git.deleteLocalBranch(branchName); } catch {}
+      // Fallback: checkout the branch in main working dir
       await git.checkout(branchName);
       return { branchName, worktreePath: workingDir };
     }
 
-    // Switch back to original branch in main working dir
-    // (the worktree has the task branch checked out)
+    // Ensure main working dir stays on the original branch
+    try { await git.checkout(currentBranch); } catch {}
+
     return { branchName, worktreePath };
   }
 
