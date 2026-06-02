@@ -15,7 +15,7 @@ describe("Skeleton", () => {
   });
 
   it("should render with circle variant", () => {
-    const { container } = render(<Skeleton variant="circle" size={40} />);
+    const { container } = render(<Skeleton variant="circle" width={40} height={40} />);
     expect(container.firstChild).toBeTruthy();
   });
 

@@ -12,9 +12,9 @@ vi.mock("../../hooks/useEngine", () => ({
 
 describe("LogPanel", () => {
   const defaultLogs = [
-    { id: "l1", timestamp: Date.now() - 2000, level: "info" as const, source: "engine" as const, message: "Started task" },
-    { id: "l2", timestamp: Date.now() - 1000, level: "error" as const, source: "engine" as const, message: "Something failed" },
-    { id: "l3", timestamp: Date.now(), level: "success" as const, source: "engine" as const, message: "Task completed" },
+    { id: 1, timestamp: Date.now() - 2000, level: "info" as const, source: "engine" as const, message: "Started task" },
+    { id: 2, timestamp: Date.now() - 1000, level: "error" as const, source: "engine" as const, message: "Something failed" },
+    { id: 3, timestamp: Date.now(), level: "success" as const, source: "engine" as const, message: "Task completed" },
   ];
 
   it("should render log messages", () => {
@@ -36,7 +36,7 @@ describe("LogPanel", () => {
 
   it("should render many logs", () => {
     const manyLogs = Array.from({ length: 50 }, (_, i) => ({
-      id: `l${i}`,
+      id: i,
       timestamp: Date.now() - (50 - i) * 100,
       level: "info" as const,
       source: "engine" as const,

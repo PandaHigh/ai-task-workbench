@@ -35,11 +35,14 @@ import { TaskQueue } from "./TaskQueue";
 
 const makeTask = (overrides: Partial<TaskDefinition> = {}): TaskDefinition => ({
   id: "t1",
+  runId: "run-1",
   content: "Test task",
   priority: 5,
-  type: "ai_generated",
+  type: "smart_task",
   status: "pending",
   timeoutMinutes: 30,
+  promptJson: "",
+  createdAt: Date.now(),
   ...overrides,
 });
 
