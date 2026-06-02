@@ -73,8 +73,20 @@ async function executeTask(assignment) {
     let stderr = "";
     proc.stdout.on("data", (d) => { stdout += d.toString(); });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
+
+    const timeoutMs = (assignment.timeoutMinutes || 10) * 60 * 1000;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill('SIGTERM');
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch(e) {} }, 5000);
+    }, timeoutMs);
+
     proc.on("close", (code) => {
-      if (code === 0) {
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(new Error("Task timed out after " + (timeoutMs / 1000) + "s"));
+      } else if (code === 0) {
         resolve({ success: true, output: stdout, durationMs: 0, costUsd: 0 });
       } else {
         reject(new Error(stderr || "Process exited with code " + code));

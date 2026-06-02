@@ -17,6 +17,8 @@ export interface WorkerTaskAssignment {
   content: string;
   workingDir: string;
   branchName?: string;
+  timeoutMinutes?: number;
+  model?: string;
 }
 
 export interface WorkerTaskResult {

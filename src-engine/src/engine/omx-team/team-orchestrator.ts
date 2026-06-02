@@ -95,10 +95,11 @@ export class OmxAmpTeamOrchestrator {
       this.transitionTo("team-exec");
       const workerConfigs: WorkerConfig[] = [];
       for (let i = 0; i < Math.min(this.config.maxWorkers, tasks.length); i++) {
+        const task = tasks[i];
         workerConfigs.push({
           workerId: `worker-${i}`,
-          workingDir: run.workingDir,
-          branchName: tasks[i]?.branchName,
+          workingDir: task?.worktreePath || run.workingDir,
+          branchName: task?.branchName,
         });
       }
 
@@ -108,6 +109,7 @@ export class OmxAmpTeamOrchestrator {
       const availableWorkers = workerManager.getAvailableWorkers();
       let workerIdx = 0;
       const dispatchPromises: Promise<unknown>[] = [];
+      const TASK_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
       for (const task of tasks) {
         if (abortSignal?.aborted) break;
@@ -117,10 +119,16 @@ export class OmxAmpTeamOrchestrator {
           content: task.content,
           workingDir: task.worktreePath || run.workingDir,
           branchName: task.branchName,
+          timeoutMinutes: task.timeoutMinutes,
         };
 
+        const dispatchPromise = workerManager.dispatch(workerId, assignment);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Task ${task.id.substring(0, 6)} timed out`)), TASK_TIMEOUT_MS)
+        );
+
         dispatchPromises.push(
-          workerManager.dispatch(workerId, assignment)
+          Promise.race([dispatchPromise, timeoutPromise])
             .then((result) => {
               this.state.results.set(task.id, { success: result.success, output: result.output });
               totalCost += result.costUsd;

@@ -224,6 +224,22 @@ export class Executor {
 
     this.log(run.id, "engine", "info", `[team] Starting Team execution: ${readyTasks.length} tasks, ${this.maxConcurrency} workers`);
 
+    // Create worktrees for each task (isolation)
+    if (useFeatureBranch) {
+      for (const task of readyTasks) {
+        try {
+          const result = await BranchStrategy.createTaskBranch(run.workingDir, task.id);
+          task.branchName = result.branchName;
+          task.worktreePath = result.worktreePath;
+          this.store.updateTask(run.id, task.id, { branchName: result.branchName, worktreePath: result.worktreePath });
+          this.log(run.id, "engine", "info", `[team] Created worktree for task ${task.id.substring(0, 6)}: ${result.branchName}`);
+        } catch (e) {
+          // If worktree creation fails, task stays in run.workingDir (shared)
+          this.log(run.id, "engine", "warn", `Failed to create worktree for task ${task.id.substring(0, 6)}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
     for (const t of readyTasks) {
       this.store.updateTask(run.id, t.id, { status: "running", startedAt: Date.now() });
       this.broadcast("task.status", { taskId: t.id, runId: run.id, status: "running" });
@@ -250,7 +266,45 @@ export class Executor {
 
       run.totalTasksCompleted += teamResult.completedTasks;
       this.store.saveRun(run);
+
+      // Merge successful task branches back
+      if (useFeatureBranch) {
+        for (const task of readyTasks) {
+          if (!task.branchName || !task.worktreePath) continue;
+          // Only merge tasks that completed successfully
+          const storedTask = this.store.getTask(run.id, task.id);
+          if (storedTask?.status === "completed") {
+            try {
+              const mergeResult = await BranchStrategy.mergeBranch(run.workingDir, task.branchName);
+              if (mergeResult.success) {
+                this.log(run.id, "engine", "info", `[team] Merged branch ${task.branchName}`);
+              } else {
+                this.log(run.id, "engine", "warn", `[team] Merge conflicts on ${task.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+              }
+            } catch (e) {
+              this.log(run.id, "engine", "warn", `Failed to merge branch ${task.branchName}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          // Cleanup worktree regardless of success/failure
+          try {
+            await BranchStrategy.cleanupBranch(run.workingDir, task.branchName, task.worktreePath);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+      }
     } catch (err) {
+      // Cleanup all worktrees on error
+      if (useFeatureBranch) {
+        for (const task of readyTasks) {
+          if (task.branchName && task.worktreePath) {
+            try {
+              await BranchStrategy.cleanupBranch(run.workingDir, task.branchName, task.worktreePath);
+            } catch (e) { /* ignore */ }
+          }
+        }
+      }
+
       this.log(run.id, "engine", "error", `[team] Team execution failed: ${errorToMessage(err)}`);
       // Fallback: execute remaining tasks sequentially
       this.log(run.id, "engine", "info", `[team] Falling back to sequential execution`);
