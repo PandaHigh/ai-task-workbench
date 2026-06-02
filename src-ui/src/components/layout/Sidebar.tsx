@@ -102,6 +102,14 @@ export function Sidebar() {
               <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
                 PandaAI
               </h1>
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{
+                  background: connected ? "var(--green)" : "var(--red)",
+                  transition: "background 0.3s ease",
+                }}
+                title={connected ? "AI 已就绪" : "AI 未连接"}
+              />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -167,34 +175,20 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Status */}
-        <div className="px-4 py-3 border-t" style={{ borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{
-                  background: connected ? "var(--green)" : "var(--red)",
-                  transition: "background 0.3s ease",
-                }}
-              />
-              <span className="text-[11px]" style={{ color: connected ? "var(--green)" : "var(--red)" }}>
-                {connected ? "AI 已就绪" : "AI 未连接"}
-              </span>
-            </div>
-            {isDesktop && !connected && (
-              <button
-                onClick={() => restartEngine()}
-                disabled={restarting}
-                className="text-[10px] px-2 py-0.5 rounded disabled:opacity-50"
-                style={{ background: "var(--blue)", color: "#fff", cursor: "pointer" }}
-                title="重启引擎进程"
-              >
-                {restarting ? "重启中..." : "重启"}
-              </button>
-            )}
+        {/* Status - restart button for desktop when disconnected */}
+        {isDesktop && !connected && (
+          <div className="px-4 py-3 border-t" style={{ borderColor: "var(--border)" }}>
+            <button
+              onClick={() => restartEngine()}
+              disabled={restarting}
+              className="text-[10px] w-full py-1 rounded disabled:opacity-50"
+              style={{ background: "var(--blue)", color: "#fff", cursor: "pointer" }}
+              title="重启引擎进程"
+            >
+              {restarting ? "重启中..." : "重启引擎"}
+            </button>
           </div>
-        </div>
+        )}
       </aside>
     </>
   );
