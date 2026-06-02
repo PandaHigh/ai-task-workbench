@@ -68,7 +68,6 @@ export function TaskWizard() {
   const [isLoading, setIsLoading] = useState(false);
   const [dirInput, setDirInput] = useState("");
   const [dirError, setDirError] = useState("");
-  const [showDirInput, setShowDirInput] = useState(false);
   const [lastAssistantIdx, setLastAssistantIdx] = useState(-1);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -109,10 +108,6 @@ export function TaskWizard() {
     }
   }, [taskParams, step]);
 
-  const handleSelectDir = () => {
-    setShowDirInput(true);
-  };
-
   const handleUseDefault = () => {
     const dir = defaultDir();
     setDirInput(dir);
@@ -134,24 +129,7 @@ export function TaskWizard() {
           return;
         }
       }
-      return;
-    } catch { /* not Tauri, fall through */ }
-
-    if ("showDirectoryPicker" in window) {
-      try {
-        const handle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name: string }> }).showDirectoryPicker();
-        if (handle?.name) {
-          const dir = handle.name;
-          setDirInput(dir);
-          setDirError("");
-          toast.info(`浏览器安全限制无法获取完整路径，请手动输入完整路径。目录名: ${dir}`);
-          setShowDirInput(true);
-          return;
-        }
-      } catch { /* user cancelled or not supported */ }
-    }
-
-    setShowDirInput(true);
+    } catch { /* not Tauri */ }
   };
 
   const validateDir = (value: string) => {
@@ -176,7 +154,6 @@ export function TaskWizard() {
     setWorkingDir(dirInput.trim());
     saveDir(dirInput.trim());
     startWizardSession(dirInput.trim());
-    setShowDirInput(false);
   };
 
   const startWizardSession = async (dir: string) => {
@@ -446,14 +423,13 @@ export function TaskWizard() {
               <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>使用默认位置</button>
             </div>
 
-            {!showDirInput ? (
-              <div className="flex gap-3">
-                <button onClick={handleBrowse} className="flex-1 px-4 py-3 rounded text-sm font-semibold" style={{ background: "var(--blue)", color: "#fff" }}>选择文件夹</button>
-                <button onClick={handleSelectDir} className="flex-1 px-4 py-3 rounded text-sm max-md:hidden" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>输入路径</button>
+            <div className="glass-card p-4 mb-4 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>输入项目路径</span>
+                <button onClick={handleBrowse} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--blue)", background: "rgba(77, 107, 254, 0.1)" }}>浏览</button>
               </div>
-            ) : (
-              <div className="flex gap-2 justify-center flex-wrap">
-                <div className="flex flex-col flex-1 max-md:w-full">
+              <div className="flex gap-2">
+                <div className="flex flex-col flex-1">
                   <input
                     type="text"
                     value={dirInput}
@@ -462,7 +438,7 @@ export function TaskWizard() {
                     placeholder="/path/to/project"
                     required
                     minLength={2}
-                    className="w-full px-3 py-2 rounded text-xs outline-none"
+                    className="w-full px-3 py-2 rounded text-xs outline-none font-mono"
                     style={{
                       background: "var(--bg-tertiary)", color: "var(--text-primary)",
                       border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
@@ -476,9 +452,8 @@ export function TaskWizard() {
                   )}
                 </div>
                 <button onClick={confirmDir} className="px-4 py-2 rounded text-xs font-semibold shrink-0" style={{ background: "var(--green)", color: "#fff" }}>确认</button>
-                <button onClick={() => setShowDirInput(false)} className="px-3 py-2 rounded text-xs shrink-0" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>取消</button>
               </div>
-            )}
+            </div>
 
             {workingDir && <p className="text-xs mt-3" style={{ color: "var(--green)" }}>已选择: {workingDir}</p>}
           </div>

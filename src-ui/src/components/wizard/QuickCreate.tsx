@@ -25,7 +25,6 @@ export function QuickCreate() {
   const [maxConcurrent, setMaxConcurrent] = useState(1);
   const [dirError, setDirError] = useState("");
   const [contentError, setContentError] = useState("");
-  const [showDirInput, setShowDirInput] = useState(false);
 
   useEffect(() => {
     if (!connected) return;
@@ -57,9 +56,7 @@ export function QuickCreate() {
         const dir = typeof selected === "string" ? selected : (selected as string[])[0];
         if (dir) { setWorkingDir(dir); saveDir(dir); setDirError(""); return; }
       }
-      return;
     } catch { /* not Tauri */ }
-    setShowDirInput(true);
   };
 
   const handleCreate = async (autoStart: boolean) => {
@@ -112,30 +109,17 @@ export function QuickCreate() {
             <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>项目目录</h3>
             <button onClick={handleBrowse} className="text-[10px] px-2 py-0.5 rounded" style={{ color: "var(--blue)", background: "rgba(77, 107, 254, 0.1)" }}>浏览</button>
           </div>
-          {showDirInput ? (
-            <div className="flex gap-2">
-              <input
-                value={workingDir}
-                onChange={(e) => { setWorkingDir(e.target.value); if (dirError) validateDir(e.target.value); }}
-                onBlur={() => validateDir(workingDir)}
-                className="flex-1 px-3 py-2 rounded text-xs outline-none"
-                style={{
-                  background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                  border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
-                }}
-                placeholder="/path/to/project"
-              />
-              <button onClick={() => { if (validateDir(workingDir)) { saveDir(workingDir); setShowDirInput(false); } }}
-                className="px-3 py-2 rounded text-xs" style={{ background: "var(--green)", color: "#fff" }}>确定</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-mono flex-1 px-3 py-2 rounded" style={{ background: "var(--bg-tertiary)", color: "var(--green)" }}>
-                {workingDir}
-              </span>
-              <button onClick={() => setShowDirInput(true)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>修改</button>
-            </div>
-          )}
+          <input
+            value={workingDir}
+            onChange={(e) => { setWorkingDir(e.target.value); if (dirError) validateDir(e.target.value); }}
+            onBlur={() => validateDir(workingDir)}
+            className="w-full px-3 py-2 rounded text-xs outline-none font-mono"
+            style={{
+              background: "var(--bg-tertiary)", color: "var(--text-primary)",
+              border: dirError ? "1px solid var(--red)" : "1px solid var(--border)",
+            }}
+            placeholder="/path/to/project"
+          />
           {dirError && <p className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{dirError}</p>}
           {lastDir !== "~/ai-workspace" && lastDir !== workingDir && (
             <button onClick={() => { setWorkingDir(lastDir); saveDir(lastDir); }} className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
