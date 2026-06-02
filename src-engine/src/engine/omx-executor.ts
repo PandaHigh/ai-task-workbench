@@ -652,6 +652,19 @@ export class Executor {
       }
 
       if (score.passed) {
+        // Merge feature branch first so autoCommit captures worktree changes
+        if (useFeatureBranch && branchResult) {
+          try {
+            const mergeResult = await BranchStrategy.mergeBranch(run.workingDir, branchResult.branchName);
+            if (mergeResult.success) {
+              this.log(run.id, "engine", "info", `Merged feature branch: ${branchResult.branchName}`);
+            } else {
+              this.log(run.id, "engine", "warn", `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+            }
+          } catch (err) {
+            this.log(run.id, "engine", "error", `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`);
+          }
+        }
         const commitHash = await gitManager.autoCommit(task.id, task.content);
         this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
         this.store.appendCommit(run.id, {
