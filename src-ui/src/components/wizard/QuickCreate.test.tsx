@@ -125,9 +125,7 @@ describe("QuickCreate", () => {
     await waitFor(() => {
       expect(mockCall).toHaveBeenCalledWith("run.create", expect.objectContaining({
         workingDir: "~/test-workspace",
-        tasks: expect.arrayContaining([
-          expect.objectContaining({ content: "Fix the login page bug" }),
-        ]),
+        goals: expect.arrayContaining(["完成: Fix the login page bug"]),
       }));
     });
 

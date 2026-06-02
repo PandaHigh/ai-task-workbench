@@ -334,6 +334,16 @@ export function ShareDashboard() {
               </div>
             </div>
 
+            {/* Budget */}
+            {run && (
+              <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>预算消耗</span>
+                  <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>${(run.totalCostUsd ?? 0).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Connection status */}
             <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center gap-2">

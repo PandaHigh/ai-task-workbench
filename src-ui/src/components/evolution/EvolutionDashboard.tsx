@@ -515,6 +515,7 @@ export function EvolutionDashboard() {
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>已完成</span><span style={{ color: "var(--green)" }}>{run.totalTasksCompleted}</span></div>
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>保存</span><span style={{ color: "var(--blue)" }}>{commits.length}</span></div>
                   <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>经验</span><span style={{ color: "var(--red)" }}>{lessons.length}</span></div>
+	                  <div className="flex justify-between"><span style={{ color: "var(--text-secondary)" }}>费用</span><span style={{ color: "var(--text-primary)" }}>${(run.totalCostUsd ?? 0).toFixed(2)}</span></div>
                 </div>
               </div>
 
