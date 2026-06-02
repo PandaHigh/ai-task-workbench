@@ -1,21 +1,15 @@
 import { TaskCreateForm } from "../common/TaskCreateForm";
 
-interface ExistingTask {
-  id: string;
-  content: string;
-}
-
 interface AddTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[] }) => void;
+  onSubmit: (text: string, priority: number, timeoutMinutes?: number) => void;
   defaultPriority?: number;
   defaultTimeout?: number;
   call?: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
-  existingTasks?: ExistingTask[];
 }
 
-export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60, existingTasks = [] }: AddTaskModalProps) {
+export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, defaultTimeout = 60 }: AddTaskModalProps) {
   if (!open) return null;
 
   return (
@@ -43,13 +37,12 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
           添加任务
         </h3>
         <TaskCreateForm
-          onSubmit={({ content, priority, timeoutMinutes, dependsOn }) => {
-            onSubmit(content, priority, timeoutMinutes, { dependsOn });
+          onSubmit={({ content, priority, timeoutMinutes }) => {
+            onSubmit(content, priority, timeoutMinutes);
           }}
           onCancel={onClose}
           defaultPriority={defaultPriority}
           defaultTimeout={defaultTimeout}
-          existingTasks={existingTasks}
           submitLabel="确认添加"
           autoFocus
         />

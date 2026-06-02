@@ -264,10 +264,10 @@ export function EvolutionDashboard() {
     handleReorder(ids);
   };
 
-  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number, extra?: { dependsOn?: string[] }) => {
+  const handleAddTask = async (text: string, priority: number, timeoutMinutes?: number) => {
     if (!runId || !text.trim()) return;
     try {
-      await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes, ...extra });
+      await call("task.create", { runId, content: text.trim(), type: "user_defined", priority, timeoutMinutes });
       const qRes = await call("queue.list", { runId });
       setQueue((qRes as { queue: TaskDefinition[] })?.queue || []);
       toast.success("任务已添加到队列");
@@ -596,12 +596,11 @@ export function EvolutionDashboard() {
       <AddTaskModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSubmit={(text, priority, timeoutMinutes, extra) => {
-          handleAddTask(text, priority, timeoutMinutes, extra);
+        onSubmit={(text, priority, timeoutMinutes) => {
+          handleAddTask(text, priority, timeoutMinutes);
           setShowAddModal(false);
         }}
         call={call}
-        existingTasks={queue.map((t) => ({ id: t.id, content: t.content }))}
       />
 
       <ConfirmDialog

@@ -1,19 +1,13 @@
 import { useState, useEffect } from "react";
 
-interface ExistingTask {
-  id: string;
-  content: string;
-}
-
 interface TaskCreateFormProps {
-  onSubmit: (params: { content: string; priority: number; timeoutMinutes: number; dependsOn?: string[] }) => void;
+  onSubmit: (params: { content: string; priority: number; timeoutMinutes: number }) => void;
   onCancel?: () => void;
   defaultPriority?: number;
   defaultTimeout?: number;
   submitLabel?: string;
   autoFocus?: boolean;
   initialContent?: string;
-  existingTasks?: ExistingTask[];
 }
 
 export function TaskCreateForm({
@@ -24,13 +18,10 @@ export function TaskCreateForm({
   submitLabel = "确认",
   autoFocus = true,
   initialContent = "",
-  existingTasks = [],
 }: TaskCreateFormProps) {
   const [content, setContent] = useState(initialContent);
   const [priority, setPriority] = useState(defaultPriority);
   const [timeoutMinutes, setTimeoutMinutes] = useState(defaultTimeout);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [dependsOn, setDependsOn] = useState<string[]>([]);
 
   useEffect(() => {
     setContent(initialContent);
@@ -42,10 +33,7 @@ export function TaskCreateForm({
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onSubmit({
-      content: content.trim(), priority, timeoutMinutes,
-      ...(dependsOn.length > 0 ? { dependsOn } : {}),
-    });
+    onSubmit({ content: content.trim(), priority, timeoutMinutes });
   };
 
   return (
@@ -95,42 +83,6 @@ export function TaskCreateForm({
           </select>
         </div>
       </div>
-
-      {existingTasks.length > 0 && (
-        <div>
-          <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-[10px] underline" style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}>
-            {showAdvanced ? "收起高级选项" : "高级选项（依赖任务）"}
-          </button>
-        </div>
-      )}
-
-      {showAdvanced && (
-        <div className="space-y-2 p-2 rounded" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
-          {existingTasks.length > 0 && (
-            <div>
-              <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>依赖任务（完成后才执行）</label>
-              <div className="flex flex-wrap gap-1">
-                {existingTasks.map((task) => (
-                  <button key={task.id} type="button" onClick={() => {
-                    setDependsOn((prev) => prev.includes(task.id) ? prev.filter((d) => d !== task.id) : [...prev, task.id]);
-                  }}
-                    className="px-1.5 py-0.5 rounded text-[10px] max-w-[200px] truncate"
-                    style={{
-                      background: dependsOn.includes(task.id) ? "var(--blue)" : "var(--bg-secondary)",
-                      color: dependsOn.includes(task.id) ? "#fff" : "var(--text-secondary)",
-                      border: `1px solid ${dependsOn.includes(task.id) ? "var(--blue)" : "var(--border)"}`,
-                    }}
-                    title={task.content}
-                  >
-                    {task.content}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <p className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Ctrl+Enter 快速提交</p>
 
