@@ -716,7 +716,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
 
   "share.unsubscribe": async (params) => {
     const runId = requireString(params, "runId");
-    subscriptionStore.unsubscribe(runId);
+    const removed = subscriptionStore.unsubscribe(runId);
+    if (!removed) throw new RpcValidationError("Subscription not found");
     return { unsubscribed: true };
   },
 

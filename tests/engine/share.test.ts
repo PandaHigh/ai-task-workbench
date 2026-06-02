@@ -156,10 +156,10 @@ describe("Share Integration", () => {
       ).rejects.toThrow("Invalid share URL format");
     });
 
-    it("should reject unreachable remote engine", async () => {
+    it("should reject remote share subscriptions (no longer supported)", async () => {
       await expect(
         methodHandlers["share.subscribe"]({ url: "http://localhost:19999/api/share/abc-123" }),
-      ).rejects.toThrow();
+      ).rejects.toThrow("Remote share subscriptions are no longer supported");
     });
   });
 
@@ -186,58 +186,6 @@ describe("Share Integration", () => {
       const runs = await methodHandlers["run.list"]({}) as ExecutionRun[];
       expect(runs.length).toBeGreaterThanOrEqual(1);
       expect(runs[0].source).toBeUndefined();
-    });
-  });
-
-  // ─── Task operations on remote runs ─────────────────────────────────────
-
-  describe("task operations on remote runs", () => {
-    it("should reject remote run task.create when engine unreachable", async () => {
-      const mod = await import("../../src-engine/src/db/subscription-store.js");
-      const subStore = new mod.SubscriptionStore(testDir);
-      subStore.subscribe({
-        runId: "remote-test-123",
-        remoteUrl: "http://localhost:19999",
-        remoteToken: "fake-token",
-        remoteRunId: "original-run-id",
-        label: "Test remote",
-      });
-
-      await expect(
-        methodHandlers["task.create"]({ runId: "remote-test-123", content: "test task" }),
-      ).rejects.toThrow();
-    });
-
-    it("should reject remote run.run.tasks when engine unreachable", async () => {
-      const mod = await import("../../src-engine/src/db/subscription-store.js");
-      const subStore = new mod.SubscriptionStore(testDir);
-      subStore.subscribe({
-        runId: "remote-tasks-456",
-        remoteUrl: "http://localhost:19999",
-        remoteToken: "fake-token",
-        remoteRunId: "original-run-id",
-        label: "Test remote",
-      });
-
-      await expect(
-        methodHandlers["run.tasks"]({ runId: "remote-tasks-456" }),
-      ).rejects.toThrow();
-    });
-
-    it("should reject remote run.run.stop when engine unreachable", async () => {
-      const mod = await import("../../src-engine/src/db/subscription-store.js");
-      const subStore = new mod.SubscriptionStore(testDir);
-      subStore.subscribe({
-        runId: "remote-stop-789",
-        remoteUrl: "http://localhost:19999",
-        remoteToken: "fake-token",
-        remoteRunId: "original-run-id",
-        label: "Test remote",
-      });
-
-      await expect(
-        methodHandlers["run.stop"]({ runId: "remote-stop-789" }),
-      ).rejects.toThrow();
     });
   });
 
