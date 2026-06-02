@@ -19,11 +19,15 @@ export function ensurePlaywrightMcpConfig(): string {
   if (configPath && fs.existsSync(configPath)) return configPath;
 
   const local = resolvePlaywrightCli();
-  const entry = local ?? { command: "npx", args: ["@playwright/mcp@latest", "--headless"] };
+  if (!local) {
+    // In air-gapped environments, Playwright MCP must be pre-installed.
+    // Return null to signal that Playwright is not available.
+    return "";
+  }
 
   const config = {
     mcpServers: {
-      playwright: entry,
+      playwright: local,
     },
   };
 

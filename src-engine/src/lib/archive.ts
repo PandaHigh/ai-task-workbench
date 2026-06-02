@@ -3,7 +3,7 @@ import type Archiver from "archiver";
 import type { ServerResponse } from "http";
 
 const EXCLUDED = new Set([
-  ".git", "node_modules", ".claude", ".DS_Store",
+  ".git", "node_modules", ".claude", ".DS_Store", "Thumbs.db",
   "__pycache__", ".env", ".env.local", ".cache",
 ]);
 

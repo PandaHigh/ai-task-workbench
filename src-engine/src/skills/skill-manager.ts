@@ -162,10 +162,12 @@ export class SkillManager {
       fs.writeFileSync(tmpZip, fileData);
 
       try {
-        const { execSync } = await import("child_process");
         if (process.platform === "win32") {
-          execSync(`powershell -Command "Expand-Archive -Path '${tmpZip}' -DestinationPath '${extractDir}' -Force"`, { stdio: "pipe" });
+          // Use tar which is built into modern Windows (10+) — no PowerShell or internet dependency
+          const { execSync } = await import("child_process");
+          execSync(`tar -xf "${tmpZip}" -C "${extractDir}"`, { stdio: "pipe" });
         } else {
+          const { execSync } = await import("child_process");
           execSync(`unzip -o "${tmpZip}" -d "${extractDir}"`, { stdio: "pipe" });
         }
       } finally {

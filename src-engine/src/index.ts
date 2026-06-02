@@ -48,9 +48,12 @@ async function main() {
   const existing = pluginRegistry.list();
   if (!existing.some((p) => p.name === "playwright")) {
     const cli = resolvePlaywrightCli();
-    const config = cli ?? { command: "npx", args: ["@playwright/mcp@latest", "--headless"] };
-    pluginRegistry.register({ name: "playwright", ...config });
-    log.info("Auto-registered built-in Playwright MCP plugin");
+    if (cli) {
+      pluginRegistry.register({ name: "playwright", ...cli });
+      log.info("Auto-registered built-in Playwright MCP plugin");
+    } else {
+      log.info("Playwright MCP not installed locally — skipping auto-registration (install @playwright/mcp for browser automation)");
+    }
   }
 
   wsServer.start();

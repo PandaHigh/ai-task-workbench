@@ -1,7 +1,8 @@
 import { spawn } from "child_process";
+import path from "path";
 import { platform, homedir } from "os";
 
-const SAFE_ENV_KEYS = ["PATH", "HOME", "LANG", "TERM", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC"] as const;
+const SAFE_ENV_KEYS = ["PATH", "HOME", "USERPROFILE", "LANG", "TERM", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC", "APPDATA", "LOCALAPPDATA"] as const;
 
 const isWin = platform() === "win32";
 
@@ -67,12 +68,23 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
     }
   }
   if (!env.HOME) env.HOME = homedir();
-  // Ensure ~/.local/bin is in PATH for claude CLI
-  if (env.PATH && !env.PATH.includes("/.local/bin")) {
-    env.PATH = `${homedir()}/.local/bin:${env.PATH}`;
+  if (isWin) {
+    if (!env.USERPROFILE) env.USERPROFILE = homedir();
+    // On Windows, add common npm global bin paths
+    if (env.PATH && !env.PATH.toLowerCase().includes("npm")) {
+      const appData = process.env.APPDATA || path.join(homedir(), "AppData", "Roaming");
+      env.PATH = `${path.join(appData, "npm")}${path.delimiter}${env.PATH}`;
+    }
+  } else {
+    // On Unix, ensure ~/.local/bin is in PATH for claude CLI
+    if (env.PATH && !env.PATH.includes("/.local/bin")) {
+      env.PATH = `${homedir()}/.local/bin${path.delimiter}${env.PATH}`;
+    }
   }
-  if (!env.PATH) env.PATH = isWin ? process.env.SYSTEMROOT ? `${process.env.SYSTEMROOT}\\System32` : "C:\\Windows\\System32" : `/usr/local/bin:/usr/bin:/bin:${homedir()}/.local/bin`;
-  env.LANG = env.LANG || "en_US.UTF-8";
+  if (!env.PATH) env.PATH = isWin
+    ? `${process.env.SYSTEMROOT ?? "C:\\Windows"}\\System32`
+    : `/usr/local/bin:/usr/bin:/bin:${homedir()}/.local/bin`;
+  env.LANG = env.LANG || (isWin ? "en_US.UTF-8" : "en_US.UTF-8");
   return env;
 }
 

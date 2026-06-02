@@ -11,9 +11,12 @@ import { writeFileSync } from "fs";
 import type { WorkerConfig, WorkerMessage, WorkerTaskAssignment, WorkerTaskResult } from "./worker-protocol.js";
 import type { NotifyFn } from "../omx-pipeline.js";
 
+const isWin = process.platform === "win32";
+
 const WORKER_SCRIPT = `
 const { spawn } = require("child_process");
 const { join } = require("path");
+const isWin = process.platform === "win32";
 
 let currentTask = null;
 
@@ -39,6 +42,11 @@ function send(msg) {
   process.stdout.write(JSON.stringify(msg) + "\\n");
 }
 
+function killProc(proc) {
+  try { proc.kill(isWin ? undefined : "SIGTERM"); } catch {}
+  setTimeout(() => { try { proc.kill(); } catch {} }, 5000);
+}
+
 async function handleMessage(msg) {
   if (msg.type === "dispatch") {
     currentTask = msg.payload;
@@ -55,6 +63,7 @@ async function handleMessage(msg) {
 }
 
 async function executeTask(assignment) {
+  const claudeCmd = isWin ? "claude.cmd" : "claude";
   const args = [
     "-p", assignment.content,
     "--output-format", "text",
@@ -65,7 +74,7 @@ async function executeTask(assignment) {
   if (assignment.model) args.push("--model", assignment.model);
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("claude", args, {
+    const proc = spawn(claudeCmd, args, {
       cwd: assignment.workingDir,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -91,8 +100,7 @@ async function executeTask(assignment) {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      proc.kill('SIGTERM');
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch(e) {} }, 5000);
+      killProc(proc);
     }, timeoutMs);
 
     proc.on("close", (code) => {
@@ -226,8 +234,8 @@ export class OmxAmpWorkerManager {
   async terminate(): Promise<void> {
     for (const [_id, proc] of this.workers) {
       try {
-        proc.kill("SIGTERM");
-        setTimeout(() => { try { proc.kill("SIGKILL"); } catch { /* already dead */ } }, 5000);
+        proc.kill(isWin ? undefined : "SIGTERM");
+        setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 5000);
       } catch { /* already dead */ }
     }
     this.workers.clear();

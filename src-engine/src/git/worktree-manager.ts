@@ -8,7 +8,9 @@ export class WorktreeManager {
 
   async create(baseDir: string, branchName: string): Promise<string> {
     const git = this.getGit(baseDir);
-    const worktreePath = path.join(baseDir, ".worktrees", branchName);
+    // Sanitize branch name for filesystem: replace / with - to avoid subdirectory issues on Windows
+    const safeDirName = branchName.replace(/[/\\]/g, "-");
+    const worktreePath = path.join(baseDir, ".worktrees", safeDirName);
 
     // Create worktree with new branch
     await git.raw(["worktree", "add", worktreePath, "-b", branchName, "HEAD"]);

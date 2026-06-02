@@ -86,8 +86,13 @@ function validateWorkingDir(dir: string): string {
     throw new Error("workingDir is required and must be a string");
   }
   if (dir.includes("\0")) throw new RpcValidationError("Invalid directory path");
-  // Expand ~/ to home directory
-  const expanded = dir.startsWith("~/") ? dir.replace("~", homedir()) : dir;
+  // Expand ~/ to home directory (both / and \ variants for Windows)
+  const homeDir = homedir();
+  const expanded = dir.startsWith("~/") || dir.startsWith("~\\")
+    ? homeDir + dir.slice(1)
+    : dir === "~"
+    ? homeDir
+    : dir;
   const resolved = resolve(expanded);
   const normalizedLower = normalize(resolved.toLowerCase());
 
