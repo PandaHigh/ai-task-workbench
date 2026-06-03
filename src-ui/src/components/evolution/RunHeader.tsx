@@ -7,9 +7,12 @@ interface RunHeaderProps {
   elapsed: string;
   isRunning: boolean;
   onBack: () => void;
-  onShare: () => void;
+  onShare?: () => void;
   onShowQueue: () => void;
   onShowPanel: () => void;
+  hideDownload?: boolean;
+  shareMode?: boolean;
+  wsConnected?: boolean;
 }
 
 export function RunHeader({
@@ -21,6 +24,9 @@ export function RunHeader({
   onShare,
   onShowQueue,
   onShowPanel,
+  hideDownload,
+  shareMode,
+  wsConnected,
 }: RunHeaderProps) {
   return (
     <div
@@ -40,7 +46,7 @@ export function RunHeader({
         <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>
           {runId?.substring(0, 8)}
         </span>
-        {run && (
+        {run && !shareMode && (
           <span
             className="text-xs px-2 py-0.5 rounded hidden md:inline"
             style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
@@ -54,22 +60,35 @@ export function RunHeader({
       </div>
       <div className="flex items-center gap-2">
         {/* Download ZIP button */}
-        <button
-          onClick={() => window.open(`${ENGINE_HTTP_URL}/api/runs/${runId}/download`)}
-          className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-          style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-          title="下载工作目录 ZIP"
-        >
-          下载
-        </button>
+        {!hideDownload && (
+          <button
+            onClick={() => window.open(`${ENGINE_HTTP_URL}/api/runs/${runId}/download`)}
+            className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
+            style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+            title="下载工作目录 ZIP"
+          >
+            下载
+          </button>
+        )}
         {/* Share button */}
-        <button
-          onClick={onShare}
-          className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
-          style={{ background: "var(--blue)", color: "#fff" }}
-        >
-          分享
-        </button>
+        {onShare && (
+          <button
+            onClick={onShare}
+            className="text-xs px-3 py-1.5 rounded font-semibold hidden md:inline"
+            style={{ background: "var(--blue)", color: "#fff" }}
+          >
+            分享
+          </button>
+        )}
+        {/* Connection indicator in share mode */}
+        {shareMode && wsConnected !== undefined && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded hidden md:inline" style={{
+            background: wsConnected ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+            color: wsConnected ? "var(--green)" : "var(--yellow)",
+          }}>
+            {wsConnected ? "实时" : "轮询中"}
+          </span>
+        )}
         {/* Mobile drawer toggles */}
         <button
           onClick={onShowQueue}

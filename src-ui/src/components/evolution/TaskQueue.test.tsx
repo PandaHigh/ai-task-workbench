@@ -120,7 +120,7 @@ describe("TaskQueue", () => {
   it("should call onShowAddModal when clicking add button", () => {
     const onShowAddModal = vi.fn();
     render(<TaskQueue {...defaultProps} onShowAddModal={onShowAddModal} />);
-    fireEvent.click(screen.getByText("+ 添加任务"));
+    fireEvent.click(screen.getByText("+ 添加"));
     expect(onShowAddModal).toHaveBeenCalled();
   });
 

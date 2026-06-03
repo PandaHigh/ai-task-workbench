@@ -250,7 +250,7 @@ describe("EvolutionDashboard", () => {
     });
     renderEvolution();
     // Click the add task button to open modal
-    await user.click(screen.getByText("+ 添加任务"));
+    await user.click(screen.getByText("+ 添加"));
     // Find the textarea by placeholder and type into it
     const textarea = screen.getByPlaceholderText("描述你的任务...");
     await user.type(textarea, "新测试任务");

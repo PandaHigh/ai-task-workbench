@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("../../hooks/useShareView", () => ({
   useShareView: () => mockShareView,
@@ -11,6 +11,67 @@ vi.mock("../common/Toast", () => ({
 
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ token: "test-token" }),
+  useNavigate: () => vi.fn(),
+}));
+
+vi.mock("../../hooks/useEngine", () => ({
+  useEngine: () => ({ connected: true, call: vi.fn() }),
+}));
+
+vi.mock("../../hooks/useNotifications", () => ({
+  useNotifications: () => {},
+}));
+
+vi.mock("../../hooks/useAnimations", () => ({
+  pageEnterStyle: () => ({}),
+  staggerItemStyle: () => ({}),
+}));
+
+vi.mock("../../hooks/useElapsedTimer", () => ({
+  useElapsedTimer: () => null,
+}));
+
+vi.mock("../ErrorBoundary", () => ({
+  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("../evolution/ApprovalPanel", () => ({
+  ApprovalPanel: () => null,
+}));
+
+vi.mock("../evolution/AgentProgressPanel", () => ({
+  AgentProgressPanel: () => <div>AgentProgress</div>,
+}));
+
+vi.mock("../evolution/LogPanel", () => ({
+  LogPanel: ({ logs }: { logs: Array<{ id: number; timestamp: number; level: string; source: string; message: string }> }) => (
+    <div>{logs.map(l => <span key={l.id}>{l.message}</span>)}</div>
+  ),
+}));
+
+vi.mock("../evolution/ReportTab", () => ({
+  ReportTab: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
+vi.mock("../evolution/StreamingOutput", () => ({
+  StreamingOutput: () => null,
+}));
+
+vi.mock("../evolution/LogSearchBar", () => ({
+  LogSearchBar: () => null,
+}));
+
+vi.mock("../evolution/TaskComments", () => ({
+  TaskComments: () => null,
+}));
+
+vi.mock("../dashboard/RobotMascot", () => ({
+  RobotMascot: ({ size }: { size: number }) => <svg data-testid="robot-mascot" width={size} height={size} />,
+}));
+
+vi.mock("../../lib/platform", () => ({
+  ENGINE_HTTP_URL: "http://localhost:9731",
+  ENGINE_WS_URL: "ws://localhost:9731",
 }));
 
 import { ShareDashboard } from "./ShareDashboard";
@@ -36,13 +97,13 @@ describe("ShareDashboard", () => {
         totalTasksCompleted: 2,
       } as any,
       tasks: [
-        { id: "t1", content: "Task 1", status: "completed", type: "user_defined", priority: 1, completedAt: Date.now() } as any,
-        { id: "t2", content: "Task 2", status: "failed", type: "ai_generated", priority: 2, errorMessage: "Error msg" } as any,
+        { id: "t1", content: "Task 1", status: "completed", type: "user_defined", priority: 1, completedAt: Date.now(), runId: "r1" } as any,
+        { id: "t2", content: "Task 2", status: "failed", type: "ai_generated", priority: 2, errorMessage: "Error msg", runId: "r1" } as any,
       ],
       commits: [],
       lessons: [],
       queue: [
-        { id: "t3", content: "Queued task", type: "ai_generated", priority: 3, status: "queued" } as any,
+        { id: "t3", content: "Queued task", type: "ai_generated", priority: 3, status: "queued", runId: "r1" } as any,
       ],
       report: null,
       logs: [
@@ -74,86 +135,37 @@ describe("ShareDashboard", () => {
     expect(screen.getByText("请联系分享者获取新的链接")).toBeInTheDocument();
   });
 
-  it("should render dashboard with task queue and logs", () => {
+  it("should render EvolutionDashboard in share mode", async () => {
     render(<ShareDashboard />);
-    expect(screen.getAllByText("Test goal").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("运行中")).toBeInTheDocument();
+    // Wait for the dashboard to render (it syncs data via effects)
+    await waitFor(() => {
+      expect(screen.getByText("任务详情")).toBeInTheDocument();
+    });
+    // Should show robot mascot
+    expect(screen.getByTestId("robot-mascot")).toBeInTheDocument();
+    // Should show connection indicator "实时"
     expect(screen.getByText("实时")).toBeInTheDocument();
-    expect(screen.getByText("协作")).toBeInTheDocument();
-  });
-
-  it("should display task queue", () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText("任务队列 (1)")).toBeInTheDocument();
+    // Should show task queue
     expect(screen.getByText("Queued task")).toBeInTheDocument();
   });
 
-  it("should display completed tasks", () => {
+  it("should not show owner-only controls", async () => {
     render(<ShareDashboard />);
-    expect(screen.getByText("已完成 (1)")).toBeInTheDocument();
-    expect(screen.getByText("Task 1")).toBeInTheDocument();
-  });
-
-  it("should display failed tasks with retry button", () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText("失败 (1)")).toBeInTheDocument();
-    expect(screen.getByText("重试")).toBeInTheDocument();
-  });
-
-  it("should show add task button in collaborate mode", () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText("+ 新增任务")).toBeInTheDocument();
-  });
-
-  it("should show budget bar always", () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText(/预算消耗/)).toBeInTheDocument();
-    expect(screen.getByText(/\$1\.50/)).toBeInTheDocument();
-  });
-
-  it("should show connection status", () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText("WebSocket 实时连接")).toBeInTheDocument();
-  });
-
-  it("should show polling mode when disconnected", () => {
-    mockShareView = { ...mockShareView, wsConnected: false };
-    render(<ShareDashboard />);
-    expect(screen.getByText("轮询中")).toBeInTheDocument();
-    expect(screen.getByText("HTTP 轮询模式")).toBeInTheDocument();
-  });
-
-  it("should switch tabs", async () => {
-    render(<ShareDashboard />);
-    expect(screen.getByText("Test log")).toBeInTheDocument();
-
-    const commitTab = screen.getByText(/Git 提交/);
-    fireEvent.click(commitTab);
-
-    expect(screen.getByText("暂无提交")).toBeInTheDocument();
-  });
-
-  it("should show refresh button", () => {
-    render(<ShareDashboard />);
-    const refreshBtns = screen.getAllByText("刷新");
-    expect(refreshBtns.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("should call refresh on button click", async () => {
-    render(<ShareDashboard />);
-    const refreshBtns = screen.getAllByText("刷新");
-    fireEvent.click(refreshBtns[0]);
     await waitFor(() => {
-      expect(mockRefresh).toHaveBeenCalled();
+      expect(screen.getByText("任务详情")).toBeInTheDocument();
     });
+    // No share, download, start/stop buttons
+    expect(screen.queryByText("分享")).not.toBeInTheDocument();
+    expect(screen.queryByText("下载")).not.toBeInTheDocument();
+    expect(screen.queryByText("开始")).not.toBeInTheDocument();
   });
 
-  it("should open and close add task modal", async () => {
+  it("should show goals read-only (no edit button in goal panel)", async () => {
     render(<ShareDashboard />);
-    fireEvent.click(screen.getByText("+ 新增任务"));
-    expect(screen.getByText("新增任务")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("取消"));
-    expect(screen.queryByText("新增任务")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("任务详情")).toBeInTheDocument();
+    });
+    // Goal content visible
+    expect(screen.getByText("Test goal")).toBeInTheDocument();
   });
 });

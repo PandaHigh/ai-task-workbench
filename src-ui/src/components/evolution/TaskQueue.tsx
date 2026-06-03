@@ -26,6 +26,7 @@ interface TaskQueueProps {
   onRetry: (taskId: string) => void;
   onShowAddModal: () => void;
   onCloseQueue: () => void;
+  readOnly?: boolean;
 }
 
 export function TaskQueue({
@@ -49,6 +50,7 @@ export function TaskQueue({
   onRetry,
   onShowAddModal,
   onCloseQueue,
+  readOnly,
 }: TaskQueueProps) {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
@@ -63,13 +65,13 @@ export function TaskQueue({
           待办 ({queue.length})
         </h3>
         <div className="flex items-center gap-1">
-          <button
+          {!readOnly && <button
             onClick={onShowAddModal}
             className="text-xs px-2 py-1 rounded font-semibold"
             style={{ background: "var(--green)", color: "#fff" }}
           >
             + 添加
-          </button>
+          </button>}
           <button
             onClick={onCloseQueue}
             className="md:hidden text-xs ml-1"
@@ -121,7 +123,7 @@ export function TaskQueue({
               aria-roledescription="可拖拽任务项，Ctrl+上下箭头可调整顺序"
               aria-label={`任务 ${i + 1}: ${task.content}，优先级 P${task.priority}`}
               tabIndex={0}
-              draggable
+              draggable={!readOnly}
               onDragStart={() => setDragIdx(i)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
@@ -153,7 +155,7 @@ export function TaskQueue({
                   {i + 1}
                 </span>
                 <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
-                <button
+                {!readOnly && <button
                   onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                   className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
                   style={{ color: "var(--blue)", border: "1px solid transparent" }}
@@ -161,8 +163,8 @@ export function TaskQueue({
                   title="编辑任务"
                 >
                   编辑
-                </button>
-                <button
+                </button>}
+                {!readOnly && <button
                   onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id, task.content); }}
                   className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
                   style={{ color: "var(--red)", border: "1px solid transparent" }}
@@ -170,7 +172,7 @@ export function TaskQueue({
                   title="删除任务"
                 >
                   移除
-                </button>
+                </button>}
               </div>
               <div className="mt-1 flex gap-2" style={{ color: "var(--text-secondary)" }}>
                 <span>{task.type === "user_defined" ? "用户" : "AI"}</span>
@@ -258,13 +260,13 @@ export function TaskQueue({
                       >
                         再试一次
                       </button>
-                      <button
+                      {!readOnly && <button
                         onClick={() => onDeleteTask(t.id, t.content)}
                         className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
                         style={{ background: "var(--red)", color: "#fff" }}
                       >
                         移除
-                      </button>
+                      </button>}
                     </div>
                   </div>
                   {t.errorMessage && (

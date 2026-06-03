@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { formatDuration } from "../../lib/utils";
 
 const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pursuing: { label: "追踪中", color: "var(--blue)", bg: "rgba(77, 107, 254,0.15)" },
@@ -8,22 +9,15 @@ const GOAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: str
   budget_exhausted: { label: "预算已用完", color: "var(--red)", bg: "rgba(239, 68, 68,0.15)" },
 };
 
-function formatGoalDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
-
 interface EditableListProps {
   title: string;
   items: string[];
   dotColor: string;
   onSave: (items: string[]) => Promise<unknown>;
+  readOnly?: boolean;
 }
 
-export function EditableList({ title, items, dotColor, onSave }: EditableListProps) {
+export function EditableList({ title, items, dotColor, onSave, readOnly }: EditableListProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
 
@@ -43,7 +37,7 @@ export function EditableList({ title, items, dotColor, onSave }: EditableListPro
     <div>
       <div className="flex items-center justify-between mb-1">
         <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>{title}</h4>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             className="text-[10px] px-1.5 py-0.5 rounded"
@@ -112,6 +106,7 @@ interface GoalPanelProps {
   run: import("@ai-workbench/shared").ExecutionRun;
   simpleMode: boolean;
   showAdvancedPanel: boolean;
+  readOnly?: boolean;
   onToggleAdvanced: () => void;
   onSaveGoals: (items: string[]) => Promise<unknown>;
   onSaveTerminationConditions: (items: string[]) => Promise<unknown>;
@@ -125,6 +120,7 @@ export function GoalPanel({
   run,
   simpleMode,
   showAdvancedPanel,
+  readOnly,
   onToggleAdvanced,
   onSaveGoals,
   onSaveTerminationConditions,
@@ -141,6 +137,7 @@ export function GoalPanel({
         items={run.goals}
         dotColor="var(--green)"
         onSave={onSaveGoals}
+        readOnly={readOnly}
       />
 
       {/* Termination Conditions */}
@@ -149,6 +146,7 @@ export function GoalPanel({
         items={run.terminationConditions}
         dotColor="var(--yellow)"
         onSave={onSaveTerminationConditions}
+        readOnly={readOnly}
       />
 
       {/* Online Users - advanced only */}
@@ -159,7 +157,7 @@ export function GoalPanel({
       )}
 
       {/* Advanced options toggle */}
-      {simpleMode && (
+      {simpleMode && !readOnly && (
         <div className="border-t pt-2" style={{ borderColor: "var(--border)" }}>
           <button
             onClick={onToggleAdvanced}
@@ -195,7 +193,7 @@ export function GoalPanel({
               </div>
               <div className="flex justify-between">
                 <span style={{ color: "var(--text-secondary)" }}>用时</span>
-                <span>{formatGoalDuration(run.goalTimeElapsedMs ?? 0)}</span>
+                <span>{formatDuration(run.goalTimeElapsedMs ?? 0)}</span>
               </div>
             </div>
           )}
@@ -218,7 +216,7 @@ export function GoalPanel({
             </div>
           )}
 
-          <div className="flex gap-2">
+          {!readOnly && <div className="flex gap-2">
             {run.goalStatus === "pursuing" && (
               <>
                 <button
@@ -260,7 +258,7 @@ export function GoalPanel({
                 {run.goalStatus === "achieved" ? "已达成" : "预算已用完"}
               </span>
             )}
-          </div>
+          </div>}
         </div>
       )}
     </div>

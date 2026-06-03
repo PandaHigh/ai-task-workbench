@@ -25,14 +25,26 @@ import { ReportTab } from "./ReportTab";
 
 type TabType = "logs" | "commits" | "lessons" | "report";
 
-export function EvolutionDashboard() {
-  const { runId } = useParams<{ runId: string }>();
+export interface ShareModeProps {
+  shareMode?: boolean;
+  shareCall?: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
+  shareRunId?: string;
+  shareRun?: ExecutionRun | null;
+  wsConnectedOverride?: boolean;
+}
+
+export function EvolutionDashboard(props: ShareModeProps = {}) {
+  const { shareMode, shareCall, shareRunId, shareRun: propRun, wsConnectedOverride } = props;
+  const { runId: urlRunId } = useParams<{ runId: string }>();
+  const runId = shareRunId || urlRunId;
   const navigate = useNavigate();
-  const { connected, call } = useEngine();
+  const engine = useEngine();
+  const connected = wsConnectedOverride ?? engine.connected;
+  const call = shareCall || engine.call;
   const tasks = useTaskStore((s) => s.tasks);
   const storeRun = tasks.find((t) => t.id === runId);
   const [fetchedRun, setFetchedRun] = useState<ExecutionRun | null>(null);
-  const run = storeRun || fetchedRun;
+  const run = propRun || storeRun || fetchedRun;
 
   const queue = useEvolutionStore((s) => s.queue);
   const logs = useEvolutionStore((s) => s.logs);
@@ -52,8 +64,8 @@ export function EvolutionDashboard() {
   const [tab, setTab] = useState<TabType>("logs");
   const [simpleMode, setSimpleMode] = useState(() => localStorage.getItem("ui-mode") !== "detailed");
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
-  const [loading, setLoading] = useState(true);
-  const showLoading = loading || !connected;
+  const [loading, setLoading] = useState(!shareMode);
+  const showLoading = !shareMode && (loading || !connected);
   const [showQueue, setShowQueue] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -73,7 +85,7 @@ export function EvolutionDashboard() {
   // Load data on mount -- only reset when runId changes
   const prevRunIdRef = useRef(runId);
   useEffect(() => {
-    if (!runId || !connected) return;
+    if (!runId || !connected || shareMode) return;
     let cancelled = false;
     const runIdChanged = prevRunIdRef.current !== runId;
     prevRunIdRef.current = runId;
@@ -154,7 +166,7 @@ export function EvolutionDashboard() {
 
   // Periodically refresh all tasks, queue, and run data while running
   useEffect(() => {
-    if (!runId || !connected) return;
+    if (!runId || !connected || shareMode) return;
     const POLL_INTERVAL = connected ? 15_000 : 30_000;
     const interval = setInterval(async () => {
       // Skip polling if run is in a terminal state
@@ -317,7 +329,7 @@ export function EvolutionDashboard() {
 
   return (
     <>
-    <ApprovalPanel />
+    {!shareMode && <ApprovalPanel />}
     <div className="flex-1 flex overflow-hidden" style={pageEnterStyle()}>
       <div className="flex-1 flex flex-col">
         {/* Header */}
@@ -327,7 +339,10 @@ export function EvolutionDashboard() {
           elapsed={elapsed}
           isRunning={isRunning}
           onBack={() => { reset(); navigate("/"); }}
-          onShare={handleShare}
+          onShare={!shareMode ? handleShare : undefined}
+          hideDownload={shareMode}
+          shareMode={shareMode}
+          wsConnected={wsConnectedOverride}
           onShowQueue={() => { setShowQueue(true); setShowPanel(false); }}
           onShowPanel={() => { setShowPanel(true); setShowQueue(false); }}
         />
@@ -347,6 +362,7 @@ export function EvolutionDashboard() {
               isRunning={isRunning}
               runId={runId}
               showQueue={showQueue}
+              readOnly={shareMode}
               runStatus={run?.status}
               onStart={handleStart}
               onSetActiveTask={addActiveTask}
@@ -376,13 +392,13 @@ export function EvolutionDashboard() {
                 </button>
               ))}
               </div>
-              <button
+              {!shareMode && <button
                 onClick={() => { const next = !simpleMode; setSimpleMode(next); localStorage.setItem("ui-mode", next ? "simple" : "detailed"); }}
                 className="text-xs px-3 py-1.5 rounded-md shrink-0 font-medium"
                 style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)", cursor: "pointer" }}
               >
                 {simpleMode ? "详细" : "简单"}
-              </button>
+              </button>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 text-xs max-md:p-2" style={{ background: simpleMode ? "var(--bg-secondary)" : "var(--bg-tertiary)", fontFamily: simpleMode ? "var(--font-sans)" : "var(--font-mono)" }}>
@@ -476,19 +492,19 @@ export function EvolutionDashboard() {
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {/* Agent Progress */}
-          <AgentProgressPanel />
+          {!shareMode && <AgentProgressPanel />}
 
           {/* Start / Stop */}
-          <div className="flex gap-2">
+          {!shareMode && <div className="flex gap-2">
             {!isRunning ? (
               <button onClick={handleStart} disabled={actionLoading === "start"} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: actionLoading === "start" ? "var(--bg-tertiary)" : "var(--green)", color: actionLoading === "start" ? "var(--text-secondary)" : "#fff", opacity: actionLoading === "start" ? 0.7 : 1 }}>{actionLoading === "start" ? "启动中..." : run?.status === "completed" ? "▶ 继续" : "▶ 开始"}</button>
             ) : (
               <button onClick={() => setStopTarget(runId ?? "")} disabled={actionLoading === "stop"} className="flex-1 px-3 py-2 rounded text-xs font-semibold" style={{ background: actionLoading === "stop" ? "var(--bg-tertiary)" : "var(--red)", color: actionLoading === "stop" ? "var(--text-secondary)" : "#fff", opacity: actionLoading === "stop" ? 0.7 : 1 }}>{actionLoading === "stop" ? "停止中..." : "⏹ 停止"}</button>
             )}
-          </div>
+          </div>}
 
           {/* Timeout - hidden in simple mode unless advanced */}
-          {(!simpleMode || showAdvancedPanel) && <div>
+          {!shareMode && (!simpleMode || showAdvancedPanel) && <div>
             <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
               超时: {timeoutMinutes}min
               {activeTaskIds.length > 0 && <button
@@ -526,6 +542,7 @@ export function EvolutionDashboard() {
               {/* Goals & Termination Conditions */}
               <GoalPanel
                 run={run}
+                readOnly={shareMode}
                 simpleMode={simpleMode}
                 showAdvancedPanel={showAdvancedPanel}
                 onToggleAdvanced={() => setShowAdvancedPanel(!showAdvancedPanel)}
@@ -541,7 +558,7 @@ export function EvolutionDashboard() {
           )}
 
           {/* Task Intervention & Snapshot */}
-          {isRunning && activeTaskIds.length > 0 && (
+          {!shareMode && isRunning && activeTaskIds.length > 0 && (
             <div className="pt-2 border-t space-y-2" style={{ borderColor: "var(--border)" }}>
               <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>任务干预</h4>
               <div className="flex flex-wrap gap-1.5">
@@ -562,7 +579,7 @@ export function EvolutionDashboard() {
           )}
 
           {/* Mobile share button */}
-          {runId && (
+          {!shareMode && runId && (
             <div className="border-t pt-3 md:hidden" style={{ borderColor: "var(--border)" }}>
               <button
                 onClick={handleShare}
@@ -587,7 +604,7 @@ export function EvolutionDashboard() {
       )}
 
       {/* Add Task Modal */}
-      <AddTaskModal
+      {!shareMode && <AddTaskModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={(text, priority, timeoutMinutes) => {
@@ -595,9 +612,9 @@ export function EvolutionDashboard() {
           setShowAddModal(false);
         }}
         call={call}
-      />
+      />}
 
-      <ConfirmDialog
+      {!shareMode && <ConfirmDialog
         open={deleteTarget !== null}
         title="删除任务"
         message={`确定要删除任务「${deleteTarget?.content ?? ""}」吗？此操作不可撤销。`}
@@ -605,9 +622,9 @@ export function EvolutionDashboard() {
         variant="danger"
         onConfirm={confirmDeleteTask}
         onCancel={() => setDeleteTarget(null)}
-      />
+      />}
 
-      <ConfirmDialog
+      {!shareMode && <ConfirmDialog
         open={stopTarget !== null}
         title="停止执行"
         message="停止执行？当前进度已保存，可随时继续。"
@@ -615,10 +632,10 @@ export function EvolutionDashboard() {
         variant="danger"
         onConfirm={handleStop}
         onCancel={() => setStopTarget(null)}
-      />
+      />}
 
       {/* Edit Task Modal */}
-      {editTarget && (
+      {!shareMode && editTarget && (
         <div
           role="dialog"
           aria-modal="true"
@@ -654,12 +671,12 @@ export function EvolutionDashboard() {
         </div>
       )}
 
-      <SharePanel
+      {!shareMode && <SharePanel
         open={showSharePanel}
         onClose={() => setShowSharePanel(false)}
         runId={runId ?? ""}
         call={call}
-      />
+      />}
     </div>
     </>
   );
