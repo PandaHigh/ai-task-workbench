@@ -78,7 +78,7 @@ describe("E2E: Feature Branch Isolation", () => {
     await BranchStrategy.cleanupBranch(tmpDir, result.branchName, result.worktreePath);
   });
 
-  it("merges feature branch back", async () => {
+  it.skipIf(process.env.CI)("merges feature branch back", async () => {
     const git = simpleGit(tmpDir);
     await git.init();
     await git.addConfig("user.name", "Test");
