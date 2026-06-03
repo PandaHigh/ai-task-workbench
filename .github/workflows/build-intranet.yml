@@ -1,0 +1,94 @@
+name: Build Windows Desktop (Intranet)
+
+# 手动触发 + tag 触发（双模式）
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 v0.1.0）'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - run: npx vitest run
+        working-directory: src-engine
+      - run: npx vitest run src/components
+        working-directory: src-ui
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: install frontend dependencies
+        run: npm install
+
+      # tauri-action 的 beforeBuildCommand 会自动执行 npm run build
+      # 此处只需 npm install，不需要重复 build
+
+      - name: build Tauri (Windows)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.version || github.ref_name }}
+          releaseName: 'AI Task Workbench ${{ github.event.inputs.version || github.ref_name }} — Windows 内网版'
+          releaseBody: |
+            ## Windows 内网部署版
+
+            ### 安装方式
+            1. 下载 `.msi` 或 NSIS `.exe` 安装包
+            2. 双击安装（安装到当前用户目录，无需管理员权限）
+            3. 安装完成后桌面会出现快捷方式，双击启动
+
+            ### 前置条件
+            - **Node.js 18+**（必须，引擎运行依赖）
+            - **Claude Code CLI**（必须，AI 任务执行）
+            - **Git**（推荐，任务版本控制）
+            - **WebView2**（Windows 10 21H2+ / Windows 11 已自带）
+
+            ### 如果 WebView2 缺失
+            安装程序会自动尝试安装 WebView2。如果目标机器无网络：
+            1. 从有网络的机器下载 [WebView2 离线安装包](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+            2. 拷贝到目标机器并安装
+            3. 然后再安装 AI Task Workbench
+          releaseDraft: true
+          prerelease: false
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 30

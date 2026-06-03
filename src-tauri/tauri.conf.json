@@ -38,7 +38,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../src-engine/dist/engine.js": "src-engine/dist/engine.js"
+      "../src-engine/dist/engine.js": "src-engine/dist/engine.js",
+      "../src-engine/resources/skills": "resources/skills"
     },
     "macOS": {
       "minimumSystemVersion": "10.15"
@@ -46,6 +47,9 @@
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
       }
     }
   },

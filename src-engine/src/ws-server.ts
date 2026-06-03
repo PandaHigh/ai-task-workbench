@@ -450,12 +450,70 @@ export class WsServer {
       req.pipe(proxyReq);
       return;
     }
-    // In production, serve built frontend files
-    const frontendPath = path.resolve(process.cwd(), "src-ui/dist/index.html");
+    // In production, serve built frontend static files
+    this.serveStaticFile(req, res, url);
+  }
+
+  private serveStaticFile(_req: IncomingMessage, res: ServerResponse, url: string): void {
+    const distDir = path.resolve(process.cwd(), "src-ui/dist");
+
+    // Decode URI and normalize path — prevent path traversal
+    let filePath = path.join(distDir, decodeURIComponent(url.split("?")[0]));
+    filePath = path.normalize(filePath);
+    if (!filePath.startsWith(distDir)) {
+      res.writeHead(403, { "Content-Type": "text/plain" });
+      res.end("Forbidden");
+      return;
+    }
+
+    // If requesting a directory or root, serve index.html
+    if (url === "/" || url === "/index.html" || !path.extname(filePath)) {
+      filePath = path.join(distDir, "index.html");
+    }
+
+    // Check if file exists and is not a directory
     try {
-      const html = fs.readFileSync(frontendPath, "utf-8");
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html);
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        filePath = path.join(filePath, "index.html");
+      }
+    } catch {
+      // File doesn't exist — SPA fallback to index.html for client-side routing
+      filePath = path.join(distDir, "index.html");
+    }
+
+    // Determine MIME type
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".html": "text/html; charset=utf-8",
+      ".js":   "application/javascript; charset=utf-8",
+      ".mjs":  "application/javascript; charset=utf-8",
+      ".css":  "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".png":  "image/png",
+      ".jpg":  "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif":  "image/gif",
+      ".svg":  "image/svg+xml",
+      ".ico":  "image/x-icon",
+      ".woff": "font/woff",
+      ".woff2": "font/woff2",
+      ".ttf":  "font/ttf",
+      ".eot":  "application/vnd.ms-fontobject",
+      ".webp": "image/webp",
+      ".webm": "video/webm",
+      ".mp4":  "video/mp4",
+      ".map":  "application/json",
+    };
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    try {
+      const data = fs.readFileSync(filePath);
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
+      });
+      res.end(data);
     } catch {
       res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: cd src-ui &amp;&amp; npm run build</p></body></html>");

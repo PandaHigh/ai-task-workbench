@@ -16,3 +16,6 @@ test-results/
 src-ui/test-results/
 *.png
 !src-tauri/icons/*.png
+
+# 部署产物
+deploy-output/
