@@ -604,7 +604,7 @@ export function EvolutionDashboard(props: ShareModeProps = {}) {
       )}
 
       {/* Add Task Modal */}
-      {!shareMode && <AddTaskModal
+      <AddTaskModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={(text, priority, timeoutMinutes) => {
@@ -612,9 +612,9 @@ export function EvolutionDashboard(props: ShareModeProps = {}) {
           setShowAddModal(false);
         }}
         call={call}
-      />}
+      />
 
-      {!shareMode && <ConfirmDialog
+      <ConfirmDialog
         open={deleteTarget !== null}
         title="删除任务"
         message={`确定要删除任务「${deleteTarget?.content ?? ""}」吗？此操作不可撤销。`}
@@ -622,7 +622,7 @@ export function EvolutionDashboard(props: ShareModeProps = {}) {
         variant="danger"
         onConfirm={confirmDeleteTask}
         onCancel={() => setDeleteTarget(null)}
-      />}
+      />
 
       {!shareMode && <ConfirmDialog
         open={stopTarget !== null}
@@ -635,7 +635,7 @@ export function EvolutionDashboard(props: ShareModeProps = {}) {
       />}
 
       {/* Edit Task Modal */}
-      {!shareMode && editTarget && (
+      {editTarget && (
         <div
           role="dialog"
           aria-modal="true"

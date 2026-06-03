@@ -34,14 +34,14 @@ export function RunHeader({
       style={{ borderColor: "var(--border)", animation: "slideDown 0.3s ease-out" }}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <button
+        {!shareMode && <button
           onClick={onBack}
           className="text-xs px-2 py-1 rounded hover:opacity-80 shrink-0"
           style={{ color: "var(--text-secondary)" }}
           aria-label="返回"
         >
           &larr;
-        </button>
+        </button>}
         <h2 className="text-sm font-bold truncate">任务详情</h2>
         <span className="text-xs hidden md:inline" style={{ color: "var(--text-secondary)" }}>
           {runId?.substring(0, 8)}

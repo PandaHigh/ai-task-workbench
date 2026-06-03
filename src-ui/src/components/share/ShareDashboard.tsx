@@ -6,7 +6,7 @@ import { useEffect, useRef, useCallback } from "react";
 
 export function ShareDashboard() {
   const { token } = useParams<{ token: string }>();
-  const { loading, error, run, tasks, commits, lessons, queue, logs, call, refresh, wsConnected } = useShareView(token!);
+  const { loading, error, run, commits, lessons, queue, logs, call, refresh, wsConnected } = useShareView(token!);
 
   const setQueue = useEvolutionStore((s) => s.setQueue);
   const setCommits = useEvolutionStore((s) => s.setCommits);
@@ -44,23 +44,8 @@ export function ShareDashboard() {
     if (method === "task.retry" && runId) {
       return call("task.retry", { taskId: (params as Record<string, unknown>)?.taskId });
     }
-    if (method === "queue.list" && runId) {
-      return { runId, queue };
-    }
-    if (method === "run.tasks") {
-      return tasks;
-    }
-    if (method === "run.commits") {
-      return commits;
-    }
-    if (method === "run.lessons") {
-      return lessons;
-    }
-    if (method === "run.logs") {
-      return logs;
-    }
     return call(method, params);
-  }, [call, run?.id, queue, tasks, commits, lessons, logs]);
+  }, [call, run?.id]);
 
   if (loading) {
     return (

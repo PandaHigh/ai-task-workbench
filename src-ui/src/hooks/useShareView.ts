@@ -169,8 +169,15 @@ export function useShareView(token: string) {
         return c.reorderQueue(token, (params!.taskIds) as string[]);
       case "task.setTimeout":
         return c.setTaskTimeout(token, params!.taskId as string, params!.minutes as number);
-      case "queue.list":
-        return { runId: token, queue };
+      case "task.update":
+        return c.updateTask(token, params!.taskId as string, params as { content?: string; priority?: number; timeoutMinutes?: number });
+      case "queue.remove":
+        return c.removeTask(token, params!.taskId as string);
+      case "queue.list": {
+        const freshQueue = await c.getQueue(token);
+        setQueue(freshQueue);
+        return { runId: token, queue: freshQueue };
+      }
       case "run.tasks":
         return tasks;
       case "run.commits":
@@ -184,7 +191,7 @@ export function useShareView(token: string) {
       default:
         throw new Error(`Unknown method: ${method}`);
     }
-  }, [token, queue, tasks, commits, lessons, run, report, logs]);
+  }, [token, tasks, commits, lessons, run, report, logs]);
 
   return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh: fullRefresh, wsConnected };
 }

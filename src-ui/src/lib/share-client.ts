@@ -119,6 +119,26 @@ export class ShareClient {
     if (!res.ok) throw new Error(await this.extractError(res));
   }
 
+  async updateTask(token: string, taskId: string, updates: { content?: string; priority?: number; timeoutMinutes?: number }): Promise<TaskDefinition> {
+    const res = await fetch(this.tokenUrl(token, "task.update"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, ...updates }),
+    });
+    if (!res.ok) throw new Error(await this.extractError(res));
+    return res.json();
+  }
+
+  async removeTask(token: string, taskId: string): Promise<{ taskId: string; removed: boolean }> {
+    const res = await fetch(this.tokenUrl(token, "queue.remove"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId }),
+    });
+    if (!res.ok) throw new Error(await this.extractError(res));
+    return res.json();
+  }
+
   private async extractError(res: Response): Promise<string> {
     try {
       const data = await res.json();

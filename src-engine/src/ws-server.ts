@@ -391,6 +391,36 @@ export class WsServer {
             this.sendJson(res, 200, { taskId: params.taskId, timeoutMinutes: params.minutes });
             break;
           }
+          case "task.update": {
+            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            const task = this.store.getTask(runId, params.taskId);
+            if (!task) { this.sendJson(res, 404, { error: "Task not found" }); return; }
+            if (!["pending", "queued"].includes(task.status)) {
+              this.sendJson(res, 400, { error: `Cannot edit task with status: ${task.status}` }); return;
+            }
+            const updates: Record<string, unknown> = {};
+            if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
+            if (typeof params.priority === "number") updates.priority = params.priority;
+            if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
+            if (Object.keys(updates).length === 0) { this.sendJson(res, 400, { error: "No valid fields to update" }); return; }
+            this.store.updateTask(runId, params.taskId, updates);
+            const queueList = this.queueManager.list(runId);
+            const queueEntry = queueList.find((t: { id: string }) => t.id === params.taskId);
+            if (queueEntry) Object.assign(queueEntry, updates);
+            if (updates.priority !== undefined) {
+              this.broadcast("queue.updated", { runId, queue: this.queueManager.list(runId) });
+            }
+            this.sendJson(res, 200, this.store.getTask(runId, params.taskId));
+            break;
+          }
+          case "queue.remove": {
+            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            const removed = this.queueManager.remove(runId, params.taskId);
+            this.store.deleteTask(runId, params.taskId);
+            this.broadcast("queue.updated", { runId, queue: this.queueManager.list(runId) });
+            this.sendJson(res, 200, { taskId: params.taskId, removed: removed });
+            break;
+          }
           default:
             this.sendJson(res, 404, { error: `Unknown resource: ${resource}` });
         }
