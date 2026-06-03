@@ -183,6 +183,7 @@ export interface CreateRunParams {
   goals: string[];
   terminationConditions: string[];
   tasks?: CreateTaskParams[];
+  useDefaultLocation?: boolean;
 }
 
 export interface CreateTaskParams {

@@ -425,9 +425,7 @@ export class CCClient {
       args.push("--model", options.model);
     }
 
-    if (options.maxTurns) {
-      args.push("--max-turns", String(options.maxTurns));
-    }
+    // maxTurns disabled — let CC run without turn limits
 
     if (options.allowedTools && options.allowedTools.length > 0) {
       args.push("--allowedTools", options.allowedTools.join(","));

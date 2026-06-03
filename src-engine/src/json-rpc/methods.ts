@@ -9,8 +9,9 @@ import { Executor } from "../engine/omx-executor.js";
 import { SessionManager } from "../engine/session-manager.js";
 import * as wizardHandler from "../wizard/wizard-handler.js";
 
-import { resolve, normalize } from "path";
+import { resolve, normalize, join } from "path";
 import { homedir, tmpdir } from "os";
+import { mkdirSync } from "fs";
 
 import { serializeGoalState } from "../lib/goal-utils.js";
 import { OMX_ROLES } from "../engine/omx-roles.js";
@@ -239,6 +240,14 @@ export const methodHandlers: Record<string, MethodHandler> = {
       autonomyLevel: params.autonomyLevel as ExecutionRun["autonomyLevel"],
       maxConcurrentTasks: typeof params.maxConcurrentTasks === "number" ? params.maxConcurrentTasks : undefined,
     };
+
+    if (params.useDefaultLocation === true) {
+      const ts = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
+      const subfolder = `run-${ts}-${run.id.substring(0, 8)}`;
+      const subfolderPath = join(safeWorkingDir, subfolder);
+      mkdirSync(subfolderPath, { recursive: true });
+      run.workingDir = subfolderPath;
+    }
     store.saveRun(run);
 
     const tasks = params.tasks;

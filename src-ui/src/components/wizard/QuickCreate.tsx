@@ -25,6 +25,7 @@ export function QuickCreate() {
   const [maxConcurrent, setMaxConcurrent] = useState(1);
   const [dirError, setDirError] = useState("");
   const [contentError, setContentError] = useState("");
+  const [isDefaultDir, setIsDefaultDir] = useState(true);
 
   useEffect(() => {
     if (!connected) return;
@@ -54,7 +55,7 @@ export function QuickCreate() {
       const selected = await open({ directory: true, multiple: false });
       if (selected) {
         const dir = typeof selected === "string" ? selected : (selected as string[])[0];
-        if (dir) { setWorkingDir(dir); saveDir(dir); setDirError(""); return; }
+        if (dir) { setWorkingDir(dir); saveDir(dir); setDirError(""); setIsDefaultDir(false); return; }
       }
     } catch { /* not Tauri */ }
   };
@@ -80,6 +81,7 @@ export function QuickCreate() {
         terminationConditions: conditions,
         autonomyLevel,
         maxConcurrentTasks: maxConcurrent,
+        useDefaultLocation: isDefaultDir,
       })) as ExecutionRun;
 
       if (autoStart) {
@@ -111,7 +113,7 @@ export function QuickCreate() {
           </div>
           <input
             value={workingDir}
-            onChange={(e) => { setWorkingDir(e.target.value); if (dirError) validateDir(e.target.value); }}
+            onChange={(e) => { setWorkingDir(e.target.value); setIsDefaultDir(false); if (dirError) validateDir(e.target.value); }}
             onBlur={() => validateDir(workingDir)}
             className="w-full px-3 py-2 rounded text-xs outline-none font-mono"
             style={{
@@ -121,8 +123,9 @@ export function QuickCreate() {
             placeholder="/path/to/project"
           />
           {dirError && <p className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{dirError}</p>}
+          {isDefaultDir && !dirError && <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>将在此目录下创建独立工作区</p>}
           {lastDir !== "~/ai-workspace" && lastDir !== workingDir && (
-            <button onClick={() => { setWorkingDir(lastDir); saveDir(lastDir); }} className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={() => { setWorkingDir(lastDir); saveDir(lastDir); setIsDefaultDir(true); }} className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
               上次使用: {lastDir}
             </button>
           )}

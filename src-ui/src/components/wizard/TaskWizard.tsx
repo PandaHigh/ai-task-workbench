@@ -75,6 +75,7 @@ export function TaskWizard() {
   const [maxConcurrent, setMaxConcurrent] = useState(1);
   const [timeoutMinutes, setTimeoutMinutes] = useState(60);
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isDefaultLocation, setIsDefaultLocation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const defaultDir = useCallback(() => {
@@ -113,6 +114,7 @@ export function TaskWizard() {
     setDirInput(dir);
     setWorkingDir(dir);
     saveDir(dir);
+    setIsDefaultLocation(true);
     startWizardSession(dir);
   };
 
@@ -125,6 +127,7 @@ export function TaskWizard() {
           setDirInput(dir);
           setWorkingDir(dir);
           saveDir(dir);
+          setIsDefaultLocation(false);
           startWizardSession(dir);
           return;
         }
@@ -153,6 +156,7 @@ export function TaskWizard() {
     if (!validateDir(dirInput)) return;
     setWorkingDir(dirInput.trim());
     saveDir(dirInput.trim());
+    setIsDefaultLocation(false);
     startWizardSession(dirInput.trim());
   };
 
@@ -247,6 +251,7 @@ export function TaskWizard() {
         terminationConditions: conditions.length > 0 ? conditions : ["所有目标均已达成并验证通过"],
         autonomyLevel,
         maxConcurrentTasks: maxConcurrent,
+        useDefaultLocation: isDefaultLocation,
       })) as ExecutionRun;
 
       if (autoStart) {
@@ -421,6 +426,7 @@ export function TaskWizard() {
               </div>
               <p className="text-sm mb-3 font-mono" style={{ color: "var(--green)" }}>{defaultDir()}</p>
               <button onClick={handleUseDefault} className="w-full px-4 py-2 rounded text-xs font-semibold" style={{ background: "var(--green)", color: "#fff" }}>使用默认位置</button>
+              <p className="text-[10px] mt-2 text-center" style={{ color: "var(--text-muted)" }}>将在默认目录下创建独立工作区</p>
             </div>
 
             <div className="glass-card p-4 mb-4 text-left">
