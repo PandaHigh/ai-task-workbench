@@ -337,11 +337,20 @@ fn spawn_npx_handle(app: &AppHandle, engine_dir: &std::path::Path) -> Result<Opt
 fn spawn_node_app(app: &App, engine_dir: &std::path::Path) -> Result<Option<CommandChild>, Box<dyn std::error::Error>> {
     let node = find_node();
     println!("[sidecar] Starting engine: {} dist/engine.js in {:?}", node, engine_dir);
+
+    // Verify node exists before spawning
+    if !std::path::Path::new(&node).exists() && node != "node" {
+        eprintln!("[sidecar] ERROR: Node.js binary not found at: {}", node);
+        return Err(format!("Node.js binary not found: {}", node).into());
+    }
+
     let (_rx, child) = app.shell()
         .command(&node)
         .args(["dist/engine.js"])
         .current_dir(engine_dir)
         .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .env("SYSTEMROOT", std::env::var("SYSTEMROOT").unwrap_or_else(|_| "C:\\Windows".to_string()))
+        .env("NODE_ENV", "production")
         .spawn()?;
     println!("[sidecar] Engine process spawned (node)");
     Ok(Some(child))
@@ -375,6 +384,8 @@ pub fn restart_engine(app: AppHandle) -> Result<String, String> {
             .args(["dist/engine.js"])
             .current_dir(&engine_dir)
             .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env("SYSTEMROOT", std::env::var("SYSTEMROOT").unwrap_or_else(|_| "C:\\Windows".to_string()))
+            .env("NODE_ENV", "production")
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(Some(child))
