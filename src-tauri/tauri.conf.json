@@ -39,6 +39,7 @@
     ],
     "resources": {
       "../src-engine/dist/engine.js": "src-engine/dist/engine.js",
+      "../src-engine/dist/package.json": "src-engine/dist/package.json",
       "../src-engine/resources/skills": "resources/skills"
     },
     "macOS": {
