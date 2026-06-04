@@ -150,6 +150,7 @@ export class CCClient {
         env: buildSafeEnv(),
         stdio: ["ignore", "pipe", "pipe"],
         detached: !isWin,
+        ...(isWin ? { shell: true } : {}),
       });
 
       if (proc.pid) trackPid(proc.pid);
@@ -293,6 +294,7 @@ export class CCClient {
       env: buildSafeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       detached: !isWin,
+      ...(isWin ? { shell: true } : {}),
     });
 
     if (proc.pid) trackPid(proc.pid);

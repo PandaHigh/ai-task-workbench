@@ -77,6 +77,7 @@ async function executeTask(assignment) {
     const proc = spawn(claudeCmd, args, {
       cwd: assignment.workingDir,
       stdio: ["ignore", "pipe", "pipe"],
+      ...(isWin ? { shell: true } : {}),
     });
     let stdout = "";
     let stderr = "";
