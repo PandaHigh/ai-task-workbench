@@ -5,6 +5,11 @@ function detectEngineUrls(): { ws: string; http: string } {
   if (typeof window === "undefined") {
     return { ws: "ws://localhost:9731", http: "http://localhost:9731" };
   }
+  // Tauri desktop: webview origin is https://tauri.localhost/ on Windows,
+  // tauri://localhost/ on macOS — always connect directly to the local engine.
+  if (isTauri) {
+    return { ws: "ws://localhost:9731", http: "http://localhost:9731" };
+  }
   const { protocol, hostname } = window.location;
   if (hostname !== "localhost" && hostname !== "127.0.0.1") {
     // Remote access: WebSocket and HTTP go through Vite proxy on same origin

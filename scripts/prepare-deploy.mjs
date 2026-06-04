@@ -194,7 +194,7 @@ const envLines = [
   "CLAUDE_PATH=claude",
   "",
 ];
-const envContent = envLines.join("\n") + "\n";
+const envContent = envLines.join("\r\n") + "\r\n";
 fs.writeFileSync(path.join(DEPLOY_DIR, ".env.production"), envContent);
 fs.writeFileSync(path.join(DEPLOY_DIR, ".env"), envContent);
 console.log("  ✓ .env.production / .env 已创建");
@@ -240,21 +240,13 @@ const startBatLines = [
   "    echo 引擎将以无前端模式启动",
   ")",
   "",
-  ":: 加载 .env 配置",
+  ":: 加载 .env 配置（使用 Node.js 解析，兼容 LF/CRLF）",
   "if exist \".env\" (",
   "    echo [信息] 加载 .env 配置...",
-  "    for /f \"usebackq tokens=1,* delims==\" %%a in (\".env\") do (",
-  "        if not \"%%a\"==\"\" if not \"%%a:~0,1%\"==\"#\" (",
-  "            set \"%%a=%%b\"",
-  "        )",
-  "    )",
+  "    for /f \"usebackq delims=\" %%e in (`node -e \"require('fs').readFileSync('.env','utf8').split(/\\r?\\n/).filter(function(l){l=l.trim();return l&&l.indexOf('#')!==0&&l.includes('=')}).forEach(function(l){var i=l.indexOf('=');console.log(l.substring(0,i)+'='+l.substring(i+1))})\"`) do set \"%%e\"",
   ") else if exist \".env.production\" (",
   "    echo [信息] 加载 .env.production 配置...",
-  "    for /f \"usebackq tokens=1,* delims==\" %%a in (\".env.production\") do (",
-  "        if not \"%%a\"==\"\" if not \"%%a:~0,1%\"==\"#\" (",
-  "            set \"%%a=%%b\"",
-  "        )",
-  "    )",
+  "    for /f \"usebackq delims=\" %%e in (`node -e \"require('fs').readFileSync('.env.production','utf8').split(/\\r?\\n/).filter(function(l){l=l.trim();return l&&l.indexOf('#')!==0&&l.includes('=')}).forEach(function(l){var i=l.indexOf('=');console.log(l.substring(0,i)+'='+l.substring(i+1))})\"`) do set \"%%e\"",
   ")",
   "",
   ":: 设置默认值",
