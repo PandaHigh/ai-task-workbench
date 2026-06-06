@@ -3,6 +3,7 @@ import { engineClient } from "../lib/engine-client";
 import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
+import { useChatStore } from "../stores/chat-store";
 import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
 
 export function useNotifications() {
@@ -164,6 +165,42 @@ export function useNotifications() {
           const progress = params as unknown as AgentProgress;
           const { updateAgentProgress } = useEvolutionStore.getState();
           updateAgentProgress(progress.role, progress);
+          break;
+        }
+        case "chat.stream": {
+          const { sessionId, type, content, toolName, success, resultPreview } = params as {
+            sessionId: string;
+            type: string;
+            content?: string;
+            toolName?: string;
+            success?: boolean;
+            resultPreview?: string;
+          };
+          const chatStore = useChatStore.getState();
+          if (chatStore.sessionId !== sessionId) break;
+          if (type === "text_delta" && content) {
+            chatStore.appendStreamContent(content);
+          } else if (type === "tool_executing" && toolName) {
+            chatStore.addToolCall({ method: toolName, status: "executing" });
+          } else if (type === "tool_complete" && toolName) {
+            chatStore.updateToolCall(toolName, success ? "completed" : "error", resultPreview);
+          }
+          break;
+        }
+        case "chat.complete": {
+          const { sessionId } = params as { sessionId: string };
+          const chatStore = useChatStore.getState();
+          if (chatStore.sessionId === sessionId) {
+            chatStore.finalizeAssistantMessage();
+          }
+          break;
+        }
+        case "chat.error": {
+          const { sessionId, error } = params as { sessionId: string; error: string };
+          const chatStore = useChatStore.getState();
+          if (chatStore.sessionId === sessionId) {
+            chatStore.setError(error);
+          }
           break;
         }
       }

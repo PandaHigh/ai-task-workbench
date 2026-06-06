@@ -5,39 +5,6 @@ import { useTheme } from "../../hooks/useTheme";
 import { useDesktopEngine } from "../../hooks/useDesktopEngine";
 import { RobotMascot } from "../dashboard/RobotMascot";
 
-const navItems = [
-  {
-    path: "/",
-    label: "首页",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 6.5L8 2l6 4.5V13a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z" />
-        <path d="M6 14V8h4v6" />
-      </svg>
-    ),
-  },
-  {
-    path: "/wizard",
-    label: "创建任务",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="8" y1="2" x2="8" y2="14" />
-        <line x1="2" y1="8" x2="14" y2="8" />
-      </svg>
-    ),
-  },
-  {
-    path: "/settings",
-    label: "设置",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8" cy="8" r="2.5" />
-        <path d="M13.3 10a1.2 1.2 0 00.2 1.3l.1.1a1.45 1.45 0 11-2.05 2.05l-.1-.1a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.73 1.1v.3a1.45 1.45 0 11-2.9 0v-.15a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.1.1a1.45 1.45 0 11-2.05-2.05l.1-.1a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.73h-.3a1.45 1.45 0 110-2.9h.15a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.1-.1A1.45 1.45 0 114.45 2.7l.1.1a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.73-1.1v-.3a1.45 1.45 0 012.9 0v.15a1.2 1.2 0 00.73 1.1 1.2 1.2 0 001.3-.2l.1-.1a1.45 1.45 0 112.05 2.05l-.1.1a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.73h.3a1.45 1.45 0 010 2.9h-.15a1.2 1.2 0 00-1.1.73z" />
-      </svg>
-    ),
-  },
-];
-
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -50,6 +17,9 @@ export function Sidebar() {
     navigate(path);
     setMobileOpen(false);
   }, [navigate]);
+
+  const isAssistant = location.pathname === "/";
+  const isSettings = location.pathname.startsWith("/settings");
 
   return (
     <>
@@ -154,25 +124,36 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-0.5" aria-label="主导航">
-          {navItems.map((item) => {
-            const isActive =
-              item.path === "/"
-                ? location.pathname === "/"
-                : location.pathname.startsWith(item.path);
+          {/* AI 助手 */}
+          <button
+            onClick={() => handleNav("/")}
+            aria-current={isAssistant ? "page" : undefined}
+            aria-label="AI 助手"
+            className={`nav-item ${isAssistant ? "active" : ""}`}
+          >
+            <span className="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 10c0 .6-.4 1-1 1H5l-3 3V3c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v7z" />
+              </svg>
+            </span>
+            <span>AI 助手</span>
+          </button>
 
-            return (
-              <button
-                key={item.path}
-                onClick={() => handleNav(item.path)}
-                aria-current={isActive ? "page" : undefined}
-                aria-label={item.label}
-                className={`nav-item ${isActive ? "active" : ""}`}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {/* 设置 */}
+          <button
+            onClick={() => handleNav("/settings")}
+            aria-current={isSettings ? "page" : undefined}
+            aria-label="设置"
+            className={`nav-item ${isSettings ? "active" : ""}`}
+          >
+            <span className="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="2.5" />
+                <path d="M13.3 10a1.2 1.2 0 00.2 1.3l.1.1a1.45 1.45 0 11-2.05 2.05l-.1-.1a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.73 1.1v.3a1.45 1.45 0 11-2.9 0v-.15a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.1.1a1.45 1.45 0 11-2.05-2.05l.1-.1a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.73h-.3a1.45 1.45 0 110-2.9h.15a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.1-.1A1.45 1.45 0 114.45 2.7l.1.1a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.73-1.1v-.3a1.45 1.45 0 012.9 0v.15a1.2 1.2 0 00.73 1.1 1.2 1.2 0 001.3-.2l.1-.1a1.45 1.45 0 112.05 2.05l-.1.1a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.73h.3a1.45 1.45 0 010 2.9h-.15a1.2 1.2 0 00-1.1.73z" />
+              </svg>
+            </span>
+            <span>设置</span>
+          </button>
         </nav>
 
         {/* Status - restart button for desktop when disconnected */}
