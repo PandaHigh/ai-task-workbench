@@ -18,6 +18,8 @@ import type { QueueManager } from "./queue-manager.js";
 import { ApprovalGate, type ApprovalDecision } from "./approval-gate.js";
 import { OmxAmpPipeline } from "./omx-pipeline.js";
 import { OmxAmpTeamOrchestrator, type TeamConfig } from "./omx-team/team-orchestrator.js";
+import { TaskRouter } from "./router/index.js";
+import type { ComplexityAssessment, RoutingContext } from "./router/index.js";
 
 // AgentExecutor removed — OMX pipeline uses OmxAmpPipeline instead
 import { BranchStrategy } from "../git/branch-strategy.js";
@@ -59,6 +61,7 @@ export class Executor {
   private approvalGate: ApprovalGate | null = null;
   private cachedCost: number | null = null;
   private maxConcurrency: number = 1;
+  private taskRouter: TaskRouter;
   private config: {
     qualityThreshold: number;
     maxEvaluationCycles: number;
@@ -79,6 +82,8 @@ export class Executor {
     this.store = store ?? new Store();
     this.ccClient = new CCClient((this.store.getConfig("claudePath") as string) || undefined);
     this.skillManager = new SkillManager(new SkillStore(), () => {});
+    this.taskRouter = new TaskRouter(this.ccClient);
+    this.taskRouter.setNotifyFn((method, params) => this.broadcast(method, params));
     this.config = {
       qualityThreshold: DEFAULT_QUALITY_THRESHOLD,
       maxEvaluationCycles: DEFAULT_MAX_EVALUATION_CYCLES,
@@ -204,7 +209,40 @@ export class Executor {
       this.store.updateTask(run.id, firstTask.id, { status: "running", startedAt: Date.now() });
       this.broadcast("task.status", { taskId: firstTask.id, runId: run.id, status: "running" });
       this.broadcast("queue.updated", { runId: run.id, queue: this.queueManager.list(run.id) });
-      await this.executeSingleTask(firstTask, run);
+
+      // Task Router: analyze complexity and choose execution strategy
+      const routingCtx: RoutingContext = {
+        runId: run.id,
+        workingDir: run.workingDir,
+        completedTaskCount: run.totalTasksCompleted,
+        costUsedUsd: run.totalCostUsd,
+        costBudgetUsd: this.config.maxBudgetUsd,
+        startedAt: run.startedAt,
+        hasGoals: run.goals.length > 0,
+      };
+
+      let routeAssessment: ComplexityAssessment | null = null;
+      try {
+        routeAssessment = await this.taskRouter.analyze(firstTask, routingCtx);
+        this.log(run.id, "router", "info",
+          `Task routed: ${routeAssessment.strategy.type}${routeAssessment.strategy.type === "builtin" ? `:${(routeAssessment.strategy as { type: "builtin"; templateName: string }).templateName}` : ""} (confidence: ${(routeAssessment.confidence * 100).toFixed(0)}%, ${routeAssessment.reason})`,
+          firstTask.id);
+      } catch (routeErr) {
+        this.log(run.id, "router", "warn", `Routing analysis failed: ${routeErr instanceof Error ? routeErr.message : String(routeErr)}`);
+      }
+
+      // Route to appropriate execution path
+      const strategy = routeAssessment?.strategy ?? { type: "builtin", templateName: "omx-pipeline" };
+
+      if (strategy.type === "direct") {
+        // Simple task: skip full pipeline, execute via single CC call
+        await this.executeDirectTask(firstTask, run);
+      } else {
+        // Default: go through OMX pipeline (builtin:omx-pipeline or future workflow templates)
+        // When WorkflowRuntime is ready (Phase 2), this will delegate to it
+        await this.executeSingleTask(firstTask, run);
+      }
+
       run.totalTasksCompleted++;
       this.store.saveRun(run);
       return;
@@ -531,6 +569,80 @@ export class Executor {
    * Execute a single task using the OMX 5-stage pipeline.
    * This is the ONLY method that differs from the old executor.
    */
+  /**
+   * Direct execution path for simple tasks.
+   * Skips the full OMX pipeline and executes via a single CC call.
+   */
+  private async executeDirectTask(task: TaskDefinition, run: ExecutionRun): Promise<void> {
+    const abortController = new AbortController();
+    this.abortControllers.set(task.id, abortController);
+    const gitManager = new GitManager({ workingDir: run.workingDir });
+
+    try {
+      await gitManager.ensureInit();
+
+      this.log(run.id, "direct", "info", `[Direct] Executing simple task: ${task.content.substring(0, 80)}...`);
+
+      const prompt = task.promptJson
+        ? `任务: ${task.content}\n\n详细指令:\n${task.promptJson}`
+        : `任务: ${task.content}\n\n请完成上述任务。工作目录: ${run.workingDir}`;
+
+      const stream = this.ccClient.executeTaskStream(prompt, {
+        workingDir: run.workingDir,
+        timeoutMinutes: task.timeoutMinutes || 3,
+        maxTurns: 10,
+      });
+
+      let output = "";
+      for await (const msg of stream) {
+        if (msg.type === "assistant") {
+          const content = (msg as unknown as Record<string, unknown>);
+          if (typeof content.content === "string") output += content.content;
+          else if (content.message && typeof (content.message as Record<string, unknown>).content === "object") {
+            const blocks = (content.message as Record<string, unknown>).content as Array<Record<string, unknown>>;
+            for (const block of blocks) {
+              if (block.type === "text" && typeof block.text === "string") output += block.text;
+            }
+          }
+        }
+        if (msg.type === "result" && typeof msg.result === "string") {
+          if (!output && msg.result) output = msg.result;
+        }
+      }
+
+      // Simple scoring for direct tasks
+      const score: ScoreDetails = {
+        overall: 0.8,
+        goalAlignment: 0.8,
+        correctness: 0.8,
+        completeness: 0.8,
+        quality: 0.8,
+        passed: true,
+        reasoning: "Direct execution — auto-assumed passing for simple task",
+      };
+
+      this.store.appendScore(run.id, task.id, score);
+      this.store.updateTask(run.id, task.id, {
+        status: "completed",
+        completedAt: Date.now(),
+        result: output,
+        score: score.overall,
+        scoreDetails: score,
+      });
+      this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
+      this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
+
+      this.log(run.id, "direct", "info", `Direct task completed successfully`, task.id);
+    } catch (err) {
+      const msg = errorToMessage(err);
+      this.log(run.id, "direct", "error", `Direct execution failed: ${msg}`, task.id);
+      this.store.updateTask(run.id, task.id, { status: "failed", completedAt: Date.now(), errorMessage: msg });
+      this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: msg });
+    } finally {
+      this.abortControllers.delete(task.id);
+    }
+  }
+
   private async executeSingleTask(task: TaskDefinition, run: ExecutionRun): Promise<void> {
     const gitManager = new GitManager({ workingDir: run.workingDir });
     const abortController = new AbortController();

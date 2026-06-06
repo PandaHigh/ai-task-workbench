@@ -4,6 +4,7 @@ import { useTaskStore } from "../stores/task-store";
 import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
 import { useChatStore } from "../stores/chat-store";
+import { useWorkflowStore } from "../stores/workflow-store";
 import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
 
 export function useNotifications() {
@@ -201,6 +202,100 @@ export function useNotifications() {
           if (chatStore.sessionId === sessionId) {
             chatStore.setError(error);
           }
+          break;
+        }
+
+        // ─── Router & Workflow notifications ─────────────────────────
+
+        case "router.decision": {
+          const { decision } = params as { decision: { taskId?: string; taskSummary: string; strategy: { type: string; templateName?: string }; level: string; reason: string; confidence: number; timestamp: number } };
+          useWorkflowStore.getState().addRouterDecision(decision);
+          break;
+        }
+
+        case "workflow.started": {
+          const { executionId, definitionId, definitionName, stageCount } = params as { executionId: string; definitionId: string; definitionName: string; stageCount: number };
+          const stages = Array.from({ length: stageCount }, (_, i) => ({
+            stageId: `stage-${i}`,
+            stageName: `阶段 ${i + 1}`,
+            status: "pending" as const,
+          }));
+          useWorkflowStore.getState().updateWorkflowProgress({
+            executionId,
+            definitionId,
+            definitionName,
+            status: "running",
+            stages,
+            currentStageIndex: 0,
+            totalAgents: 0,
+            completedAgents: 0,
+            totalCostUsd: 0,
+            totalDurationMs: 0,
+          });
+          break;
+        }
+
+        case "workflow.phase.started":
+        case "workflow.phase.completed":
+        case "workflow.phase.failed": {
+          const { executionId, stageId, stageName } = params as { executionId: string; stageId: string; stageName: string; durationMs?: number; costUsd?: number };
+          const wfStore = useWorkflowStore.getState();
+          const existing = wfStore.activeWorkflows.get(executionId);
+          if (existing) {
+            const stageStatus = method === "workflow.phase.failed" ? "failed" as const : method === "workflow.phase.started" ? "running" as const : "passed" as const;
+            const stages = existing.stages.map((s) =>
+              s.stageId === stageId ? { ...s, status: stageStatus, stageName: stageName || s.stageName, ...(method === "workflow.phase.completed" ? { durationMs: (params as { durationMs?: number }).durationMs, costUsd: (params as { costUsd?: number }).costUsd } : {}) } : s
+            );
+            wfStore.updateWorkflowProgress({ executionId, stages });
+          }
+          break;
+        }
+
+        case "workflow.agent.started": {
+          const { executionId } = params as { executionId: string };
+          const wfStore = useWorkflowStore.getState();
+          const existing = wfStore.activeWorkflows.get(executionId);
+          if (existing) {
+            wfStore.updateWorkflowProgress({ executionId, totalAgents: existing.totalAgents + 1 });
+          }
+          break;
+        }
+
+        case "workflow.agent.completed": {
+          const { executionId } = params as { executionId: string };
+          const wfStore = useWorkflowStore.getState();
+          const existing = wfStore.activeWorkflows.get(executionId);
+          if (existing) {
+            wfStore.updateWorkflowProgress({ executionId, completedAgents: existing.completedAgents + 1 });
+          }
+          break;
+        }
+
+        case "workflow.completed": {
+          const { executionId, status, totalDurationMs, totalCostUsd, totalAgents } = params as { executionId: string; status: string; totalDurationMs: number; totalCostUsd: number; totalAgents: number };
+          useWorkflowStore.getState().updateWorkflowProgress({
+            executionId,
+            status: status as "completed" | "failed" | "cancelled",
+            totalDurationMs,
+            totalCostUsd,
+            totalAgents,
+          });
+          break;
+        }
+
+        case "workflow.error": {
+          const { executionId } = params as { executionId: string; error: string };
+          useWorkflowStore.getState().updateWorkflowProgress({ executionId, status: "failed" });
+          break;
+        }
+
+        case "workflow.loop.iteration": {
+          // Loop iterations are informational, no state update needed
+          break;
+        }
+
+        case "workflow.adversarial.vote": {
+          // Adversarial votes are informational
           break;
         }
       }

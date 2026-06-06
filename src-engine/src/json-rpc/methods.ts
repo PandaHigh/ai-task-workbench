@@ -1,8 +1,9 @@
-import type { ExecutionRun } from "@ai-workbench/shared";
+import type { ExecutionRun, TaskDefinition } from "@ai-workbench/shared";
 import { Store } from "../db/store.js";
 import { ShareStore } from "../db/share-store.js";
 import { SubscriptionStore } from "../db/subscription-store.js";
 import { SkillStore } from "../db/skill-store.js";
+import { CCClient } from "../cc-integration/cc-client.js";
 import { SkillManager } from "../skills/skill-manager.js";
 import { QueueManager } from "../engine/queue-manager.js";
 import { Executor } from "../engine/omx-executor.js";
@@ -1355,4 +1356,265 @@ methodHandlers["wecom.test"] = async (params) => {
   const content = requireNonEmptyString(params, "content");
   await wecomBot.sendProactiveMessage(target, content);
   return { sent: true };
+};
+
+// ─── Task Router ────────────────────────────────────────────────────────
+
+import { TaskRouter } from "../engine/router/index.js";
+
+const taskRouter = new TaskRouter();
+
+methodHandlers["router.analyze"] = async (params) => {
+  const content = requireNonEmptyString(params, "content");
+  const runId = requireString(params, "runId");
+
+  const run = store.getRun(runId);
+  if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+
+  // Create a temporary task for routing analysis
+  const tempTask: TaskDefinition = {
+    id: "router-temp",
+    runId,
+    type: "user_defined",
+    priority: 1,
+    content,
+    timeoutMinutes: 5,
+    promptJson: "",
+    status: "pending",
+    createdAt: Date.now(),
+  };
+
+  const routingCtx = {
+    runId,
+    workingDir: run.workingDir,
+    completedTaskCount: run.totalTasksCompleted,
+    costUsedUsd: run.totalCostUsd,
+    costBudgetUsd: Infinity,
+    startedAt: run.startedAt,
+    hasGoals: run.goals.length > 0,
+  };
+
+  const assessment = await taskRouter.analyze(tempTask, routingCtx);
+  return { assessment };
+};
+
+methodMeta["router.analyze"] = {
+  description: "分析任务复杂度并返回路由决策（direct / builtin:xxx / dynamic）",
+  params: [
+    { name: "content", type: "string", required: true, description: "任务内容" },
+    { name: "runId", type: "string", required: true, description: "关联的 run ID" },
+  ],
+  category: "router",
+};
+
+// ─── Workflow ───────────────────────────────────────────────────────────
+
+import { WorkflowRuntime, WorkflowGenerator, WorkflowStore } from "../engine/workflow/index.js";
+import type { WorkflowDefinition } from "../engine/workflow/index.js";
+
+const workflowStore = new WorkflowStore();
+
+// Initialize built-in templates on first call
+import { registerBuiltinWorkflows } from "../engine/workflow/builtins/index.js";
+
+let workflowInitialized = false;
+async function ensureWorkflowInit(): Promise<void> {
+  if (workflowInitialized) return;
+  await workflowStore.load();
+  await registerBuiltinWorkflows(async (def) => {
+    await workflowStore.register(def);
+  });
+  workflowInitialized = true;
+}
+
+methodHandlers["workflow.list"] = async () => {
+  await ensureWorkflowInit();
+  const defs = workflowStore.list();
+  return { workflows: defs.map((d) => ({ id: d.id, name: d.name, description: d.description, tags: d.tags, isBuiltIn: d.isBuiltIn, useCase: d.useCase })) };
+};
+
+methodMeta["workflow.list"] = {
+  description: "列出所有可用 workflow（内置 + 用户保存的）",
+  params: [],
+  category: "workflow",
+};
+
+methodHandlers["workflow.generate"] = async (params) => {
+  const content = requireNonEmptyString(params, "content");
+  const runId = requireString(params, "runId");
+
+  const run = store.getRun(runId);
+  if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+
+  const tempTask: TaskDefinition = {
+    id: `gen-${Date.now()}`,
+    runId,
+    type: "user_defined",
+    priority: 1,
+    content,
+    timeoutMinutes: 5,
+    promptJson: "",
+    status: "pending",
+    createdAt: Date.now(),
+  };
+
+  const defs = workflowStore.list();
+  const generator = new WorkflowGenerator();
+  const definition = await generator.generate(tempTask, {
+    workingDir: run.workingDir,
+    availableTemplates: defs.map((d) => d.id),
+    budgetRemaining: Infinity,
+  });
+
+  return { definition };
+};
+
+methodMeta["workflow.generate"] = {
+  description: "让 AI 为任务动态生成一个 workflow 定义",
+  params: [
+    { name: "content", type: "string", required: true, description: "任务内容" },
+    { name: "runId", type: "string", required: true, description: "关联的 run ID" },
+  ],
+  category: "workflow",
+};
+
+methodHandlers["workflow.start"] = async (params) => {
+  const definitionId = requireNonEmptyString(params, "definitionId");
+  const runId = requireNonEmptyString(params, "runId");
+
+  const run = store.getRun(runId);
+  if (!run) throw new RpcValidationError(`Run not found: ${runId}`);
+
+  const tasks = store.listTasks(runId);
+  const task = tasks.find((t) => t.status === "pending" || t.status === "running");
+  if (!task) throw new RpcValidationError("No pending/running task found for this run");
+
+  await ensureWorkflowInit();
+  const definition = workflowStore.get(definitionId);
+  if (!definition) throw new RpcValidationError(`Workflow not found: ${definitionId}`);
+
+  const notifyFn = (method: string, p: Record<string, unknown>) => {
+    notify(method, p);
+  };
+
+  const ccPath = (store.getConfig("claudePath") as string) || undefined;
+  const ccClient = new CCClient(ccPath);
+  const runtime = new WorkflowRuntime(ccClient, notifyFn);
+
+  // Run workflow asynchronously
+  const result = await runtime.execute(definition, task, run.workingDir);
+
+  return {
+    status: "completed",
+    finalOutput: result.finalOutput,
+    totalDurationMs: result.totalDurationMs,
+    totalCostUsd: result.totalCostUsd,
+    totalAgents: result.totalAgents,
+    allGatesPassed: result.allGatesPassed,
+  };
+};
+
+methodMeta["workflow.start"] = {
+  description: "启动一个 workflow 执行",
+  params: [
+    { name: "definitionId", type: "string", required: true, description: "Workflow 定义 ID" },
+    { name: "runId", type: "string", required: true, description: "关联的 run ID" },
+  ],
+  category: "workflow",
+};
+
+methodHandlers["workflow.status"] = async (params) => {
+  const runId = requireString(params, "runId");
+  const executions = workflowStore.listExecutions(runId);
+  return { executions };
+};
+
+methodMeta["workflow.status"] = {
+  description: "查询 workflow 执行状态",
+  params: [
+    { name: "runId", type: "string", required: false, description: "过滤指定 run 的执行记录" },
+  ],
+  category: "workflow",
+};
+
+methodHandlers["workflow.save"] = async (params) => {
+  const definition = params.definition as WorkflowDefinition | undefined;
+  if (!definition || !definition.id || !definition.name) {
+    throw new RpcValidationError("Invalid workflow definition: must include id and name");
+  }
+  await ensureWorkflowInit();
+  await workflowStore.register({ ...definition, isBuiltIn: false, createdAt: Date.now() });
+  return { saved: true, id: definition.id };
+};
+
+methodMeta["workflow.save"] = {
+  description: "保存一个 workflow 定义供复用",
+  params: [
+    { name: "definition", type: "object", required: true, description: "WorkflowDefinition 对象" },
+  ],
+  category: "workflow",
+};
+
+// ─── Loop Scheduler ─────────────────────────────────────────────────────
+
+import { LoopScheduler } from "../engine/loop/loop-scheduler.js";
+
+const loopScheduler = new LoopScheduler((method, params) => notify(method, params));
+
+methodHandlers["loop.create"] = async (params) => {
+  const runId = requireNonEmptyString(params, "runId");
+  const taskTemplate = requireNonEmptyString(params, "taskTemplate");
+  const intervalMinSec = typeof params.intervalMinSec === "number" ? params.intervalMinSec : 60;
+  const intervalMaxSec = typeof params.intervalMaxSec === "number" ? params.intervalMaxSec : 3600;
+
+  const loop = loopScheduler.create({
+    id: `loop-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    runId,
+    taskTemplate,
+    intervalMinSec,
+    intervalMaxSec,
+    stopCondition: typeof params.stopCondition === "string" ? params.stopCondition : undefined,
+  });
+
+  return { loopId: loop.id, intervalSec: loop.currentIntervalSec };
+};
+
+methodMeta["loop.create"] = {
+  description: "创建一个自适应定时循环任务",
+  params: [
+    { name: "runId", type: "string", required: true, description: "关联的 run ID" },
+    { name: "taskTemplate", type: "string", required: true, description: "每次执行的任务模板" },
+    { name: "intervalMinSec", type: "number", required: false, description: "最小间隔（秒），默认 60" },
+    { name: "intervalMaxSec", type: "number", required: false, description: "最大间隔（秒），默认 3600" },
+    { name: "stopCondition", type: "string", required: false, description: "停止条件描述" },
+  ],
+  category: "loop",
+};
+
+methodHandlers["loop.cancel"] = async (params) => {
+  const loopId = requireNonEmptyString(params, "loopId");
+  const cancelled = loopScheduler.cancel(loopId);
+  return { cancelled };
+};
+
+methodMeta["loop.cancel"] = {
+  description: "取消一个循环任务",
+  params: [
+    { name: "loopId", type: "string", required: true, description: "循环任务 ID" },
+  ],
+  category: "loop",
+};
+
+methodHandlers["loop.list"] = async (params) => {
+  const runId = typeof params.runId === "string" ? params.runId : undefined;
+  const loops = loopScheduler.list(runId);
+  return { loops: loops.map((l) => ({ id: l.id, runId: l.runId, active: l.active, currentIntervalSec: l.currentIntervalSec, executionCount: l.history.length })) };
+};
+
+methodMeta["loop.list"] = {
+  description: "列出循环任务",
+  params: [
+    { name: "runId", type: "string", required: false, description: "过滤指定 run" },
+  ],
+  category: "loop",
 };
