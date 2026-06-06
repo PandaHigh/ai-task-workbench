@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { classifyError, getRetryStrategy, TaskError, type ErrorCategory } from "../../src-engine/src/lib/error-types.js";
+import {
+  classifyError,
+  getRetryStrategy,
+  TaskError,
+  type ErrorCategory,
+} from "../../src-engine/src/lib/error-types.js";
 
 describe("classifyError", () => {
   it("passes through existing TaskError", () => {

@@ -17,9 +17,7 @@ vi.mock("../../src-engine/src/db/store-utils.js", () => ({
 
 // ── Import after mocks ─────────────────────────────────────────────────────
 
-const { PluginRegistry } = await import(
-  "../../src-engine/src/plugins/plugin-registry.js"
-);
+const { PluginRegistry } = await import("../../src-engine/src/plugins/plugin-registry.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -39,9 +37,7 @@ describe("PluginRegistry", () => {
     mockEnsureDir.mockReturnValue(undefined);
     mockReadJsonFile.mockReturnValue([]);
     mockWriteJsonFile.mockReturnValue(undefined);
-    mockRandomUUID.mockReturnValue(
-      "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-    );
+    mockRandomUUID.mockReturnValue("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
     registry = new PluginRegistry("/data");
   });
@@ -61,10 +57,7 @@ describe("PluginRegistry", () => {
     expect(entry.startedAt).toBeUndefined();
     expect(entry.error).toBeUndefined();
 
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/plugins.json",
-      [entry]
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/plugins.json", [entry]);
   });
 
   // ── list ─────────────────────────────────────────────────────────────

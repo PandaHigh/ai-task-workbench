@@ -147,10 +147,7 @@ describe("E2E: DAG Task Dependencies", () => {
   });
 
   it("DAGScheduler detects cycles", () => {
-    const tasks = [
-      makeTask("a", { dependsOn: ["b"] }),
-      makeTask("b", { dependsOn: ["a"] }),
-    ];
+    const tasks = [makeTask("a", { dependsOn: ["b"] }), makeTask("b", { dependsOn: ["a"] })];
     expect(() => new DAGScheduler(tasks)).toThrow("Circular dependency");
   });
 
@@ -165,17 +162,20 @@ describe("E2E: DAG Task Dependencies", () => {
 
     // d first
     const r1 = dag.getReadyTasks();
-    expect(r1.map(t => t.id)).toEqual(["d"]);
+    expect(r1.map((t) => t.id)).toEqual(["d"]);
     dag.markCompleted("d");
 
     // b and c in parallel
-    const r2 = dag.getReadyTasks().map(t => t.id).sort();
+    const r2 = dag
+      .getReadyTasks()
+      .map((t) => t.id)
+      .sort();
     expect(r2).toEqual(["b", "c"]);
     dag.markCompleted("b");
     dag.markCompleted("c");
 
     // a last
-    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["a"]);
+    expect(dag.getReadyTasks().map((t) => t.id)).toEqual(["a"]);
   });
 });
 
@@ -204,7 +204,7 @@ describe("E2E: Parallel Execution Pool", () => {
 
     const results = await pool.runAll(tasks, scheduler);
     expect(results).toHaveLength(4);
-    expect(results.every(r => r.success)).toBe(true);
+    expect(results.every((r) => r.success)).toBe(true);
 
     // d must come before b and c
     expect(executed.indexOf("d")).toBeLessThan(executed.indexOf("b"));
@@ -215,24 +215,17 @@ describe("E2E: Parallel Execution Pool", () => {
   });
 
   it("handles partial failures without blocking other tasks", async () => {
-    const tasks = [
-      makeTask("t1"),
-      makeTask("t2"),
-      makeTask("t3"),
-    ];
+    const tasks = [makeTask("t1"), makeTask("t2"), makeTask("t3")];
     const scheduler = new DAGScheduler(tasks);
-    const pool = new ExecutionPool(
-      async (t) => {
-        if (t.id === "t2") throw new Error("Task t2 failed");
-      },
-      3,
-    );
+    const pool = new ExecutionPool(async (t) => {
+      if (t.id === "t2") throw new Error("Task t2 failed");
+    }, 3);
 
     const results = await pool.runAll(tasks, scheduler);
-    expect(results.find(r => r.task.id === "t1")?.success).toBe(true);
-    expect(results.find(r => r.task.id === "t2")?.success).toBe(false);
-    expect(results.find(r => r.task.id === "t2")?.error).toBe("Task t2 failed");
-    expect(results.find(r => r.task.id === "t3")?.success).toBe(true);
+    expect(results.find((r) => r.task.id === "t1")?.success).toBe(true);
+    expect(results.find((r) => r.task.id === "t2")?.success).toBe(false);
+    expect(results.find((r) => r.task.id === "t2")?.error).toBe("Task t2 failed");
+    expect(results.find((r) => r.task.id === "t3")?.success).toBe(true);
   });
 });
 
@@ -242,21 +235,18 @@ describe("E2E: Parallel Execution Pool", () => {
 
 describe("E2E: Conditional Branching", () => {
   it("skips tasks whose condition is false, runs when condition becomes true", () => {
-    const tasks = [
-      makeTask("t1"),
-      makeTask("t2", { condition: "lastScore >= 0.8" }),
-    ];
+    const tasks = [makeTask("t1"), makeTask("t2", { condition: "lastScore >= 0.8" })];
     const dag = new DAGScheduler(tasks, { lastScore: 0.3 });
 
     // Only t1 is ready (t2 condition not met)
     let ready = dag.getReadyTasks();
-    expect(ready.map(t => t.id)).toEqual(["t1"]);
+    expect(ready.map((t) => t.id)).toEqual(["t1"]);
 
     // Complete t1 and update context
     dag.markCompleted("t1");
     dag.updateContext({ lastScore: 0.9 });
     ready = dag.getReadyTasks();
-    expect(ready.map(t => t.id)).toEqual(["t2"]);
+    expect(ready.map((t) => t.id)).toEqual(["t2"]);
   });
 
   it("supports complex conditions with multiple variables", () => {
@@ -268,11 +258,11 @@ describe("E2E: Conditional Branching", () => {
     const dag = new DAGScheduler(tasks, { completedCount: 0, cycleCount: 3, failedCount: 0 });
 
     // Only t1 (t2 needs completedCount >= 1, t3 needs failedCount > 0)
-    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["t1"]);
+    expect(dag.getReadyTasks().map((t) => t.id)).toEqual(["t1"]);
 
     dag.markCompleted("t1");
     // Now t2 is ready (completedCount=1, cycleCount=3<5)
-    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["t2"]);
+    expect(dag.getReadyTasks().map((t) => t.id)).toEqual(["t2"]);
     // t3 still blocked (failedCount=0)
   });
 
@@ -295,18 +285,14 @@ describe("E2E: DAG Visualization Data", () => {
   it("positions all nodes in layout", () => {
     // We test the layout algorithm by importing the component's logic
     // The component uses layoutDAG internally, we test via DAGScheduler
-    const tasks = [
-      makeTask("a", { dependsOn: ["b"] }),
-      makeTask("b", { dependsOn: ["c"] }),
-      makeTask("c"),
-    ];
+    const tasks = [makeTask("a", { dependsOn: ["b"] }), makeTask("b", { dependsOn: ["c"] }), makeTask("c")];
     const dag = new DAGScheduler(tasks);
     const ready = dag.getReadyTasks();
-    expect(ready.map(t => t.id)).toEqual(["c"]);
+    expect(ready.map((t) => t.id)).toEqual(["c"]);
     dag.markCompleted("c");
-    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["b"]);
+    expect(dag.getReadyTasks().map((t) => t.id)).toEqual(["b"]);
     dag.markCompleted("b");
-    expect(dag.getReadyTasks().map(t => t.id)).toEqual(["a"]);
+    expect(dag.getReadyTasks().map((t) => t.id)).toEqual(["a"]);
   });
 
   it("empty tasks produces empty ready list", () => {
@@ -315,8 +301,6 @@ describe("E2E: DAG Visualization Data", () => {
     expect(dag.hasUnfinishedTasks()).toBe(false);
   });
 });
-
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Feature 9: Autonomy Level + Real-time Intervention
@@ -446,13 +430,10 @@ describe("E2E: Cross-feature Integration", () => {
     ];
 
     const scheduler = new DAGScheduler(tasks, { completedCount: 0 });
-    const pool = new ExecutionPool(
-      async (t) => {
-        order.push(t.id);
-        await new Promise((r) => setTimeout(r, 10));
-      },
-      2,
-    );
+    const pool = new ExecutionPool(async (t) => {
+      order.push(t.id);
+      await new Promise((r) => setTimeout(r, 10));
+    }, 2);
 
     const results = await pool.runAll(tasks, scheduler);
 
@@ -461,7 +442,7 @@ describe("E2E: Cross-feature Integration", () => {
     // Deploy runs last (depends on lint + test)
     expect(order.indexOf("deploy")).toBe(3);
     // All succeeded
-    expect(results.every(r => r.success)).toBe(true);
+    expect(results.every((r) => r.success)).toBe(true);
   });
 
   it("store round-trip with all new fields", () => {

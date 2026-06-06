@@ -61,7 +61,12 @@ describe("Task Router + Goal + Loop 端到端", () => {
             yield {
               type: "assistant",
               message: {
-                content: [{ type: "text", text: '```json\n{"level":"moderate","strategy":{"type":"pipeline"},"confidence":0.8,"reason":"中等复杂度任务","dimensions":{"scope":0.5,"uncertainty":0.4,"risk":0.5,"parallelism":0.3,"verificationNeed":0.3},"estimatedAgents":5,"estimatedCostUsd":1.5}\n```' }],
+                content: [
+                  {
+                    type: "text",
+                    text: '```json\n{"level":"moderate","strategy":{"type":"pipeline"},"confidence":0.8,"reason":"中等复杂度任务","dimensions":{"scope":0.5,"uncertainty":0.4,"risk":0.5,"parallelism":0.3,"verificationNeed":0.3},"estimatedAgents":5,"estimatedCostUsd":1.5}\n```',
+                  },
+                ],
               },
             };
             yield { type: "result", result: "" };
@@ -71,7 +76,12 @@ describe("Task Router + Goal + Loop 端到端", () => {
             yield {
               type: "assistant",
               message: {
-                content: [{ type: "text", text: '```json\n{"achieved":false,"progress":0.3,"reason":"目标部分完成","evidence":["已完成3个任务"],"milestones":[{"id":"m1","description":"实现功能","status":"in_progress"}],"completedGoals":[],"remainingGoals":["goal 1"],"suggestedStrategy":"continue","strategyReason":"继续执行"}\n```' }],
+                content: [
+                  {
+                    type: "text",
+                    text: '```json\n{"achieved":false,"progress":0.3,"reason":"目标部分完成","evidence":["已完成3个任务"],"milestones":[{"id":"m1","description":"实现功能","status":"in_progress"}],"completedGoals":[],"remainingGoals":["goal 1"],"suggestedStrategy":"continue","strategyReason":"继续执行"}\n```',
+                  },
+                ],
               },
             };
             yield { type: "result", result: "" };
@@ -88,8 +98,13 @@ describe("Task Router + Goal + Loop 端到端", () => {
           }
         }),
         executeTask: vi.fn(async () => ({
-          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
-          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+          result:
+            '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test",
+          totalCostUsd: 0,
+          durationMs: 0,
+          numTurns: 0,
+          messages: [],
         })),
       })),
     }));
@@ -132,10 +147,10 @@ describe("Task Router + Goal + Loop 端到端", () => {
   describe("Task Router — 关键词匹配", () => {
     it("安全审计关键词匹配到 pipeline", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "对整个代码库做安全审计，查找所有安全漏洞",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string }; level: string; confidence: number } };
+      })) as { assessment: { strategy: { type: string }; level: string; confidence: number } };
 
       expect(result.assessment.strategy.type).toBe("pipeline");
       expect(result.assessment.confidence).toBeGreaterThan(0.5);
@@ -143,40 +158,40 @@ describe("Task Router + Goal + Loop 端到端", () => {
 
     it("代码审查关键词匹配到 pipeline", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "帮我做一次全面的代码审查",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string } } };
+      })) as { assessment: { strategy: { type: string } } };
 
       expect(result.assessment.strategy.type).toBe("pipeline");
     });
 
     it("Bug 巡检关键词匹配到 pipeline", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "扫描整个项目，查找所有 bug 和缺陷",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string } } };
+      })) as { assessment: { strategy: { type: string } } };
 
       expect(result.assessment.strategy.type).toBe("pipeline");
     });
 
     it("迁移关键词匹配到 pipeline", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "将整个项目从 JavaScript 迁移到 TypeScript",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string } } };
+      })) as { assessment: { strategy: { type: string } } };
 
       expect(result.assessment.strategy.type).toBe("pipeline");
     });
 
     it("死代码关键词匹配到 pipeline", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "找出项目中所有的死代码和未使用的函数",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string } } };
+      })) as { assessment: { strategy: { type: string } } };
 
       expect(result.assessment.strategy.type).toBe("pipeline");
     });
@@ -187,10 +202,10 @@ describe("Task Router + Goal + Loop 端到端", () => {
   describe("Task Router — CC 评估", () => {
     it("无关键词命中时走 CC 完整评估", async () => {
       const run = await createRun();
-      const result = await methodHandlers["router.analyze"]({
+      const result = (await methodHandlers["router.analyze"]({
         content: "优化数据库查询性能",
         runId: run.id,
-      }) as { assessment: { strategy: { type: string }; confidence: number } };
+      })) as { assessment: { strategy: { type: string }; confidence: number } };
 
       // CC mock 返回 moderate + pipeline
       expect(result.assessment.strategy.type).toBe("pipeline");
@@ -203,12 +218,12 @@ describe("Task Router + Goal + Loop 端到端", () => {
   describe("RPC: Loop Scheduler", () => {
     it("创建循环任务", async () => {
       const run = await createRun();
-      const result = await methodHandlers["loop.create"]({
+      const result = (await methodHandlers["loop.create"]({
         runId: run.id,
         taskTemplate: "检查 git status 是否有变化",
         intervalMinSec: 60,
         intervalMaxSec: 600,
-      }) as { loopId: string; intervalSec: number };
+      })) as { loopId: string; intervalSec: number };
 
       expect(result.loopId).toBeTruthy();
       expect(result.intervalSec).toBe(60);
@@ -221,22 +236,24 @@ describe("Task Router + Goal + Loop 端到端", () => {
         taskTemplate: "检查部署状态",
       });
 
-      const result = await methodHandlers["loop.list"]({ runId: run.id }) as { loops: Array<{ id: string; active: boolean }> };
+      const result = (await methodHandlers["loop.list"]({ runId: run.id })) as {
+        loops: Array<{ id: string; active: boolean }>;
+      };
       expect(result.loops.length).toBe(1);
       expect(result.loops[0].active).toBe(true);
     });
 
     it("取消循环任务", async () => {
       const run = await createRun();
-      const created = await methodHandlers["loop.create"]({
+      const created = (await methodHandlers["loop.create"]({
         runId: run.id,
         taskTemplate: "检查状态",
-      }) as { loopId: string };
+      })) as { loopId: string };
 
-      const result = await methodHandlers["loop.cancel"]({ loopId: created.loopId }) as { cancelled: boolean };
+      const result = (await methodHandlers["loop.cancel"]({ loopId: created.loopId })) as { cancelled: boolean };
       expect(result.cancelled).toBe(true);
 
-      const list = await methodHandlers["loop.list"]({ runId: run.id }) as { loops: Array<{ active: boolean }> };
+      const list = (await methodHandlers["loop.list"]({ runId: run.id })) as { loops: Array<{ active: boolean }> };
       expect(list.loops[0].active).toBe(false);
     });
   });
@@ -284,9 +301,7 @@ describe("Task Router + Goal + Loop 端到端", () => {
         progress: 0.2,
         reason: "部分完成",
         evidence: [],
-        milestones: [
-          { id: "m1", description: "实现功能", status: "blocked", blocker: "缺少 API 文档" },
-        ],
+        milestones: [{ id: "m1", description: "实现功能", status: "blocked", blocker: "缺少 API 文档" }],
         completedGoals: [],
         remainingGoals: ["goal 1"],
         suggestedStrategy: "continue",

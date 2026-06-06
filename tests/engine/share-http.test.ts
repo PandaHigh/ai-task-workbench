@@ -13,7 +13,10 @@ describe("Share HTTP API Integration", () => {
   let server: any;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `ai-workbench-share-http-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `ai-workbench-share-http-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
 
     vi.resetModules();
@@ -48,8 +51,13 @@ describe("Share HTTP API Integration", () => {
     vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
       CCClient: vi.fn(() => ({
         executeTask: vi.fn(async () => ({
-          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
-          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+          result:
+            '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test",
+          totalCostUsd: 0,
+          durationMs: 0,
+          numTurns: 0,
+          messages: [],
         })),
       })),
     }));
@@ -117,29 +125,38 @@ describe("Share HTTP API Integration", () => {
     return methodHandlers["share.create"]({ runId }) as Promise<{ token: string; url: string; apiUrl: string }>;
   }
 
-  function fetchShare(token: string, resource: string, options?: { method?: string; body?: unknown }): Promise<{ status: number; data: unknown }> {
+  function fetchShare(
+    token: string,
+    resource: string,
+    options?: { method?: string; body?: unknown },
+  ): Promise<{ status: number; data: unknown }> {
     return new Promise((resolve, reject) => {
       const opts = options || {};
       const method = opts.method || "GET";
       const urlPath = `/api/share/${token}/${resource}`;
 
-      const req = http.request({
-        hostname: "127.0.0.1",
-        port: serverPort,
-        path: urlPath,
-        method,
-        headers: { "Content-Type": "application/json" },
-      }, (res) => {
-        let body = "";
-        res.on("data", (chunk) => { body += chunk; });
-        res.on("end", () => {
-          try {
-            resolve({ status: res.statusCode || 0, data: JSON.parse(body) });
-          } catch {
-            resolve({ status: res.statusCode || 0, data: body });
-          }
-        });
-      });
+      const req = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: serverPort,
+          path: urlPath,
+          method,
+          headers: { "Content-Type": "application/json" },
+        },
+        (res) => {
+          let body = "";
+          res.on("data", (chunk) => {
+            body += chunk;
+          });
+          res.on("end", () => {
+            try {
+              resolve({ status: res.statusCode || 0, data: JSON.parse(body) });
+            } catch {
+              resolve({ status: res.statusCode || 0, data: body });
+            }
+          });
+        },
+      );
       req.on("error", reject);
       if (opts.body) req.write(JSON.stringify(opts.body));
       req.end();
@@ -425,15 +442,18 @@ describe("Share HTTP API Integration", () => {
       const share = await createShare(run.id);
 
       const corsHeaders = await new Promise<http.IncomingHttpHeaders>((resolve, reject) => {
-        const req = http.request({
-          hostname: "127.0.0.1",
-          port: serverPort,
-          path: `/api/share/${share.token}/run`,
-          method: "OPTIONS",
-          headers: { origin: "http://localhost:9731" },
-        }, (res) => {
-          resolve(res.headers);
-        });
+        const req = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: serverPort,
+            path: `/api/share/${share.token}/run`,
+            method: "OPTIONS",
+            headers: { origin: "http://localhost:9731" },
+          },
+          (res) => {
+            resolve(res.headers);
+          },
+        );
         req.on("error", reject);
         req.end();
       });
@@ -456,19 +476,27 @@ describe("Share HTTP API Integration", () => {
 
     it("should reject requests without token", async () => {
       const res = await new Promise<{ status: number; data: unknown }>((resolve, reject) => {
-        const req = http.request({
-          hostname: "127.0.0.1",
-          port: serverPort,
-          path: "/api/share/",
-          method: "GET",
-        }, (res) => {
-          let body = "";
-          res.on("data", (chunk) => { body += chunk; });
-          res.on("end", () => {
-            try { resolve({ status: res.statusCode || 0, data: JSON.parse(body) }); }
-            catch { resolve({ status: res.statusCode || 0, data: body }); }
-          });
-        });
+        const req = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: serverPort,
+            path: "/api/share/",
+            method: "GET",
+          },
+          (res) => {
+            let body = "";
+            res.on("data", (chunk) => {
+              body += chunk;
+            });
+            res.on("end", () => {
+              try {
+                resolve({ status: res.statusCode || 0, data: JSON.parse(body) });
+              } catch {
+                resolve({ status: res.statusCode || 0, data: body });
+              }
+            });
+          },
+        );
         req.on("error", reject);
         req.end();
       });
@@ -479,7 +507,11 @@ describe("Share HTTP API Integration", () => {
     it("should reject expired tokens", async () => {
       const run = await createRun();
       const pastExpiry = Date.now() - 1000;
-      const share = await methodHandlers["share.create"]({ runId: run.id, label: "expired", expiresAt: pastExpiry }) as { token: string; url: string; apiUrl: string };
+      const share = (await methodHandlers["share.create"]({
+        runId: run.id,
+        label: "expired",
+        expiresAt: pastExpiry,
+      })) as { token: string; url: string; apiUrl: string };
 
       const res = await fetchShare(share.token, "run");
       expect(res.status).toBe(404);

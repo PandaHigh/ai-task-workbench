@@ -48,9 +48,7 @@ describe("ApprovalGate", () => {
 
   describe("waitForApproval", () => {
     it("creates request, persists to store, and sends notification", async () => {
-      const { promise, requestId } = startApproval(
-        "run-1", "task-1", "code", "Test summary", { key: "value" },
-      );
+      const { promise, requestId } = startApproval("run-1", "task-1", "code", "Test summary", { key: "value" });
 
       // Should persist the request
       expect(mockStore.saveApprovalRequest).toHaveBeenCalledWith(
@@ -222,9 +220,7 @@ describe("ApprovalGate", () => {
     });
 
     it("respects custom timeout value", async () => {
-      const { promise } = startApproval(
-        "run-1", "task-1", "code", "Summary", {}, 5000,
-      );
+      const { promise } = startApproval("run-1", "task-1", "code", "Summary", {}, 5000);
 
       vi.advanceTimersByTime(5000);
 
@@ -254,7 +250,9 @@ describe("ApprovalGate", () => {
       expect(gate.pendingApprovalId).toBeNull();
 
       // Handle the rejection to avoid unhandled rejection warning
-      await promise.catch(() => { /* expected */ });
+      await promise.catch(() => {
+        /* expected */
+      });
     });
   });
 

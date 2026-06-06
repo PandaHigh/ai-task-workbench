@@ -108,14 +108,19 @@ describe("QueueManager", () => {
     for (let i = 0; i < 200; i++) {
       queue.enqueue("run-1", { content: `Task ${i}`, type: "smart_task", priority: 1 });
     }
-    expect(() => queue.enqueue("run-1", { content: "Overflow", type: "smart_task", priority: 1 }))
-      .toThrow("Queue is full");
+    expect(() => queue.enqueue("run-1", { content: "Overflow", type: "smart_task", priority: 1 })).toThrow(
+      "Queue is full",
+    );
   });
 
   it("should restore tasks into queue", () => {
     const task = {
-      id: "restored-1", runId: "run-1", content: "Restored",
-      type: "user_defined" as const, priority: 1, status: "pending" as const,
+      id: "restored-1",
+      runId: "run-1",
+      content: "Restored",
+      type: "user_defined" as const,
+      priority: 1,
+      status: "pending" as const,
       createdAt: Date.now(),
     };
     queue.restore("run-1", task);

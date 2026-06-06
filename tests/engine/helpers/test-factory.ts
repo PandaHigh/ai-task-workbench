@@ -67,7 +67,8 @@ export function mockEngineStores() {
  * Mock CCClient to return a successful evaluation result.
  */
 export function mockCCClient(overrides?: { result?: string }) {
-  const defaultResult = '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}';
+  const defaultResult =
+    '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}';
   vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
     CCClient: vi.fn(() => ({
       executeTask: vi.fn(async () => ({

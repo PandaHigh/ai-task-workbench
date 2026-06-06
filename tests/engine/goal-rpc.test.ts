@@ -96,7 +96,7 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
     it("should pause a pursuing goal", async () => {
       const run = await createRun();
       await initGoalState(run.id);
-      const result = await methodHandlers["run.pauseGoal"]({ runId: run.id }) as { goalStatus: string };
+      const result = (await methodHandlers["run.pauseGoal"]({ runId: run.id })) as { goalStatus: string };
       expect(result.goalStatus).toBe("paused");
 
       // Verify persistence
@@ -120,18 +120,15 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
 
     it("should reject when no pursuing goal", async () => {
       const run = await createRun();
-      await expect(methodHandlers["run.pauseGoal"]({ runId: run.id }))
-        .rejects.toThrow("No pursuing goal");
+      await expect(methodHandlers["run.pauseGoal"]({ runId: run.id })).rejects.toThrow("No pursuing goal");
     });
 
     it("should reject non-existent run", async () => {
-      await expect(methodHandlers["run.pauseGoal"]({ runId: "nonexistent" }))
-        .rejects.toThrow("Run not found");
+      await expect(methodHandlers["run.pauseGoal"]({ runId: "nonexistent" })).rejects.toThrow("Run not found");
     });
 
     it("should reject missing runId", async () => {
-      await expect(methodHandlers["run.pauseGoal"]({}))
-        .rejects.toThrow("Missing required parameter: runId");
+      await expect(methodHandlers["run.pauseGoal"]({})).rejects.toThrow("Missing required parameter: runId");
     });
   });
 
@@ -140,7 +137,7 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
       const run = await createRun();
       await initGoalState(run.id);
       await methodHandlers["run.pauseGoal"]({ runId: run.id });
-      const result = await methodHandlers["run.resumeGoal"]({ runId: run.id }) as { goalStatus: string };
+      const result = (await methodHandlers["run.resumeGoal"]({ runId: run.id })) as { goalStatus: string };
       expect(result.goalStatus).toBe("pursuing");
 
       // Verify persistence
@@ -152,8 +149,7 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
 
     it("should reject when no paused goal", async () => {
       const run = await createRun();
-      await expect(methodHandlers["run.resumeGoal"]({ runId: run.id }))
-        .rejects.toThrow("No paused goal");
+      await expect(methodHandlers["run.resumeGoal"]({ runId: run.id })).rejects.toThrow("No paused goal");
     });
 
     it("should broadcast goal.updated on resume", async () => {
@@ -173,7 +169,7 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
     it("should clear an active goal", async () => {
       const run = await createRun();
       await initGoalState(run.id);
-      const result = await methodHandlers["run.clearGoal"]({ runId: run.id }) as { cleared: boolean };
+      const result = (await methodHandlers["run.clearGoal"]({ runId: run.id })) as { cleared: boolean };
       expect(result.cleared).toBe(true);
 
       // Verify persistence — goal state reset to unmet
@@ -186,8 +182,7 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
 
     it("should reject when no active goal", async () => {
       const run = await createRun();
-      await expect(methodHandlers["run.clearGoal"]({ runId: run.id }))
-        .rejects.toThrow("No active goal");
+      await expect(methodHandlers["run.clearGoal"]({ runId: run.id })).rejects.toThrow("No active goal");
     });
 
     it("should broadcast goal.updated on clear", async () => {
@@ -216,24 +211,22 @@ describe("RPC Methods — Unified Goal Lifecycle", () => {
       expect(persisted?.goalStatus).toBe("pursuing");
 
       // Pause
-      const pauseResult = await methodHandlers["run.pauseGoal"]({ runId: run.id }) as { goalStatus: string };
+      const pauseResult = (await methodHandlers["run.pauseGoal"]({ runId: run.id })) as { goalStatus: string };
       expect(pauseResult.goalStatus).toBe("paused");
 
       // Cannot pause again
-      await expect(methodHandlers["run.pauseGoal"]({ runId: run.id }))
-        .rejects.toThrow("No pursuing goal");
+      await expect(methodHandlers["run.pauseGoal"]({ runId: run.id })).rejects.toThrow("No pursuing goal");
 
       // Resume
-      const resumeResult = await methodHandlers["run.resumeGoal"]({ runId: run.id }) as { goalStatus: string };
+      const resumeResult = (await methodHandlers["run.resumeGoal"]({ runId: run.id })) as { goalStatus: string };
       expect(resumeResult.goalStatus).toBe("pursuing");
 
       // Clear
-      const clearResult = await methodHandlers["run.clearGoal"]({ runId: run.id }) as { cleared: boolean };
+      const clearResult = (await methodHandlers["run.clearGoal"]({ runId: run.id })) as { cleared: boolean };
       expect(clearResult.cleared).toBe(true);
 
       // Cannot clear again (status is now "unmet")
-      await expect(methodHandlers["run.clearGoal"]({ runId: run.id }))
-        .rejects.toThrow("No active goal");
+      await expect(methodHandlers["run.clearGoal"]({ runId: run.id })).rejects.toThrow("No active goal");
     });
 
     it("should persist goal state across simulated restart", async () => {

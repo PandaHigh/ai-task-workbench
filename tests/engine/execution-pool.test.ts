@@ -22,7 +22,9 @@ describe("ExecutionPool", () => {
   it("executes a single task", async () => {
     const executed: string[] = [];
     const task = makeTask("t1");
-    const pool = new ExecutionPool(async (t) => { executed.push(t.id); }, 1);
+    const pool = new ExecutionPool(async (t) => {
+      executed.push(t.id);
+    }, 1);
     const scheduler = new DAGScheduler([task]);
     const results = await pool.runAll([task], scheduler);
     expect(results).toHaveLength(1);
@@ -61,11 +63,7 @@ describe("ExecutionPool", () => {
 
   it("respects dependency order", async () => {
     const order: string[] = [];
-    const tasks = [
-      makeTask("t1"),
-      makeTask("t2", { dependsOn: ["t1"] }),
-      makeTask("t3", { dependsOn: ["t2"] }),
-    ];
+    const tasks = [makeTask("t1"), makeTask("t2", { dependsOn: ["t1"] }), makeTask("t3", { dependsOn: ["t2"] })];
     const pool = new ExecutionPool(async (t) => {
       order.push(t.id);
       await new Promise((r) => setTimeout(r, 10));

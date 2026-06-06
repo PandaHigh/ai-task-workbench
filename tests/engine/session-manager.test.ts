@@ -10,20 +10,48 @@ vi.doMock("../../src-engine/src/db/store.js", () => ({
 }));
 
 vi.doMock("../../src-engine/src/lib/error-utils.js", () => ({
-  errorToMessage: (err: unknown) => err instanceof Error ? err.message : String(err),
+  errorToMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)),
 }));
 
 vi.doMock("@ai-workbench/shared", () => ({
   roleToPermissions: (role: string) => {
     switch (role) {
       case "owner":
-        return { role: "owner", canAddTask: true, canApproveTask: true, canEditQueue: true, canStartStop: true, canManageShare: true };
+        return {
+          role: "owner",
+          canAddTask: true,
+          canApproveTask: true,
+          canEditQueue: true,
+          canStartStop: true,
+          canManageShare: true,
+        };
       case "collaborator":
-        return { role: "collaborator", canAddTask: true, canApproveTask: true, canEditQueue: true, canStartStop: false, canManageShare: false };
+        return {
+          role: "collaborator",
+          canAddTask: true,
+          canApproveTask: true,
+          canEditQueue: true,
+          canStartStop: false,
+          canManageShare: false,
+        };
       case "viewer":
-        return { role: "viewer", canAddTask: false, canApproveTask: false, canEditQueue: false, canStartStop: false, canManageShare: false };
+        return {
+          role: "viewer",
+          canAddTask: false,
+          canApproveTask: false,
+          canEditQueue: false,
+          canStartStop: false,
+          canManageShare: false,
+        };
       default:
-        return { role: "viewer", canAddTask: false, canApproveTask: false, canEditQueue: false, canStartStop: false, canManageShare: false };
+        return {
+          role: "viewer",
+          canAddTask: false,
+          canApproveTask: false,
+          canEditQueue: false,
+          canStartStop: false,
+          canManageShare: false,
+        };
     }
   },
 }));

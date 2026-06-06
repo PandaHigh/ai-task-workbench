@@ -26,9 +26,7 @@ vi.mock("../../src-engine/src/db/store-utils.js", () => ({
 
 // ── Import after mocks (dynamic to allow vi.mock to take effect) ──────────
 
-const { SkillStore } = await import(
-  "../../src-engine/src/db/skill-store.js"
-);
+const { SkillStore } = await import("../../src-engine/src/db/skill-store.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -111,10 +109,7 @@ describe("SkillStore", () => {
   it("add appends new skill", () => {
     mockReadJsonFile.mockReturnValue([builtinSkill]);
     store.add(customSkill);
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/skills.json",
-      [builtinSkill, customSkill]
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/skills.json", [builtinSkill, customSkill]);
   });
 
   it("add upserts existing skill by name", () => {
@@ -124,10 +119,7 @@ describe("SkillStore", () => {
     };
     mockReadJsonFile.mockReturnValue([builtinSkill, customSkill]);
     store.add(updatedSkill);
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/skills.json",
-      [builtinSkill, updatedSkill]
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/skills.json", [builtinSkill, updatedSkill]);
   });
 
   // ── remove ───────────────────────────────────────────────────────────
@@ -152,17 +144,9 @@ describe("SkillStore", () => {
     mockExistsSync.mockReturnValue(true);
     const result = store.remove("my-custom-skill");
     expect(result).toBe(true);
-    expect(mockExistsSync).toHaveBeenCalledWith(
-      "/data/skills/custom/my-custom-skill"
-    );
-    expect(mockRmSync).toHaveBeenCalledWith(
-      "/data/skills/custom/my-custom-skill",
-      { recursive: true }
-    );
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/skills.json",
-      [builtinSkill]
-    );
+    expect(mockExistsSync).toHaveBeenCalledWith("/data/skills/custom/my-custom-skill");
+    expect(mockRmSync).toHaveBeenCalledWith("/data/skills/custom/my-custom-skill", { recursive: true });
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/skills.json", [builtinSkill]);
   });
 
   // ── getCustomSkillsDir ───────────────────────────────────────────────

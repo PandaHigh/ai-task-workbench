@@ -62,14 +62,16 @@ describe("7x24: Evaluation cycle reset logic", () => {
   it("should halve evaluationCycles when progress increases >0.01", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
-      dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
-      peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
-      clear: vi.fn(), reorder: vi.fn(),
+      dequeue: vi.fn(),
+      enqueue: vi.fn(),
+      list: vi.fn(() => []),
+      peekNext: vi.fn(() => []),
+      remove: vi.fn(),
+      restore: vi.fn(),
+      clear: vi.fn(),
+      reorder: vi.fn(),
     };
-    const executor = new Executor(
-      qm as unknown as ConstructorParameters<typeof Executor>[0],
-      vi.fn(), "run-1",
-    );
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], vi.fn(), "run-1");
     // Access internal state
     const internal = executor as unknown as {
       evaluationCycles: number;
@@ -104,14 +106,16 @@ describe("7x24: Evaluation cycle reset logic", () => {
   it("should NOT reset evaluationCycles when progress does not increase", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
-      dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
-      peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
-      clear: vi.fn(), reorder: vi.fn(),
+      dequeue: vi.fn(),
+      enqueue: vi.fn(),
+      list: vi.fn(() => []),
+      peekNext: vi.fn(() => []),
+      remove: vi.fn(),
+      restore: vi.fn(),
+      clear: vi.fn(),
+      reorder: vi.fn(),
     };
-    const executor = new Executor(
-      qm as unknown as ConstructorParameters<typeof Executor>[0],
-      vi.fn(), "run-1",
-    );
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], vi.fn(), "run-1");
     const internal = executor as unknown as {
       evaluationCycles: number;
       progressHistory: number[];
@@ -137,18 +141,20 @@ describe("7x24: Evaluation cycle reset logic", () => {
   it("should trim progressHistory to stagnationWindow * 2", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = {
-      dequeue: vi.fn(), enqueue: vi.fn(), list: vi.fn(() => []),
-      peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
-      clear: vi.fn(), reorder: vi.fn(),
+      dequeue: vi.fn(),
+      enqueue: vi.fn(),
+      list: vi.fn(() => []),
+      peekNext: vi.fn(() => []),
+      remove: vi.fn(),
+      restore: vi.fn(),
+      clear: vi.fn(),
+      reorder: vi.fn(),
     };
     mockStore.getConfig.mockImplementation((key: string) => {
       if (key === "stagnationWindow") return 3;
       return undefined;
     });
-    const executor = new Executor(
-      qm as unknown as ConstructorParameters<typeof Executor>[0],
-      vi.fn(), "run-1",
-    );
+    const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], vi.fn(), "run-1");
     const internal = executor as unknown as {
       progressHistory: number[];
       config: { stagnationWindow: number };
@@ -174,14 +180,32 @@ describe("7x24: Auto-retry decision logic", () => {
   });
 
   it("should detect timeout as transient error", () => {
-    const patterns = ["timed out", "econnreset", "econnrefused", "etimedout", "sigterm", "sigkill", "aborted", "enoent"];
+    const patterns = [
+      "timed out",
+      "econnreset",
+      "econnrefused",
+      "etimedout",
+      "sigterm",
+      "sigkill",
+      "aborted",
+      "enoent",
+    ];
     const msg = "Task timed out after 60 minutes";
     const isTransient = patterns.some((p) => msg.toLowerCase().includes(p));
     expect(isTransient).toBe(true);
   });
 
   it("should NOT detect exit code 1 as transient", () => {
-    const patterns = ["timed out", "econnreset", "econnrefused", "etimedout", "sigterm", "sigkill", "aborted", "enoent"];
+    const patterns = [
+      "timed out",
+      "econnreset",
+      "econnrefused",
+      "etimedout",
+      "sigterm",
+      "sigkill",
+      "aborted",
+      "enoent",
+    ];
     const msg = "CC process exited with code 1: compilation error";
     const isTransient = patterns.some((p) => msg.toLowerCase().includes(p));
     expect(isTransient).toBe(false);
@@ -189,11 +213,11 @@ describe("7x24: Auto-retry decision logic", () => {
 
   it("should compute backoff correctly", () => {
     const computeBackoff = (retryCount: number) => Math.min(30000 * Math.pow(2, retryCount), 300000);
-    expect(computeBackoff(0)).toBe(30000);   // 30s
-    expect(computeBackoff(1)).toBe(60000);   // 60s
-    expect(computeBackoff(2)).toBe(120000);  // 120s
-    expect(computeBackoff(3)).toBe(240000);  // 240s
-    expect(computeBackoff(4)).toBe(300000);  // capped at 5min
+    expect(computeBackoff(0)).toBe(30000); // 30s
+    expect(computeBackoff(1)).toBe(60000); // 60s
+    expect(computeBackoff(2)).toBe(120000); // 120s
+    expect(computeBackoff(3)).toBe(240000); // 240s
+    expect(computeBackoff(4)).toBe(300000); // capped at 5min
   });
 
   it("should retry when retryCount < maxAutoRetries and error is transient", () => {
@@ -220,8 +244,24 @@ describe("7x24: Crash recovery", () => {
     const { recoverStaleRuns } = await import("../../src-engine/src/json-rpc/methods.js");
 
     mockStore.listRuns.mockReturnValue([
-      { id: "run-1", status: "running", workingDir: "/tmp", goals: ["g"], terminationConditions: ["t"], totalCostUsd: 0, totalTasksCompleted: 0 },
-      { id: "run-2", status: "paused", workingDir: "/tmp", goals: ["g"], terminationConditions: ["t"], totalCostUsd: 0, totalTasksCompleted: 0 },
+      {
+        id: "run-1",
+        status: "running",
+        workingDir: "/tmp",
+        goals: ["g"],
+        terminationConditions: ["t"],
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
+      },
+      {
+        id: "run-2",
+        status: "paused",
+        workingDir: "/tmp",
+        goals: ["g"],
+        terminationConditions: ["t"],
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
+      },
     ]);
 
     mockStore.listTasks.mockImplementation((runId: string) => {
@@ -244,22 +284,20 @@ describe("7x24: Crash recovery", () => {
     const result = recoverStaleRuns();
 
     expect(result.runsReset).toBe(1);
-    expect(mockStore.saveRun).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "run-1", status: "paused" }),
-    );
+    expect(mockStore.saveRun).toHaveBeenCalledWith(expect.objectContaining({ id: "run-1", status: "paused" }));
 
     expect(result.tasksReset).toBe(3);
-    expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "t1",
+    expect(mockStore.updateTask).toHaveBeenCalledWith(
+      "run-1",
+      "t1",
       expect.objectContaining({ status: "pending", errorMessage: expect.stringContaining("Crash recovery") }),
     );
-    expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "t2",
-      expect.objectContaining({ status: "pending" }),
-    );
-    expect(mockStore.updateTask).toHaveBeenCalledWith("run-2", "t4",
-      expect.objectContaining({ status: "pending" }),
-    );
+    expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "t2", expect.objectContaining({ status: "pending" }));
+    expect(mockStore.updateTask).toHaveBeenCalledWith("run-2", "t4", expect.objectContaining({ status: "pending" }));
 
-    const updateCalls = mockStore.updateTask.mock.calls.map((c: unknown[]) => `${(c as [string, string])[0]}-${(c as [string, string])[1]}`);
+    const updateCalls = mockStore.updateTask.mock.calls.map(
+      (c: unknown[]) => `${(c as [string, string])[0]}-${(c as [string, string])[1]}`,
+    );
     expect(updateCalls).not.toContain("run-1-t3");
     expect(updateCalls).not.toContain("run-2-t5");
   });
@@ -268,7 +306,15 @@ describe("7x24: Crash recovery", () => {
     const { recoverStaleRuns } = await import("../../src-engine/src/json-rpc/methods.js");
 
     mockStore.listRuns.mockReturnValue([
-      { id: "run-ok", status: "paused", workingDir: "/tmp", goals: ["g"], terminationConditions: ["t"], totalCostUsd: 0, totalTasksCompleted: 0 },
+      {
+        id: "run-ok",
+        status: "paused",
+        workingDir: "/tmp",
+        goals: ["g"],
+        terminationConditions: ["t"],
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
+      },
     ]);
     mockStore.listTasks.mockReturnValue([
       { id: "t1", status: "completed" },
@@ -295,20 +341,32 @@ describe("7x24: Data array trimming (real Store)", () => {
   });
 
   it("should trim commits at 500 entries", { timeout: 15000 }, async () => {
-    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
+    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>(
+      "../../src-engine/src/db/store.js",
+    );
     const store = new RealStore(tmpDir);
     const runId = "run-trim";
 
     store.saveRun({
-      id: runId, workingDir: "/tmp", goals: ["g"],
-      terminationConditions: ["t"], status: "idle",
-      totalCostUsd: 0, totalTasksCompleted: 0,
+      id: runId,
+      workingDir: "/tmp",
+      goals: ["g"],
+      terminationConditions: ["t"],
+      status: "idle",
+      totalCostUsd: 0,
+      totalTasksCompleted: 0,
     });
 
     for (let i = 0; i < 600; i++) {
       store.appendCommit(runId, {
-        taskId: `t-${i}`, runId, hash: `hash-${i}`, message: `commit ${i}`,
-        isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
+        taskId: `t-${i}`,
+        runId,
+        hash: `hash-${i}`,
+        message: `commit ${i}`,
+        isAiCommit: true,
+        timestamp: Date.now(),
+        additions: 0,
+        deletions: 0,
       });
     }
 
@@ -319,20 +377,29 @@ describe("7x24: Data array trimming (real Store)", () => {
   });
 
   it("should trim lessons at 500 entries", { timeout: 15000 }, async () => {
-    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
+    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>(
+      "../../src-engine/src/db/store.js",
+    );
     const store = new RealStore(tmpDir);
     const runId = "run-lessons";
 
     store.saveRun({
-      id: runId, workingDir: "/tmp", goals: ["g"],
-      terminationConditions: ["t"], status: "idle",
-      totalCostUsd: 0, totalTasksCompleted: 0,
+      id: runId,
+      workingDir: "/tmp",
+      goals: ["g"],
+      terminationConditions: ["t"],
+      status: "idle",
+      totalCostUsd: 0,
+      totalTasksCompleted: 0,
     });
 
     for (let i = 0; i < 600; i++) {
       store.appendLesson(runId, {
-        runId, category: "failure" as const, lesson: `lesson ${i}`,
-        score: 0.3, createdAt: Date.now(),
+        runId,
+        category: "failure" as const,
+        lesson: `lesson ${i}`,
+        score: 0.3,
+        createdAt: Date.now(),
       });
     }
 
@@ -343,20 +410,31 @@ describe("7x24: Data array trimming (real Store)", () => {
   });
 
   it("should trim scores at 500 entries", { timeout: 15000 }, async () => {
-    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>("../../src-engine/src/db/store.js");
+    const { Store: RealStore } = await vi.importActual<typeof import("../../src-engine/src/db/store.js")>(
+      "../../src-engine/src/db/store.js",
+    );
     const store = new RealStore(tmpDir);
     const runId = "run-scores";
 
     store.saveRun({
-      id: runId, workingDir: "/tmp", goals: ["g"],
-      terminationConditions: ["t"], status: "idle",
-      totalCostUsd: 0, totalTasksCompleted: 0,
+      id: runId,
+      workingDir: "/tmp",
+      goals: ["g"],
+      terminationConditions: ["t"],
+      status: "idle",
+      totalCostUsd: 0,
+      totalTasksCompleted: 0,
     });
 
     for (let i = 0; i < 600; i++) {
       store.appendScore(runId, `t-${i}`, {
-        overall: 0.5, goalAlignment: 0.1, correctness: 0.1,
-        completeness: 0.1, quality: 0.2, passed: false, reasoning: "test",
+        overall: 0.5,
+        goalAlignment: 0.1,
+        correctness: 0.1,
+        completeness: 0.1,
+        quality: 0.2,
+        passed: false,
+        reasoning: "test",
       });
     }
 
@@ -438,14 +516,14 @@ describe("7x24: Config key alignment", () => {
   it("should reject old key names (maxEvalLoops)", async () => {
     const { methodHandlers } = await import("../../src-engine/src/json-rpc/methods.js");
 
-    await expect(methodHandlers["config.set"]({ key: "maxEvalLoops", value: 10 }))
-      .rejects.toThrow("not allowed");
+    await expect(methodHandlers["config.set"]({ key: "maxEvalLoops", value: 10 })).rejects.toThrow("not allowed");
   });
 
   it("should reject old key names (stagnationThreshold)", async () => {
     const { methodHandlers } = await import("../../src-engine/src/json-rpc/methods.js");
 
-    await expect(methodHandlers["config.set"]({ key: "stagnationThreshold", value: 0.05 }))
-      .rejects.toThrow("not allowed");
+    await expect(methodHandlers["config.set"]({ key: "stagnationThreshold", value: 0.05 })).rejects.toThrow(
+      "not allowed",
+    );
   });
 });

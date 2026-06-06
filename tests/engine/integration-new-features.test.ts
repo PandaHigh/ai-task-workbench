@@ -48,8 +48,13 @@ describe("New Features Integration", () => {
     vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
       CCClient: vi.fn(() => ({
         executeTask: vi.fn(async () => ({
-          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
-          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+          result:
+            '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test",
+          totalCostUsd: 0,
+          durationMs: 0,
+          numTurns: 0,
+          messages: [],
         })),
       })),
     }));
@@ -96,7 +101,7 @@ describe("New Features Integration", () => {
 
   describe("crew.list", () => {
     it("should return OMX built-in roles", async () => {
-      const roles = await methodHandlers["crew.list"]({}) as Array<Record<string, unknown>>;
+      const roles = (await methodHandlers["crew.list"]({})) as Array<Record<string, unknown>>;
       expect(roles.length).toBeGreaterThan(0);
       // Verify key roles exist
       const ids = roles.map((r) => r.id);
@@ -106,7 +111,7 @@ describe("New Features Integration", () => {
     });
 
     it("each role should have required fields", async () => {
-      const roles = await methodHandlers["crew.list"]({}) as Array<Record<string, unknown>>;
+      const roles = (await methodHandlers["crew.list"]({})) as Array<Record<string, unknown>>;
       for (const role of roles) {
         expect(role.id).toBeTruthy();
         expect(role.name).toBeTruthy();
@@ -128,15 +133,15 @@ describe("New Features Integration", () => {
     });
 
     it("should reject invalid mode", async () => {
-      await expect(
-        methodHandlers["crew.configure"]({ runId: "test-run", mode: "invalid" })
-      ).rejects.toThrow("mode must be");
+      await expect(methodHandlers["crew.configure"]({ runId: "test-run", mode: "invalid" })).rejects.toThrow(
+        "mode must be",
+      );
     });
 
     it("should require runId", async () => {
-      await expect(
-        methodHandlers["crew.configure"]({ mode: "sequential" })
-      ).rejects.toThrow("Missing required parameter");
+      await expect(methodHandlers["crew.configure"]({ mode: "sequential" })).rejects.toThrow(
+        "Missing required parameter",
+      );
     });
   });
 
@@ -144,11 +149,11 @@ describe("New Features Integration", () => {
 
   describe("plugin.install", () => {
     it("should install a plugin", async () => {
-      const plugin = await methodHandlers["plugin.install"]({
+      const plugin = (await methodHandlers["plugin.install"]({
         name: "filesystem",
         command: "npx",
         args: ["-y", "@mcp/server"],
-      }) as Record<string, unknown>;
+      })) as Record<string, unknown>;
 
       expect(plugin.name).toBe("filesystem");
       expect(plugin.id).toBeTruthy();
@@ -157,15 +162,15 @@ describe("New Features Integration", () => {
     });
 
     it("should require name", async () => {
-      await expect(
-        methodHandlers["plugin.install"]({ command: "npx", args: [] })
-      ).rejects.toThrow("Missing required parameter");
+      await expect(methodHandlers["plugin.install"]({ command: "npx", args: [] })).rejects.toThrow(
+        "Missing required parameter",
+      );
     });
 
     it("should require command", async () => {
-      await expect(
-        methodHandlers["plugin.install"]({ name: "test", args: [] })
-      ).rejects.toThrow("Missing required parameter");
+      await expect(methodHandlers["plugin.install"]({ name: "test", args: [] })).rejects.toThrow(
+        "Missing required parameter",
+      );
     });
   });
 
@@ -174,7 +179,7 @@ describe("New Features Integration", () => {
       await methodHandlers["plugin.install"]({ name: "list-test-p1", command: "node", args: [] });
       await methodHandlers["plugin.install"]({ name: "list-test-p2", command: "npx", args: ["test"] });
 
-      const list = await methodHandlers["plugin.list"]({}) as Array<Record<string, unknown>>;
+      const list = (await methodHandlers["plugin.list"]({})) as Array<Record<string, unknown>>;
       const names = list.map((p) => p.name);
       expect(names).toContain("list-test-p1");
       expect(names).toContain("list-test-p2");
@@ -183,34 +188,38 @@ describe("New Features Integration", () => {
 
   describe("plugin.remove", () => {
     it("should remove an installed plugin", async () => {
-      const plugin = await methodHandlers["plugin.install"]({ name: "to-remove-test", command: "node", args: [] }) as Record<string, unknown>;
+      const plugin = (await methodHandlers["plugin.install"]({
+        name: "to-remove-test",
+        command: "node",
+        args: [],
+      })) as Record<string, unknown>;
       const result = await methodHandlers["plugin.remove"]({ id: plugin.id });
       expect((result as Record<string, unknown>).ok).toBe(true);
 
-      const list = await methodHandlers["plugin.list"]({}) as Array<Record<string, unknown>>;
+      const list = (await methodHandlers["plugin.list"]({})) as Array<Record<string, unknown>>;
       expect(list.find((p) => p.id === plugin.id)).toBeUndefined();
     });
 
     it("should reject unknown plugin id", async () => {
-      await expect(
-        methodHandlers["plugin.remove"]({ id: "nonexistent" })
-      ).rejects.toThrow("Plugin not found");
+      await expect(methodHandlers["plugin.remove"]({ id: "nonexistent" })).rejects.toThrow("Plugin not found");
     });
   });
 
   describe("plugin.toggle", () => {
     it("should toggle plugin enabled state", async () => {
-      const plugin = await methodHandlers["plugin.install"]({ name: "toggle-test", command: "echo", args: [] }) as Record<string, unknown>;
+      const plugin = (await methodHandlers["plugin.install"]({
+        name: "toggle-test",
+        command: "echo",
+        args: [],
+      })) as Record<string, unknown>;
 
-      const toggled = await methodHandlers["plugin.toggle"]({ id: plugin.id }) as Record<string, unknown>;
+      const toggled = (await methodHandlers["plugin.toggle"]({ id: plugin.id })) as Record<string, unknown>;
       // Since echo doesn't start an MCP server, it will likely fail to start, but the toggle should change enabled
       expect(toggled.id).toBe(plugin.id);
     });
 
     it("should reject unknown id", async () => {
-      await expect(
-        methodHandlers["plugin.toggle"]({ id: "nonexistent" })
-      ).rejects.toThrow("Plugin not found");
+      await expect(methodHandlers["plugin.toggle"]({ id: "nonexistent" })).rejects.toThrow("Plugin not found");
     });
   });
 
@@ -234,9 +243,7 @@ describe("New Features Integration", () => {
     });
 
     it("should require runId", async () => {
-      await expect(
-        methodHandlers["config.adaptive"]({})
-      ).rejects.toThrow("Missing required parameter");
+      await expect(methodHandlers["config.adaptive"]({})).rejects.toThrow("Missing required parameter");
     });
   });
 
@@ -253,5 +260,4 @@ describe("New Features Integration", () => {
       expect((result as Record<string, unknown>).saved).toBe(true);
     });
   });
-
 });

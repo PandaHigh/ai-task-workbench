@@ -16,9 +16,7 @@ vi.mock("../../src-engine/src/db/store-utils.js", () => ({
 
 // ── Import after mocks ─────────────────────────────────────────────────────
 
-const { SubscriptionStore } = await import(
-  "../../src-engine/src/db/subscription-store.js"
-);
+const { SubscriptionStore } = await import("../../src-engine/src/db/subscription-store.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -63,10 +61,7 @@ describe("SubscriptionStore", () => {
     expect(typeof result.subscribedAt).toBe("number");
     expect(typeof result.lastSyncedAt).toBe("number");
 
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/subscriptions.json",
-      [result]
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/subscriptions.json", [result]);
   });
 
   it("subscribe is idempotent (same URL + token returns existing)", () => {
@@ -117,10 +112,7 @@ describe("SubscriptionStore", () => {
 
     const result = store.unsubscribe("run-1");
     expect(result).toBe(true);
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/subscriptions.json",
-      []
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/subscriptions.json", []);
   });
 
   it("unsubscribe returns false for not found", () => {
@@ -138,10 +130,9 @@ describe("SubscriptionStore", () => {
 
     store.updateLastSync("run-1");
 
-    expect(mockWriteJsonFile).toHaveBeenCalledWith(
-      "/data/subscriptions.json",
-      [expect.objectContaining({ lastSyncedAt: expect.any(Number) })]
-    );
+    expect(mockWriteJsonFile).toHaveBeenCalledWith("/data/subscriptions.json", [
+      expect.objectContaining({ lastSyncedAt: expect.any(Number) }),
+    ]);
 
     // Verify the timestamp was updated
     const writtenArg = mockWriteJsonFile.mock.calls[0][1] as Subscription[];

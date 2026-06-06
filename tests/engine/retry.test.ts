@@ -26,9 +26,7 @@ describe("retryWithBackoff", () => {
     const fn = vi.fn(async () => {
       throw new Error("always fail");
     });
-    await expect(
-      retryWithBackoff(fn, { maxAttempts: 2, initialDelayMs: 10 }),
-    ).rejects.toThrow("always fail");
+    await expect(retryWithBackoff(fn, { maxAttempts: 2, initialDelayMs: 10 })).rejects.toThrow("always fail");
     expect(fn).toHaveBeenCalledTimes(2);
   });
 

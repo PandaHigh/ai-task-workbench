@@ -116,5 +116,4 @@ describe("GitManager", () => {
       expect(mockGitInstance.diff).toHaveBeenCalledWith(["abc123"]);
     });
   });
-
 });

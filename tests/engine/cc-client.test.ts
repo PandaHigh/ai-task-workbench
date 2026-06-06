@@ -44,11 +44,20 @@ describe("CCClient", () => {
     });
 
     // Simulate stdout with result
-    proc.stdout.emit("data", Buffer.from(JSON.stringify({
-      type: "result", subtype: "success",
-      result: "done", session_id: "sess-1",
-      total_cost_usd: 0.01, duration_ms: 1000, num_turns: 1,
-    }) + "\n"));
+    proc.stdout.emit(
+      "data",
+      Buffer.from(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "done",
+          session_id: "sess-1",
+          total_cost_usd: 0.01,
+          duration_ms: 1000,
+          num_turns: 1,
+        }) + "\n",
+      ),
+    );
 
     proc.emit("close", 0);
 
@@ -63,7 +72,8 @@ describe("CCClient", () => {
     vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
-      workingDir: "/tmp", timeoutMinutes: 1,
+      workingDir: "/tmp",
+      timeoutMinutes: 1,
     });
 
     proc.stderr.emit("data", Buffer.from("error output"));
@@ -77,7 +87,8 @@ describe("CCClient", () => {
     vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
-      workingDir: "/tmp", timeoutMinutes: 1,
+      workingDir: "/tmp",
+      timeoutMinutes: 1,
     });
 
     proc.emit("error", new Error("spawn failed"));
@@ -91,7 +102,8 @@ describe("CCClient", () => {
 
     // Use a very short timeout
     const promise = client.executeTask("test", {
-      workingDir: "/tmp", timeoutMinutes: 0.001, // ~60ms
+      workingDir: "/tmp",
+      timeoutMinutes: 0.001, // ~60ms
     });
 
     await expect(promise).rejects.toThrow("timed out");
@@ -104,7 +116,8 @@ describe("CCClient", () => {
 
     const controller = new AbortController();
     const promise = client.executeTask("test", {
-      workingDir: "/tmp", timeoutMinutes: 60,
+      workingDir: "/tmp",
+      timeoutMinutes: 60,
       abortSignal: controller.signal,
     });
 
@@ -119,15 +132,25 @@ describe("CCClient", () => {
     vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const promise = client.executeTask("test", {
-      workingDir: "/tmp", timeoutMinutes: 5,
+      workingDir: "/tmp",
+      timeoutMinutes: 5,
     });
 
     // Emit partial JSON (no trailing newline)
-    proc.stdout.emit("data", Buffer.from(JSON.stringify({
-      type: "result", subtype: "success",
-      result: "flushed", session_id: "s1",
-      total_cost_usd: 0, duration_ms: 100, num_turns: 1,
-    })));
+    proc.stdout.emit(
+      "data",
+      Buffer.from(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "flushed",
+          session_id: "s1",
+          total_cost_usd: 0,
+          duration_ms: 100,
+          num_turns: 1,
+        }),
+      ),
+    );
 
     // Close without the data ever being split by newline
     proc.emit("close", 0);
@@ -141,7 +164,8 @@ describe("CCClient", () => {
     vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const gen = client.executeTaskStream("test", {
-      workingDir: "/tmp", timeoutMinutes: 5,
+      workingDir: "/tmp",
+      timeoutMinutes: 5,
     });
 
     // Emit a message
@@ -163,7 +187,8 @@ describe("CCClient", () => {
     vi.mocked(spawn).mockReturnValue(proc as unknown as ReturnType<typeof spawn>);
 
     const gen = client.executeTaskStream("test", {
-      workingDir: "/tmp", timeoutMinutes: 5,
+      workingDir: "/tmp",
+      timeoutMinutes: 5,
     });
 
     setTimeout(() => proc.emit("error", new Error("stream spawn fail")), 10);

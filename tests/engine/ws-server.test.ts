@@ -22,7 +22,9 @@ const mockWss = {
 const mockHttpServer = {
   on: vi.fn(),
   listen: vi.fn(),
-  close: vi.fn((cb?: () => void) => { if (cb) cb(); }),
+  close: vi.fn((cb?: () => void) => {
+    if (cb) cb();
+  }),
 };
 
 vi.mock("ws", () => ({
@@ -76,29 +78,50 @@ const mockQueueManager = {
 
 vi.mock("../../src-engine/src/db/store.js", () => ({
   Store: vi.fn(() => ({
-    saveRun: vi.fn(), getRun: vi.fn(), listRuns: vi.fn(() => []),
-    deleteRun: vi.fn(), saveTask: vi.fn(), listTasks: vi.fn(() => []),
-    getTask: vi.fn(), updateTask: vi.fn(), appendLog: vi.fn(),
-    getLogs: vi.fn(() => []), appendScore: vi.fn(), appendCommit: vi.fn(),
-    appendLesson: vi.fn(), getLessons: vi.fn(() => []),
-    getCommits: vi.fn(() => []), saveReport: vi.fn(), getReport: vi.fn(() => null),
-    getConfig: vi.fn(() => undefined), setConfig: vi.fn(),
+    saveRun: vi.fn(),
+    getRun: vi.fn(),
+    listRuns: vi.fn(() => []),
+    deleteRun: vi.fn(),
+    saveTask: vi.fn(),
+    listTasks: vi.fn(() => []),
+    getTask: vi.fn(),
+    updateTask: vi.fn(),
+    appendLog: vi.fn(),
+    getLogs: vi.fn(() => []),
+    appendScore: vi.fn(),
+    appendCommit: vi.fn(),
+    appendLesson: vi.fn(),
+    getLessons: vi.fn(() => []),
+    getCommits: vi.fn(() => []),
+    saveReport: vi.fn(),
+    getReport: vi.fn(() => null),
+    getConfig: vi.fn(() => undefined),
+    setConfig: vi.fn(),
   })),
 }));
 
 vi.mock("../../src-engine/src/db/share-store.js", () => ({
   ShareStore: vi.fn(() => ({
-    createShare: vi.fn(), getShare: vi.fn(), listShares: vi.fn(() => []),
-    list: vi.fn(() => []), revokeShare: vi.fn(), revoke: vi.fn(),
+    createShare: vi.fn(),
+    getShare: vi.fn(),
+    listShares: vi.fn(() => []),
+    list: vi.fn(() => []),
+    revokeShare: vi.fn(),
+    revoke: vi.fn(),
     cleanup: vi.fn(),
   })),
 }));
 
 vi.mock("../../src-engine/src/engine/queue-manager.js", () => ({
   QueueManager: vi.fn(() => ({
-    enqueue: vi.fn(), dequeue: vi.fn(), list: vi.fn(() => []),
-    peekNext: vi.fn(() => []), remove: vi.fn(), restore: vi.fn(),
-    clear: vi.fn(), reorder: vi.fn(),
+    enqueue: vi.fn(),
+    dequeue: vi.fn(),
+    list: vi.fn(() => []),
+    peekNext: vi.fn(() => []),
+    remove: vi.fn(),
+    restore: vi.fn(),
+    clear: vi.fn(),
+    reorder: vi.fn(),
   })),
 }));
 
@@ -117,9 +140,7 @@ function createMockWs(): MockWs {
 }
 
 function findHandler(calls: unknown[][], event: string): Function | undefined {
-  return calls.find(
-    (c: unknown[]) => c[0] === event,
-  )?.[1] as Function | undefined;
+  return calls.find((c: unknown[]) => c[0] === event)?.[1] as Function | undefined;
 }
 
 describe("WsServer", () => {
@@ -139,7 +160,9 @@ describe("WsServer", () => {
     mockWss.close.mockImplementation((cb: () => void) => cb());
     mockHttpServer.on.mockReset();
     mockHttpServer.listen.mockReset();
-    mockHttpServer.close.mockImplementation((cb?: () => void) => { if (cb) cb(); });
+    mockHttpServer.close.mockImplementation((cb?: () => void) => {
+      if (cb) cb();
+    });
     const { Store } = await import("../../src-engine/src/db/store.js");
     const { ShareStore } = await import("../../src-engine/src/db/share-store.js");
     const { QueueManager } = await import("../../src-engine/src/engine/queue-manager.js");
@@ -264,12 +287,14 @@ describe("WsServer", () => {
     it("should handle validation errors as INVALID_PARAMS", async () => {
       const messageHandler = findHandler(ws.on.mock.calls, "message");
 
-      await messageHandler!(JSON.stringify({
-        jsonrpc: "2.0",
-        method: "task.create",
-        id: 99,
-        params: { runId: "nonexistent", content: "test" },
-      }));
+      await messageHandler!(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          method: "task.create",
+          id: 99,
+          params: { runId: "nonexistent", content: "test" },
+        }),
+      );
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32602);
     });
@@ -278,12 +303,14 @@ describe("WsServer", () => {
       const messageHandler = findHandler(ws.on.mock.calls, "message");
 
       // run.create with a system dir triggers a non-validation Error (INTERNAL_ERROR)
-      await messageHandler!(JSON.stringify({
-        jsonrpc: "2.0",
-        method: "run.create",
-        id: 100,
-        params: { workingDir: "/etc", goals: ["g"], terminationConditions: ["c"] },
-      }));
+      await messageHandler!(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          method: "run.create",
+          id: 100,
+          params: { workingDir: "/etc", goals: ["g"], terminationConditions: ["c"] },
+        }),
+      );
       const response = JSON.parse(ws.send.mock.calls[0][0]);
       expect(response.error.code).toBe(-32603);
     });
@@ -340,7 +367,9 @@ describe("WsServer", () => {
       const connectionHandler = findHandler(mockWss.on.mock.calls, "connection");
 
       const ws = createMockWs();
-      ws.send.mockImplementation(() => { throw new Error("send failed"); });
+      ws.send.mockImplementation(() => {
+        throw new Error("send failed");
+      });
       connectionHandler!(ws);
 
       server.broadcast("test.event", {});
@@ -383,15 +412,34 @@ describe("WsServer", () => {
       const { methodHandlers } = await import("../../src-engine/src/json-rpc/methods.js");
 
       const requiredMethods = [
-        "run.list", "run.create", "run.report", "run.tasks",
-        "run.commits", "run.lessons", "run.stop", "run.delete",
-        "task.create", "task.start", "task.pause", "task.resume",
-        "task.cancel", "task.retry", "task.setTimeout",
-        "queue.list", "queue.reorder",
-        "wizard.start", "wizard.chat", "wizard.validate",
-        "config.get", "config.set",
-        "share.create", "share.list", "share.revoke",
-        "share.subscribe", "share.unsubscribe", "share.subscriptions",
+        "run.list",
+        "run.create",
+        "run.report",
+        "run.tasks",
+        "run.commits",
+        "run.lessons",
+        "run.stop",
+        "run.delete",
+        "task.create",
+        "task.start",
+        "task.pause",
+        "task.resume",
+        "task.cancel",
+        "task.retry",
+        "task.setTimeout",
+        "queue.list",
+        "queue.reorder",
+        "wizard.start",
+        "wizard.chat",
+        "wizard.validate",
+        "config.get",
+        "config.set",
+        "share.create",
+        "share.list",
+        "share.revoke",
+        "share.subscribe",
+        "share.unsubscribe",
+        "share.subscriptions",
       ];
 
       for (const method of requiredMethods) {

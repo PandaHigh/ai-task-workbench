@@ -41,9 +41,7 @@ export function MainDashboard() {
             className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0"
             style={{ borderColor: "var(--border)" }}
           >
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
-              任务 · {tasks.length}
-            </span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>任务 · {tasks.length}</span>
             <button
               onClick={() => setShowTasks(false)}
               style={{

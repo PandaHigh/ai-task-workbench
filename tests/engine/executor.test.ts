@@ -66,7 +66,17 @@ function createMockQueueManager(): MockQueueManager {
   return {
     _tasks: tasks,
     enqueue: vi.fn((runId: string, t: Partial<TaskDefinition>) => {
-      const task: TaskDefinition = { id: `task-${tasks.length}`, runId, type: "user_defined", priority: 1, timeoutMinutes: 60, promptJson: "", status: "pending", createdAt: Date.now(), ...t };
+      const task: TaskDefinition = {
+        id: `task-${tasks.length}`,
+        runId,
+        type: "user_defined",
+        priority: 1,
+        timeoutMinutes: 60,
+        promptJson: "",
+        status: "pending",
+        createdAt: Date.now(),
+        ...t,
+      };
       tasks.push(task);
       return task;
     }),
@@ -98,16 +108,25 @@ describe("Executor", () => {
 
   it("should stop and mark active tasks as cancelled", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     executor.stop();
   });
 
   it("should cancel a specific task and update store", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     executor.cancelTask("task-1", "run-1");
     expect(mockStore.updateTask).toHaveBeenCalledWith("run-1", "task-1", {
-      status: "cancelled", completedAt: expect.any(Number),
+      status: "cancelled",
+      completedAt: expect.any(Number),
     });
   });
 
@@ -115,14 +134,14 @@ describe("Executor", () => {
     const progressHistory = [0.5, 0.5, 0.5, 0.5, 0.5];
     const first = progressHistory[0];
     const last = progressHistory[progressHistory.length - 1];
-    expect((last - first) < 0.05).toBe(true);
+    expect(last - first < 0.05).toBe(true);
   });
 
   it("should not be stagnant when progress is advancing", () => {
     const progressHistory = [0.3, 0.4, 0.5, 0.6, 0.7];
     const first = progressHistory[0];
     const last = progressHistory[progressHistory.length - 1];
-    expect((last - first) >= 0.05).toBe(true);
+    expect(last - first >= 0.05).toBe(true);
   });
 });
 
@@ -145,7 +164,8 @@ describe("Executor core loop (mocked)", () => {
     let dequeueCount = 0;
     queueManager.dequeue.mockImplementation((runId: string) => {
       dequeueCount++;
-      if (dequeueCount === 1) return { id: "t-1", runId, content: "Add health endpoint", type: "user_defined", timeoutMinutes: 60 };
+      if (dequeueCount === 1)
+        return { id: "t-1", runId, content: "Add health endpoint", type: "user_defined", timeoutMinutes: 60 };
       return null; // Empty queue triggers evaluation
     });
 
@@ -154,10 +174,26 @@ describe("Executor core loop (mocked)", () => {
     const ccInstance = new (CCClient as unknown as new () => MockCCInstance)();
     ccInstance.executeTask.mockImplementation(async (prompt: string, _opts: unknown) => {
       if (prompt.includes("Score")) {
-        return { result: '{"goalAlignment": 0.2, "correctness": 0.2, "completeness": 0.15, "quality": 0.15, "reasoning": "Good"}', sessionId: "s1", totalCostUsd: 0.01, durationMs: 1000, numTurns: 1, messages: [] };
+        return {
+          result:
+            '{"goalAlignment": 0.2, "correctness": 0.2, "completeness": 0.15, "quality": 0.15, "reasoning": "Good"}',
+          sessionId: "s1",
+          totalCostUsd: 0.01,
+          durationMs: 1000,
+          numTurns: 1,
+          messages: [],
+        };
       }
       if (prompt.includes("Evaluate")) {
-        return { result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1.0}', sessionId: "s2", totalCostUsd: 0.01, durationMs: 500, numTurns: 1, messages: [] };
+        return {
+          result:
+            '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1.0}',
+          sessionId: "s2",
+          totalCostUsd: 0.01,
+          durationMs: 500,
+          numTurns: 1,
+          messages: [],
+        };
       }
       return { result: "Task done", sessionId: "s3", totalCostUsd: 0.05, durationMs: 2000, numTurns: 1, messages: [] };
     });
@@ -174,9 +210,34 @@ describe("Executor core loop (mocked)", () => {
     let callCount = 0;
     ccInstance.executeTask.mockImplementation(async () => {
       callCount++;
-      if (callCount === 1) return { result: "Bad result", sessionId: "s1", totalCostUsd: 0.01, durationMs: 100, numTurns: 1, messages: [] };
-      if (callCount === 2) return { result: '{"goalAlignment": 0.05, "correctness": 0.05, "completeness": 0.05, "quality": 0.05, "reasoning": "Failed"}', sessionId: "s2", totalCostUsd: 0.01, durationMs: 50, numTurns: 1, messages: [] };
-      return { result: '{"isComplete": true, "progressReport": "Done", "completedGoals": [], "remainingGoals": [], "overallProgress": 1}', sessionId: "s3", totalCostUsd: 0, durationMs: 50, numTurns: 1, messages: [] };
+      if (callCount === 1)
+        return {
+          result: "Bad result",
+          sessionId: "s1",
+          totalCostUsd: 0.01,
+          durationMs: 100,
+          numTurns: 1,
+          messages: [],
+        };
+      if (callCount === 2)
+        return {
+          result:
+            '{"goalAlignment": 0.05, "correctness": 0.05, "completeness": 0.05, "quality": 0.05, "reasoning": "Failed"}',
+          sessionId: "s2",
+          totalCostUsd: 0.01,
+          durationMs: 50,
+          numTurns: 1,
+          messages: [],
+        };
+      return {
+        result:
+          '{"isComplete": true, "progressReport": "Done", "completedGoals": [], "remainingGoals": [], "overallProgress": 1}',
+        sessionId: "s3",
+        totalCostUsd: 0,
+        durationMs: 50,
+        numTurns: 1,
+        messages: [],
+      };
     });
 
     // Score = 0.2, below threshold 0.6 → should revert
@@ -191,15 +252,30 @@ describe("Executor core loop (mocked)", () => {
     ccInstance.executeTask.mockImplementation(async (prompt: string) => {
       if (prompt.includes("Generate")) {
         return {
-          result: '[{"content": "Fix tests", "priority": 3, "reasoning": "Tests are failing"}, {"content": "Refactor utils", "priority": 5, "reasoning": "Code smell"}]',
-          sessionId: "s1", totalCostUsd: 0.01, durationMs: 100, numTurns: 1, messages: [],
+          result:
+            '[{"content": "Fix tests", "priority": 3, "reasoning": "Tests are failing"}, {"content": "Refactor utils", "priority": 5, "reasoning": "Code smell"}]',
+          sessionId: "s1",
+          totalCostUsd: 0.01,
+          durationMs: 100,
+          numTurns: 1,
+          messages: [],
         };
       }
-      return { result: '{"isComplete": false, "progressReport": "50%", "completedGoals": [], "remainingGoals": ["g1"], "overallProgress": 0.5}', sessionId: "s2", totalCostUsd: 0.01, durationMs: 50, numTurns: 1, messages: [] };
+      return {
+        result:
+          '{"isComplete": false, "progressReport": "50%", "completedGoals": [], "remainingGoals": ["g1"], "overallProgress": 0.5}',
+        sessionId: "s2",
+        totalCostUsd: 0.01,
+        durationMs: 50,
+        numTurns: 1,
+        messages: [],
+      };
     });
 
     // Verify the parsed smart tasks would be correct
-    const tasks = JSON.parse('[{"content":"Fix tests","priority":3,"reasoning":"Tests are failing"},{"content":"Refactor utils","priority":5,"reasoning":"Code smell"}]');
+    const tasks = JSON.parse(
+      '[{"content":"Fix tests","priority":3,"reasoning":"Tests are failing"},{"content":"Refactor utils","priority":5,"reasoning":"Code smell"}]',
+    );
     expect(tasks).toHaveLength(2);
     expect(tasks[0].content).toBe("Fix tests");
     expect(tasks[1].priority).toBe(5);
@@ -208,23 +284,47 @@ describe("Executor core loop (mocked)", () => {
 
 describe("Executor extractJson", () => {
   function extractJson(text: string): string {
-    let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
-    try { JSON.parse(cleaned); return cleaned; } catch { /* expected for non-JSON */ }
+    let cleaned = text
+      .replace(/```(?:json)?\s*/gi, "")
+      .replace(/```/g, "")
+      .trim();
+    try {
+      JSON.parse(cleaned);
+      return cleaned;
+    } catch {
+      /* expected for non-JSON */
+    }
     const findBalanced = (open: string, close: string): string | null => {
       const startIdx = cleaned.indexOf(open);
       if (startIdx === -1) return null;
-      let depth = 0, inString = false, escape = false;
+      let depth = 0,
+        inString = false,
+        escape = false;
       for (let i = startIdx; i < cleaned.length; i++) {
         const ch = cleaned[i];
-        if (escape) { escape = false; continue; }
-        if (ch === "\\") { escape = true; continue; }
-        if (ch === '"') { inString = !inString; continue; }
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = !inString;
+          continue;
+        }
         if (inString) continue;
         if (ch === open) depth++;
         if (ch === close) depth--;
         if (depth === 0) {
           const candidate = cleaned.substring(startIdx, i + 1);
-          try { JSON.parse(candidate); return candidate; } catch { return null; }
+          try {
+            JSON.parse(candidate);
+            return candidate;
+          } catch {
+            return null;
+          }
         }
       }
       return null;
@@ -237,7 +337,7 @@ describe("Executor extractJson", () => {
   });
 
   it("should extract JSON from markdown code block", () => {
-    expect(JSON.parse(extractJson("```json\n{\"score\": 0.8}\n```"))).toEqual({ score: 0.8 });
+    expect(JSON.parse(extractJson('```json\n{"score": 0.8}\n```'))).toEqual({ score: 0.8 });
   });
 
   it("should handle text before and after JSON", () => {
@@ -253,14 +353,19 @@ describe("Executor extractJson", () => {
   });
 
   it("should handle JSON with nested braces", () => {
-    expect(JSON.parse(extractJson('{"outer": {"inner": "v"}, "list": [1, 2]}'))).toEqual({ outer: { inner: "v" }, list: [1, 2] });
+    expect(JSON.parse(extractJson('{"outer": {"inner": "v"}, "list": [1, 2]}'))).toEqual({
+      outer: { inner: "v" },
+      list: [1, 2],
+    });
   });
 
   it("should handle JSON with strings containing braces", () => {
-    expect(JSON.parse(extractJson('{"msg": "use {curly} braces", "val": 1}'))).toEqual({ msg: "use {curly} braces", val: 1 });
+    expect(JSON.parse(extractJson('{"msg": "use {curly} braces", "val": 1}'))).toEqual({
+      msg: "use {curly} braces",
+      val: 1,
+    });
   });
 });
-
 
 describe("Executor recalculateCost", () => {
   beforeEach(() => {
@@ -270,11 +375,7 @@ describe("Executor recalculateCost", () => {
   it("should sum task costs", async () => {
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
     const qm = createMockQueueManager();
-    mockStore.listTasks.mockReturnValue([
-      { costUsd: 0.5 },
-      { costUsd: 0.3 },
-      { costUsd: 0.2 },
-    ]);
+    mockStore.listTasks.mockReturnValue([{ costUsd: 0.5 }, { costUsd: 0.3 }, { costUsd: 0.2 }]);
 
     const executor = new Executor(qm as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
     const cost = (executor as unknown as { recalculateCost: (runId: string) => number }).recalculateCost("run-1");
@@ -301,4 +402,3 @@ describe("Executor config loading", () => {
     expect(config.maxBudgetUsd).toBe(Infinity);
   });
 });
-

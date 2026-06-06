@@ -86,7 +86,11 @@ vi.mock("../../src-engine/src/engine/omx-state.js", () => ({
     canResume: vi.fn(() => false),
     clear: vi.fn(),
   })),
-  createInitialRunState: vi.fn(() => ({ runId: "run-1", pipeline: { stages: [], currentStageIndex: 0 }, snapshot: {} })),
+  createInitialRunState: vi.fn(() => ({
+    runId: "run-1",
+    pipeline: { stages: [], currentStageIndex: 0 },
+    snapshot: {},
+  })),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -111,8 +115,15 @@ function createMockQueueManager(): MockQueueManager {
     _tasks: tasks,
     enqueue: vi.fn((runId: string, t: Partial<TaskDefinition>) => {
       const task: TaskDefinition = {
-        id: `task-${tasks.length}`, runId, type: "user_defined", priority: 1,
-        timeoutMinutes: 60, promptJson: "", status: "pending", createdAt: Date.now(), ...t,
+        id: `task-${tasks.length}`,
+        runId,
+        type: "user_defined",
+        priority: 1,
+        timeoutMinutes: 60,
+        promptJson: "",
+        status: "pending",
+        createdAt: Date.now(),
+        ...t,
       };
       tasks.push(task);
       return task;
@@ -160,31 +171,66 @@ describe("Executor generateInitialTasks", () => {
 
   it("should generate initial tasks with AI-specified dependencies", async () => {
     mockExecuteTask.mockResolvedValue({
-      result: '[{"content":"Setup project structure","priority":1,"reasoning":"Foundation","dependsOnIndices":[]},{"content":"Implement login","priority":2,"reasoning":"Feature","dependsOnIndices":[0]},{"content":"Implement registration","priority":2,"reasoning":"Feature","dependsOnIndices":[0]},{"content":"Restyle UI to cute theme","priority":5,"reasoning":"Polish","dependsOnIndices":[1,2]}]',
-      sessionId: "s-init", totalCostUsd: 0.01, durationMs: 1000, numTurns: 3, messages: [],
+      result:
+        '[{"content":"Setup project structure","priority":1,"reasoning":"Foundation","dependsOnIndices":[]},{"content":"Implement login","priority":2,"reasoning":"Feature","dependsOnIndices":[0]},{"content":"Implement registration","priority":2,"reasoning":"Feature","dependsOnIndices":[0]},{"content":"Restyle UI to cute theme","priority":5,"reasoning":"Polish","dependsOnIndices":[1,2]}]',
+      sessionId: "s-init",
+      totalCostUsd: 0.01,
+      durationMs: 1000,
+      numTurns: 3,
+      messages: [],
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     const run = createTestRun();
 
-    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(run);
+    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(
+      run,
+    );
 
     expect(queueManager.enqueue).toHaveBeenCalledTimes(4);
 
     // All tasks enqueued (without dependencies in first pass)
-    expect(queueManager.enqueue).toHaveBeenNthCalledWith(1, "run-1", expect.objectContaining({
-      content: "Setup project structure", type: "smart_task", priority: 1,
-    }));
-    expect(queueManager.enqueue).toHaveBeenNthCalledWith(2, "run-1", expect.objectContaining({
-      content: "Implement login", type: "smart_task", priority: 2,
-    }));
-    expect(queueManager.enqueue).toHaveBeenNthCalledWith(3, "run-1", expect.objectContaining({
-      content: "Implement registration", type: "smart_task", priority: 2,
-    }));
-    expect(queueManager.enqueue).toHaveBeenNthCalledWith(4, "run-1", expect.objectContaining({
-      content: "Restyle UI to cute theme", type: "smart_task", priority: 5,
-    }));
+    expect(queueManager.enqueue).toHaveBeenNthCalledWith(
+      1,
+      "run-1",
+      expect.objectContaining({
+        content: "Setup project structure",
+        type: "smart_task",
+        priority: 1,
+      }),
+    );
+    expect(queueManager.enqueue).toHaveBeenNthCalledWith(
+      2,
+      "run-1",
+      expect.objectContaining({
+        content: "Implement login",
+        type: "smart_task",
+        priority: 2,
+      }),
+    );
+    expect(queueManager.enqueue).toHaveBeenNthCalledWith(
+      3,
+      "run-1",
+      expect.objectContaining({
+        content: "Implement registration",
+        type: "smart_task",
+        priority: 2,
+      }),
+    );
+    expect(queueManager.enqueue).toHaveBeenNthCalledWith(
+      4,
+      "run-1",
+      expect.objectContaining({
+        content: "Restyle UI to cute theme",
+        type: "smart_task",
+        priority: 5,
+      }),
+    );
 
     // Second pass: dependencies resolved via updateDependencies
     expect(queueManager.updateDependencies).toHaveBeenCalledTimes(3);
@@ -202,14 +248,24 @@ describe("Executor generateInitialTasks", () => {
   it("should create fallback tasks (one per goal) without dependencies when AI returns invalid JSON", async () => {
     mockExecuteTask.mockResolvedValue({
       result: "Sorry, I couldn't generate tasks.",
-      sessionId: "s-fail", totalCostUsd: 0.01, durationMs: 500, numTurns: 1, messages: [],
+      sessionId: "s-fail",
+      totalCostUsd: 0.01,
+      durationMs: 500,
+      numTurns: 1,
+      messages: [],
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     const run = createTestRun(); // has 2 goals
 
-    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(run);
+    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(
+      run,
+    );
 
     // Fallback creates one task per goal, no dependencies (independent)
     expect(queueManager.enqueue).toHaveBeenCalledTimes(2);
@@ -220,14 +276,24 @@ describe("Executor generateInitialTasks", () => {
   it("should create fallback tasks when AI returns non-array JSON", async () => {
     mockExecuteTask.mockResolvedValue({
       result: '{"error": "something went wrong"}',
-      sessionId: "s-fail2", totalCostUsd: 0.01, durationMs: 500, numTurns: 1, messages: [],
+      sessionId: "s-fail2",
+      totalCostUsd: 0.01,
+      durationMs: 500,
+      numTurns: 1,
+      messages: [],
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     const run = createTestRun();
 
-    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(run);
+    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(
+      run,
+    );
 
     expect(queueManager.enqueue).toHaveBeenCalledTimes(2);
     expect(queueManager.updateDependencies).not.toHaveBeenCalled();
@@ -236,14 +302,24 @@ describe("Executor generateInitialTasks", () => {
   it("should include dependency guidance and goals in the prompt", async () => {
     mockExecuteTask.mockResolvedValue({
       result: '[{"content":"Task","priority":5,"reasoning":"Why","dependsOnIndices":[]}]',
-      sessionId: "s1", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+      sessionId: "s1",
+      totalCostUsd: 0,
+      durationMs: 0,
+      numTurns: 0,
+      messages: [],
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     const run = createTestRun({ goals: ["Build auth system", "Write tests"] });
 
-    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(run);
+    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(
+      run,
+    );
 
     const call = mockExecuteTask.mock.calls[0];
     const prompt = call[0] as string;
@@ -258,14 +334,24 @@ describe("Executor generateInitialTasks", () => {
   it("should log initial task generation", async () => {
     mockExecuteTask.mockResolvedValue({
       result: '[{"content":"Task 1","priority":5,"reasoning":"Test"}]',
-      sessionId: "s1", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+      sessionId: "s1",
+      totalCostUsd: 0,
+      durationMs: 0,
+      numTurns: 0,
+      messages: [],
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], notify, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      notify,
+      "run-1",
+    );
     const run = createTestRun();
 
-    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(run);
+    await (executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }).generateInitialTasks(
+      run,
+    );
 
     expect(mockStore.appendLog).toHaveBeenCalledWith(
       "run-1",
@@ -300,20 +386,41 @@ describe("Executor start() — initial task generation condition", () => {
   it("should call generateInitialTasks when queue is empty at startup", async () => {
     mockExecuteTask.mockImplementation(async (prompt: string) => {
       if (prompt.includes("initial task plan") || prompt.includes("task plan")) {
-        return { result: '[{"content":"Setup project","priority":8,"reasoning":"Foundation"}]', sessionId: "s-init", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
+        return {
+          result: '[{"content":"Setup project","priority":8,"reasoning":"Foundation"}]',
+          sessionId: "s-init",
+          totalCostUsd: 0,
+          durationMs: 0,
+          numTurns: 0,
+          messages: [],
+        };
       }
-      return { result: '{"features":[]}', sessionId: "s-default", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [] };
+      return {
+        result: '{"features":[]}',
+        sessionId: "s-default",
+        totalCostUsd: 0,
+        durationMs: 0,
+        numTurns: 0,
+        messages: [],
+      };
     });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      () => {},
+      "run-1",
+    );
     const run = createTestRun({ featuresGeneratedAt: Date.now() });
 
-    const spy = vi.spyOn(executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }, "generateInitialTasks");
+    const spy = vi.spyOn(
+      executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> },
+      "generateInitialTasks",
+    );
 
     // Stop executor early to avoid pipeline execution
     const startPromise = executor.start(run);
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
     executor.stop();
     await startPromise.catch(() => {});
 
@@ -324,14 +431,21 @@ describe("Executor start() — initial task generation condition", () => {
     queueManager.enqueue("run-1", { content: "Existing task", type: "user_defined", priority: 1 });
 
     const { Executor } = await import("../../src-engine/src/engine/omx-executor.js");
-    const executor = new Executor(queueManager as unknown as ConstructorParameters<typeof Executor>[0], () => {}, "run-1");
+    const executor = new Executor(
+      queueManager as unknown as ConstructorParameters<typeof Executor>[0],
+      () => {},
+      "run-1",
+    );
 
-    const spy = vi.spyOn(executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> }, "generateInitialTasks");
+    const spy = vi.spyOn(
+      executor as unknown as { generateInitialTasks: (r: ExecutionRun) => Promise<void> },
+      "generateInitialTasks",
+    );
 
     const run = createTestRun({ featuresGeneratedAt: Date.now() });
     const startPromise = executor.start(run);
 
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 300));
     executor.stop();
     await startPromise.catch(() => {});
 
@@ -353,21 +467,38 @@ describe("run.create without initial tasks (RPC integration)", () => {
 
     vi.doMock("../../src-engine/src/db/store.js", async (importOriginal) => {
       const actual = await importOriginal<typeof import("../../src-engine/src/db/store.js")>();
-      return { Store: vi.fn(function (this: unknown) { return new actual.Store(testDir); }) };
+      return {
+        Store: vi.fn(function (this: unknown) {
+          return new actual.Store(testDir);
+        }),
+      };
     });
     vi.doMock("../../src-engine/src/db/share-store.js", async (importOriginal) => {
       const actual = await importOriginal<typeof import("../../src-engine/src/db/share-store.js")>();
-      return { ShareStore: vi.fn(function (this: unknown) { return new actual.ShareStore(testDir); }) };
+      return {
+        ShareStore: vi.fn(function (this: unknown) {
+          return new actual.ShareStore(testDir);
+        }),
+      };
     });
     vi.doMock("../../src-engine/src/db/subscription-store.js", async (importOriginal) => {
       const actual = await importOriginal<typeof import("../../src-engine/src/db/subscription-store.js")>();
-      return { SubscriptionStore: vi.fn(function (this: unknown) { return new actual.SubscriptionStore(testDir); }) };
+      return {
+        SubscriptionStore: vi.fn(function (this: unknown) {
+          return new actual.SubscriptionStore(testDir);
+        }),
+      };
     });
     vi.doMock("../../src-engine/src/cc-integration/cc-client.js", () => ({
       CCClient: vi.fn(() => ({
         executeTask: vi.fn(async () => ({
-          result: '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
-          sessionId: "s-test", totalCostUsd: 0, durationMs: 0, numTurns: 0, messages: [],
+          result:
+            '{"isComplete": true, "progressReport": "Done", "completedGoals": ["g1"], "remainingGoals": [], "overallProgress": 1}',
+          sessionId: "s-test",
+          totalCostUsd: 0,
+          durationMs: 0,
+          numTurns: 0,
+          messages: [],
         })),
       })),
     }));
@@ -400,43 +531,43 @@ describe("run.create without initial tasks (RPC integration)", () => {
   });
 
   it("should create run without tasks parameter", async () => {
-    const run = await methodHandlers["run.create"]({
+    const run = (await methodHandlers["run.create"]({
       workingDir: "/tmp/test",
       goals: ["Build a React app"],
       terminationConditions: ["All goals met"],
-    }) as ExecutionRun;
+    })) as ExecutionRun;
 
     expect(run.id).toBeDefined();
     expect(run.status).toBe("idle");
 
-    const tasks = await methodHandlers["run.tasks"]({ runId: run.id }) as TaskDefinition[];
+    const tasks = (await methodHandlers["run.tasks"]({ runId: run.id })) as TaskDefinition[];
     expect(tasks).toHaveLength(0);
   });
 
   it("should start run created without tasks", async () => {
-    const run = await methodHandlers["run.create"]({
+    const run = (await methodHandlers["run.create"]({
       workingDir: "/tmp/test",
       goals: ["Build a React app"],
       terminationConditions: ["All goals met"],
-    }) as ExecutionRun;
+    })) as ExecutionRun;
 
-    const result = await methodHandlers["task.start"]({ runId: run.id }) as Record<string, unknown>;
+    const result = (await methodHandlers["task.start"]({ runId: run.id })) as Record<string, unknown>;
     expect(result.status).toBe("running");
 
     await methodHandlers["run.stop"]({ runId: run.id });
   });
 
   it("should still support creating run with tasks for backward compatibility", async () => {
-    const run = await methodHandlers["run.create"]({
+    const run = (await methodHandlers["run.create"]({
       workingDir: "/tmp/test",
       goals: ["Build a React app"],
       terminationConditions: ["All goals met"],
       tasks: [{ content: "Setup project", type: "user_defined", priority: 1 }],
-    }) as ExecutionRun;
+    })) as ExecutionRun;
 
     expect(run.id).toBeDefined();
 
-    const tasks = await methodHandlers["run.tasks"]({ runId: run.id }) as TaskDefinition[];
+    const tasks = (await methodHandlers["run.tasks"]({ runId: run.id })) as TaskDefinition[];
     expect(tasks).toHaveLength(1);
     expect(tasks[0].content).toBe("Setup project");
   });

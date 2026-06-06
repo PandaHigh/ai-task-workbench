@@ -77,16 +77,12 @@ describe("parseJsonOrThrow", () => {
 
   it("throws on invalid input with truncated message", () => {
     const input = "not json at all, just plain text";
-    expect(() => parseJsonOrThrow(input)).toThrow(
-      `Failed to parse JSON from: ${input.substring(0, 200)}`,
-    );
+    expect(() => parseJsonOrThrow(input)).toThrow(`Failed to parse JSON from: ${input.substring(0, 200)}`);
   });
 
   it("throws with truncation for very long invalid input", () => {
     const longInput = "a".repeat(300);
-    expect(() => parseJsonOrThrow(longInput)).toThrow(
-      `Failed to parse JSON from: ${longInput.substring(0, 200)}`,
-    );
+    expect(() => parseJsonOrThrow(longInput)).toThrow(`Failed to parse JSON from: ${longInput.substring(0, 200)}`);
   });
 
   it("parses arrays", () => {

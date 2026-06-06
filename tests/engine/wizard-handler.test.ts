@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../src-engine/src/cc-integration/cc-client.js", () => ({
   CCClient: vi.fn(() => ({
     executeTask: vi.fn().mockResolvedValue({
-      result: "---TASK_SUMMARY---\n内容: 测试任务\n目标:\n- 完成功能\n终止条件:\n- 测试通过\n完成后动作: 无\n---END_SUMMARY---",
+      result:
+        "---TASK_SUMMARY---\n内容: 测试任务\n目标:\n- 完成功能\n终止条件:\n- 测试通过\n完成后动作: 无\n---END_SUMMARY---",
       sessionId: "sess-1",
       totalCostUsd: 0,
       durationMs: 100,

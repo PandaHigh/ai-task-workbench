@@ -38,13 +38,23 @@ describe("Store (JSON file)", () => {
 
     it("should update existing runs", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "running", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "running",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       expect(store.getRun("run-1")!.status).toBe("running");
@@ -52,8 +62,13 @@ describe("Store (JSON file)", () => {
 
     it("should delete runs", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.deleteRun("run-1");
       expect(store.listRuns()).toHaveLength(0);
@@ -63,14 +78,24 @@ describe("Store (JSON file)", () => {
   describe("tasks", () => {
     it("should save and list tasks for a run", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       const task = {
-        id: "task-1", runId: "run-1", type: "user_defined" as const,
-        priority: 1, content: "Test task", timeoutMinutes: 60,
-        status: "pending" as const, createdAt: Date.now(),
+        id: "task-1",
+        runId: "run-1",
+        type: "user_defined" as const,
+        priority: 1,
+        content: "Test task",
+        timeoutMinutes: 60,
+        status: "pending" as const,
+        createdAt: Date.now(),
       };
 
       store.saveTask("run-1", task);
@@ -81,14 +106,24 @@ describe("Store (JSON file)", () => {
 
     it("should update task fields", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       store.saveTask("run-1", {
-        id: "task-1", runId: "run-1", type: "smart_task" as const,
-        priority: 5, content: "Test", timeoutMinutes: 60,
-        status: "pending" as const, createdAt: Date.now(),
+        id: "task-1",
+        runId: "run-1",
+        type: "smart_task" as const,
+        priority: 5,
+        content: "Test",
+        timeoutMinutes: 60,
+        status: "pending" as const,
+        createdAt: Date.now(),
       });
 
       store.updateTask("run-1", "task-1", { status: "running" });
@@ -99,18 +134,32 @@ describe("Store (JSON file)", () => {
   describe("logs", () => {
     it("should append and retrieve logs", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.saveTask("run-1", {
-        id: "task-1", runId: "run-1", type: "smart_task" as const,
-        priority: 5, content: "Test", timeoutMinutes: 60,
-        status: "pending" as const, createdAt: Date.now(),
+        id: "task-1",
+        runId: "run-1",
+        type: "smart_task" as const,
+        priority: 5,
+        content: "Test",
+        timeoutMinutes: 60,
+        status: "pending" as const,
+        createdAt: Date.now(),
       });
 
       store.appendLog("run-1", {
-        taskId: "task-1", runId: "run-1", timestamp: Date.now(),
-        level: "info", source: "engine", message: "Task started",
+        taskId: "task-1",
+        runId: "run-1",
+        timestamp: Date.now(),
+        level: "info",
+        source: "engine",
+        message: "Task started",
       });
 
       const logs = store.getLogs("run-1");
@@ -129,14 +178,23 @@ describe("Store (JSON file)", () => {
   describe("log trimming", () => {
     it("should trim logs at 1000 entries", { timeout: 30000 }, () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       for (let i = 0; i < 1100; i++) {
         store.appendLog("run-1", {
-          taskId: "", runId: "run-1", timestamp: Date.now(),
-          level: "info", source: "engine", message: `log ${i}`,
+          taskId: "",
+          runId: "run-1",
+          timestamp: Date.now(),
+          level: "info",
+          source: "engine",
+          message: `log ${i}`,
         });
       }
 
@@ -156,13 +214,23 @@ describe("Store (JSON file)", () => {
   describe("updateTask undefined filtering", () => {
     it("should not overwrite fields with undefined", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.saveTask("run-1", {
-        id: "task-1", runId: "run-1", type: "user_defined" as const,
-        priority: 1, content: "Test", timeoutMinutes: 60,
-        status: "pending" as const, createdAt: Date.now(),
+        id: "task-1",
+        runId: "run-1",
+        type: "user_defined" as const,
+        priority: 1,
+        content: "Test",
+        timeoutMinutes: 60,
+        status: "pending" as const,
+        createdAt: Date.now(),
       });
 
       store.updateTask("run-1", "task-1", { status: "running", costUsd: undefined });
@@ -173,14 +241,26 @@ describe("Store (JSON file)", () => {
 
     it("should clear fields when passed null", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.saveTask("run-1", {
-        id: "task-1", runId: "run-1", type: "user_defined" as const,
-        priority: 1, content: "Test", timeoutMinutes: 60,
-        status: "failed" as const, createdAt: Date.now(),
-        errorMessage: "some error", score: 0.3, completedAt: Date.now(),
+        id: "task-1",
+        runId: "run-1",
+        type: "user_defined" as const,
+        priority: 1,
+        content: "Test",
+        timeoutMinutes: 60,
+        status: "failed" as const,
+        createdAt: Date.now(),
+        errorMessage: "some error",
+        score: 0.3,
+        completedAt: Date.now(),
       });
 
       store.updateTask("run-1", "task-1", { status: "pending", errorMessage: null, score: null, completedAt: null });
@@ -201,8 +281,13 @@ describe("Store (JSON file)", () => {
   describe("report", () => {
     it("should save and get report", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.saveReport("run-1", "All goals completed successfully.");
       const report = store.getReport("run-1");
@@ -213,8 +298,13 @@ describe("Store (JSON file)", () => {
 
     it("should return null for nonexistent report", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       expect(store.getReport("run-1")).toBeNull();
     });
@@ -223,12 +313,22 @@ describe("Store (JSON file)", () => {
   describe("scores", () => {
     it("should append and get scores", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.appendScore("run-1", "task-1", {
-        overall: 0.8, goalAlignment: 0.2, correctness: 0.2,
-        completeness: 0.2, quality: 0.2, passed: true, reasoning: "Good",
+        overall: 0.8,
+        goalAlignment: 0.2,
+        correctness: 0.2,
+        completeness: 0.2,
+        quality: 0.2,
+        passed: true,
+        reasoning: "Good",
       });
       const scores = store.getScores("run-1");
       expect(scores).toHaveLength(1);
@@ -240,14 +340,33 @@ describe("Store (JSON file)", () => {
   describe("commits", () => {
     it("should append and get commits with limit", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.appendCommit("run-1", {
-        taskId: "t1", runId: "run-1", hash: "abc", message: "fix", isAiCommit: true, timestamp: Date.now(), additions: 10, deletions: 5,
+        taskId: "t1",
+        runId: "run-1",
+        hash: "abc",
+        message: "fix",
+        isAiCommit: true,
+        timestamp: Date.now(),
+        additions: 10,
+        deletions: 5,
       });
       store.appendCommit("run-1", {
-        taskId: "t2", runId: "run-1", hash: "def", message: "feat", isAiCommit: false, timestamp: Date.now(), additions: 20, deletions: 0,
+        taskId: "t2",
+        runId: "run-1",
+        hash: "def",
+        message: "feat",
+        isAiCommit: false,
+        timestamp: Date.now(),
+        additions: 20,
+        deletions: 0,
       });
       const all = store.getCommits("run-1");
       expect(all).toHaveLength(2);
@@ -260,14 +379,29 @@ describe("Store (JSON file)", () => {
   describe("lessons", () => {
     it("should get lessons filtered by category", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.appendLesson("run-1", {
-        runId: "run-1", taskId: "t1", category: "failure", lesson: "bad", score: 0.3, createdAt: Date.now(),
+        runId: "run-1",
+        taskId: "t1",
+        category: "failure",
+        lesson: "bad",
+        score: 0.3,
+        createdAt: Date.now(),
       });
       store.appendLesson("run-1", {
-        runId: "run-1", taskId: "t2", category: "success", lesson: "good", score: 0.9, createdAt: Date.now(),
+        runId: "run-1",
+        taskId: "t2",
+        category: "success",
+        lesson: "good",
+        score: 0.9,
+        createdAt: Date.now(),
       });
       const failures = store.getLessons("run-1", "failure");
       expect(failures).toHaveLength(1);
@@ -280,11 +414,30 @@ describe("Store (JSON file)", () => {
   describe("logs with filters", () => {
     it("should filter logs by taskId", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
-      store.appendLog("run-1", { taskId: "t1", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: "log 1" });
-      store.appendLog("run-1", { taskId: "t2", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: "log 2" });
+      store.appendLog("run-1", {
+        taskId: "t1",
+        runId: "run-1",
+        timestamp: Date.now(),
+        level: "info",
+        source: "engine",
+        message: "log 1",
+      });
+      store.appendLog("run-1", {
+        taskId: "t2",
+        runId: "run-1",
+        timestamp: Date.now(),
+        level: "info",
+        source: "engine",
+        message: "log 2",
+      });
       const filtered = store.getLogs("run-1", "t1");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].message).toBe("log 1");
@@ -292,11 +445,23 @@ describe("Store (JSON file)", () => {
 
     it("should limit logs", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       for (let i = 0; i < 10; i++) {
-        store.appendLog("run-1", { taskId: "", runId: "run-1", timestamp: Date.now(), level: "info", source: "engine", message: `log ${i}` });
+        store.appendLog("run-1", {
+          taskId: "",
+          runId: "run-1",
+          timestamp: Date.now(),
+          level: "info",
+          source: "engine",
+          message: `log ${i}`,
+        });
       }
       const limited = store.getLogs("run-1", undefined, 3);
       expect(limited).toHaveLength(3);
@@ -306,8 +471,13 @@ describe("Store (JSON file)", () => {
   describe("corrupted task file", () => {
     it("should handle corrupted tasks.json gracefully", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       // Ensure run dir exists before writing corrupted file
       const runDir = path.join(testDir, "runs", "run-1");
@@ -341,8 +511,13 @@ describe("Store (JSON file)", () => {
 
       // Write initial data
       store.saveRun({
-        id: "run-original", workingDir: "/tmp", goals: ["original"],
-        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-original",
+        workingDir: "/tmp",
+        goals: ["original"],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       const originalContent = fs.readFileSync(indexPath, "utf-8");
 
@@ -352,8 +527,13 @@ describe("Store (JSON file)", () => {
 
       // Write again — should succeed and not leave .tmp
       store.saveRun({
-        id: "run-new", workingDir: "/tmp", goals: ["new"],
-        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-new",
+        workingDir: "/tmp",
+        goals: ["new"],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       expect(fs.existsSync(indexPath + ".tmp")).toBe(false);
@@ -388,19 +568,33 @@ describe("Store (JSON file)", () => {
 
     it("should handle concurrent writes to different files without corruption", () => {
       store.saveRun({
-        id: "run-1", workingDir: "/tmp", goals: [], terminationConditions: [],
-        status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "run-1",
+        workingDir: "/tmp",
+        goals: [],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
 
       // Rapid sequential writes to different files in same run
       for (let i = 0; i < 50; i++) {
         store.appendLog("run-1", {
-          taskId: `t-${i}`, runId: "run-1", timestamp: Date.now(),
-          level: "info", source: "engine", message: `log ${i}`,
+          taskId: `t-${i}`,
+          runId: "run-1",
+          timestamp: Date.now(),
+          level: "info",
+          source: "engine",
+          message: `log ${i}`,
         });
         store.appendScore("run-1", `t-${i}`, {
-          overall: 0.5, goalAlignment: 0.1, correctness: 0.1,
-          completeness: 0.1, quality: 0.2, passed: true, reasoning: "ok",
+          overall: 0.5,
+          goalAlignment: 0.1,
+          correctness: 0.1,
+          completeness: 0.1,
+          quality: 0.2,
+          passed: true,
+          reasoning: "ok",
         });
       }
 
@@ -413,18 +607,27 @@ describe("Store (JSON file)", () => {
 
       // No leftover tmp files
       const files = fs.readdirSync(runDir);
-      expect(files.every(f => !f.endsWith(".tmp"))).toBe(true);
+      expect(files.every((f) => !f.endsWith(".tmp"))).toBe(true);
     });
 
     it("should not corrupt file if target dir does not exist yet", () => {
       // New run creates subdirectory automatically
       store.saveRun({
-        id: "brand-new-run", workingDir: "/tmp", goals: ["g"],
-        terminationConditions: [], status: "idle", totalCostUsd: 0, totalTasksCompleted: 0,
+        id: "brand-new-run",
+        workingDir: "/tmp",
+        goals: ["g"],
+        terminationConditions: [],
+        status: "idle",
+        totalCostUsd: 0,
+        totalTasksCompleted: 0,
       });
       store.appendLog("brand-new-run", {
-        taskId: "t1", runId: "brand-new-run", timestamp: Date.now(),
-        level: "info", source: "engine", message: "hello",
+        taskId: "t1",
+        runId: "brand-new-run",
+        timestamp: Date.now(),
+        level: "info",
+        source: "engine",
+        message: "hello",
       });
 
       const runDir = path.join(testDir, "runs", "brand-new-run");
