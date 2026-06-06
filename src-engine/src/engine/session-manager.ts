@@ -15,12 +15,7 @@ export class SessionManager {
     this.store = store ?? new Store();
   }
 
-  identify(params: {
-    userId?: string;
-    displayName?: string;
-    role?: UserRole;
-    sessionId?: string;
-  }): ClientSession {
+  identify(params: { userId?: string; displayName?: string; role?: UserRole; sessionId?: string }): ClientSession {
     const userId = params.userId || DEFAULT_OWNER;
     const session: ClientSession = {
       sessionId: params.sessionId || crypto.randomUUID(),
@@ -69,12 +64,14 @@ export class SessionManager {
     return firstSession?.userId === userId;
   }
 
-  recordActivity(params: {
+  recordActivity(params: { userId: string; action: string; runId: string; details?: Record<string, unknown> }): {
+    id: string;
+    timestamp: number;
     userId: string;
     action: string;
+    details: Record<string, unknown>;
     runId: string;
-    details?: Record<string, unknown>;
-  }): { id: string; timestamp: number; userId: string; action: string; details: Record<string, unknown>; runId: string } {
+  } {
     const event = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -89,7 +86,17 @@ export class SessionManager {
     return event;
   }
 
-  getActivities(_runId: string, _limit?: number): { id: string; timestamp: number; userId: string; action: string; details: Record<string, unknown>; runId: string }[] {
+  getActivities(
+    _runId: string,
+    _limit?: number,
+  ): {
+    id: string;
+    timestamp: number;
+    userId: string;
+    action: string;
+    details: Record<string, unknown>;
+    runId: string;
+  }[] {
     return [];
   }
 
@@ -119,7 +126,8 @@ export class SessionManager {
       const all = this.store.getComments(runId);
       if (taskId) return all.filter((c) => c.taskId === taskId);
       return all;
-    } catch (err) { console.warn("[session] Failed to get comments:", errorToMessage(err));
+    } catch (err) {
+      console.warn("[session] Failed to get comments:", errorToMessage(err));
       return [];
     }
   }

@@ -63,7 +63,8 @@ Respond ONLY with valid JSON:
     workingDir,
     timeoutMinutes: 15,
     maxTurns: role.maxTurns,
-    systemPrompt: "You are a quality assurance engineer. Write tests and verify code changes. Use the project's existing test framework. Respond with valid JSON only.",
+    systemPrompt:
+      "You are a quality assurance engineer. Write tests and verify code changes. Use the project's existing test framework. Respond with valid JSON only.",
     allowedTools: role.tools,
     abortSignal,
   });
@@ -72,7 +73,12 @@ Respond ONLY with valid JSON:
   try {
     testResult = JSON.parse(extractJson(result.result));
   } catch {
-    testResult = { testsWritten: [], allPassed: false, failures: ["Failed to parse test results"], coverage: "unknown" };
+    testResult = {
+      testsWritten: [],
+      allPassed: false,
+      failures: ["Failed to parse test results"],
+      coverage: "unknown",
+    };
   }
 
   notify("task.progress", {

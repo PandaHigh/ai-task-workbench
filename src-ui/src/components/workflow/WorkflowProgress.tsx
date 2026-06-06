@@ -21,11 +21,11 @@ interface WorkflowProgressProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending:  "bg-gray-200 dark:bg-gray-700",
-  running:  "bg-blue-400 animate-pulse",
-  passed:   "bg-green-400",
-  failed:   "bg-red-400",
-  skipped:  "bg-gray-300 dark:bg-gray-600",
+  pending: "bg-gray-200 dark:bg-gray-700",
+  running: "bg-blue-400 animate-pulse",
+  passed: "bg-green-400",
+  failed: "bg-red-400",
+  skipped: "bg-gray-300 dark:bg-gray-600",
 };
 
 export const WorkflowProgress: React.FC<WorkflowProgressProps> = ({
@@ -38,9 +38,7 @@ export const WorkflowProgress: React.FC<WorkflowProgressProps> = ({
     <div className="my-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-          🔄 {definitionName}
-        </span>
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">🔄 {definitionName}</span>
         <span className="text-xs text-gray-400">
           {completedAgents}/{totalAgents} agents
         </span>
@@ -61,11 +59,18 @@ export const WorkflowProgress: React.FC<WorkflowProgressProps> = ({
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {stages.map((stage) => {
           const icons: Record<string, string> = {
-            pending: "○", running: "◉", passed: "●", failed: "✕", skipped: "—",
+            pending: "○",
+            running: "◉",
+            passed: "●",
+            failed: "✕",
+            skipped: "—",
           };
           const colors: Record<string, string> = {
-            pending: "text-gray-400", running: "text-blue-500", passed: "text-green-500",
-            failed: "text-red-500", skipped: "text-gray-400",
+            pending: "text-gray-400",
+            running: "text-blue-500",
+            passed: "text-green-500",
+            failed: "text-red-500",
+            skipped: "text-gray-400",
           };
           return (
             <span key={stage.stageId} className={`text-xs ${colors[stage.status]}`}>

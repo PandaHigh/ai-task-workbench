@@ -32,7 +32,9 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex-1 flex items-center justify-center p-8" style={{ animation: "fadeIn 0.3s ease-out" }}>
           <div className="max-w-md text-center">
             <div style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.5 }}>⚠</div>
-            <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: "8px", color: "var(--text-primary)" }}>出错了</h2>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: "8px", color: "var(--text-primary)" }}>
+              出错了
+            </h2>
             <p style={{ fontSize: "13px", marginBottom: "16px", color: "var(--text-secondary)" }}>
               {this.state.error?.message || "未知错误"}
             </p>
@@ -40,16 +42,28 @@ export class ErrorBoundary extends Component<Props, State> {
               <div style={{ marginBottom: "16px" }}>
                 <button
                   onClick={() => this.setState((s) => ({ expanded: !s.expanded }))}
-                  style={{ background: "none", border: "none", color: "var(--blue)", cursor: "pointer", fontSize: "12px" }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--blue)",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                  }}
                 >
                   {this.state.expanded ? "收起" : "查看详情"}
                 </button>
                 {this.state.expanded && (
                   <pre
                     style={{
-                      textAlign: "left", fontSize: "11px", color: "var(--text-secondary)",
-                      background: "var(--bg-primary)", padding: "8px", borderRadius: "6px",
-                      maxHeight: "120px", overflow: "auto", marginTop: "8px",
+                      textAlign: "left",
+                      fontSize: "11px",
+                      color: "var(--text-secondary)",
+                      background: "var(--bg-primary)",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      maxHeight: "120px",
+                      overflow: "auto",
+                      marginTop: "8px",
                     }}
                   >
                     {this.state.error.stack}
@@ -60,8 +74,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={this.handleRetry}
               style={{
-                padding: "6px 16px", background: "var(--blue)", color: "#fff",
-                border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                padding: "6px 16px",
+                background: "var(--blue)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 600,
               }}
             >
               重试
@@ -70,6 +90,10 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return <div key={this.state.retryKey} className="flex-1 flex flex-col min-h-0">{this.props.children}</div>;
+    return (
+      <div key={this.state.retryKey} className="flex-1 flex flex-col min-h-0">
+        {this.props.children}
+      </div>
+    );
   }
 }

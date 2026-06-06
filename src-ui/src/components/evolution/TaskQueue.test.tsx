@@ -12,9 +12,7 @@ vi.mock("../common/EmptyState", () => ({
 }));
 
 vi.mock("../common/Skeleton", () => ({
-  Skeleton: ({ variant }: { variant: string }) => (
-    <div data-testid="skeleton" data-variant={variant} />
-  ),
+  Skeleton: ({ variant }: { variant: string }) => <div data-testid="skeleton" data-variant={variant} />,
 }));
 
 vi.mock("../../hooks/useAnimations", () => ({
@@ -22,9 +20,7 @@ vi.mock("../../hooks/useAnimations", () => ({
 }));
 
 vi.mock("./TaskComments", () => ({
-  TaskComments: ({ taskId }: { taskId: string }) => (
-    <div data-testid="task-comments" data-task-id={taskId} />
-  ),
+  TaskComments: ({ taskId }: { taskId: string }) => <div data-testid="task-comments" data-task-id={taskId} />,
 }));
 
 vi.mock("../../hooks/useEngine", () => ({
@@ -157,7 +153,9 @@ describe("TaskQueue", () => {
   });
 
   it("should render failed tasks section", () => {
-    const failedTasks = [makeTask({ id: "f1", content: "Failed task", status: "failed", errorMessage: "Error occurred" })];
+    const failedTasks = [
+      makeTask({ id: "f1", content: "Failed task", status: "failed", errorMessage: "Error occurred" }),
+    ];
     render(<TaskQueue {...defaultProps} failedTasks={failedTasks} />);
     expect(screen.getByText(/出错了 \(1\)/)).toBeInTheDocument();
     expect(screen.getByText("Error occurred")).toBeInTheDocument();

@@ -21,7 +21,8 @@ function parseSkillFrontmatter(skillMdPath: string): { name: string; description
       name: nameMatch[1].trim(),
       description: descMatch ? descMatch[1].trim() : "",
     };
-  } catch (err) { console.warn("[skill] Parse SKILL.md failed:", errorToMessage(err));
+  } catch (err) {
+    console.warn("[skill] Parse SKILL.md failed:", errorToMessage(err));
     return null;
   }
 }
@@ -255,7 +256,10 @@ function copyDirSync(src: string, dest: string): void {
 }
 
 /** Minimal multipart parser — extracts first file from form-data */
-async function parseMultipart(req: IncomingMessage, boundary: string): Promise<{ fileData: Buffer | null; fileName: string }> {
+async function parseMultipart(
+  req: IncomingMessage,
+  boundary: string,
+): Promise<{ fileData: Buffer | null; fileName: string }> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);

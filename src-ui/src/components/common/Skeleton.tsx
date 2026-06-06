@@ -5,7 +5,13 @@ interface SkeletonProps {
   count?: number;
 }
 
-const skeletonAria = { "aria-busy": "true", "aria-label": "加载中", "aria-valuenow": 0, "aria-valuemin": 0, "aria-valuemax": 100 } as const;
+const skeletonAria = {
+  "aria-busy": "true",
+  "aria-label": "加载中",
+  "aria-valuenow": 0,
+  "aria-valuemin": 0,
+  "aria-valuemax": 100,
+} as const;
 
 export function Skeleton({ variant = "text", width, height, count = 1 }: SkeletonProps) {
   const items = Array.from({ length: count }, (_, i) => i);

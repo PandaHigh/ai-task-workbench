@@ -86,7 +86,16 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         }}
         aria-label="发送"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M2 8l5.5-5.5M2 8l5.5 5.5M2 8h12" />
         </svg>
       </button>

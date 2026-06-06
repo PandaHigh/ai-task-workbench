@@ -27,10 +27,7 @@ export class DashboardErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          className="flex flex-col items-center justify-center p-6"
-          style={{ minHeight: 120 }}
-        >
+        <div className="flex flex-col items-center justify-center p-6" style={{ minHeight: 120 }}>
           <p className="text-xs font-bold mb-2" style={{ color: "var(--red)" }}>
             {this.props.name ? `${this.props.name} 加载出错` : "加载出错"}
           </p>

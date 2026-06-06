@@ -105,7 +105,12 @@ export class Store {
     this.invalidateRunIndex();
   }
 
-  listRunsPaginated(options: { page?: number; pageSize?: number; status?: string }): { runs: ExecutionRun[]; total: number; page: number; pageSize: number } {
+  listRunsPaginated(options: { page?: number; pageSize?: number; status?: string }): {
+    runs: ExecutionRun[];
+    total: number;
+    page: number;
+    pageSize: number;
+  } {
     const all = this.listRuns();
     const filtered = options.status ? all.filter((r) => r.status === options.status) : all;
     const page = options.page ?? 1;
@@ -132,7 +137,10 @@ export class Store {
     return readJsonFile<TaskDefinition[]>(file, []);
   }
 
-  listTasksPaginated(runId: string, options: { page?: number; pageSize?: number; status?: string }): { tasks: TaskDefinition[]; total: number; page: number; pageSize: number } {
+  listTasksPaginated(
+    runId: string,
+    options: { page?: number; pageSize?: number; status?: string },
+  ): { tasks: TaskDefinition[]; total: number; page: number; pageSize: number } {
     const all = this.listTasks(runId);
     const filtered = options.status ? all.filter((t) => t.status === options.status) : all;
     const page = options.page ?? 1;
@@ -175,8 +183,9 @@ export class Store {
     const idx = tasks.findIndex((t) => t.id === taskId);
     if (idx >= 0) {
       const cleanUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([, v]) => v !== undefined)
-          .map(([k, v]) => [k, v === null ? undefined : v])
+        Object.entries(updates)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, v === null ? undefined : v]),
       );
       const merged = { ...tasks[idx] };
       for (const [k, v] of Object.entries(cleanUpdates)) {
@@ -381,5 +390,4 @@ export class Store {
     writeJsonFile(file, filtered);
     return true;
   }
-
 }

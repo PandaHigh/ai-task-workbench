@@ -35,7 +35,10 @@ export function startSession(workingDir: string): WizardSession {
   return session;
 }
 
-export async function chat(sessionId: string, userMessage: string): Promise<{
+export async function chat(
+  sessionId: string,
+  userMessage: string,
+): Promise<{
   response: string;
   shouldExtractParams: boolean;
 }> {
@@ -121,26 +124,18 @@ export function extractParams(sessionId: string): {
   const session = sessions.get(sessionId);
   if (!session) return null;
 
-  const lastAssistant = [...session.messages]
-    .reverse()
-    .find((m) => m.role === "assistant");
+  const lastAssistant = [...session.messages].reverse().find((m) => m.role === "assistant");
 
   if (lastAssistant?.content.includes("---TASK_SUMMARY---")) {
     return parseSummary(lastAssistant.content);
   }
 
   // Fallback: extract from conversation
-  const userTexts = session.messages
-    .filter((m) => m.role === "user")
-    .map((m) => m.content);
+  const userTexts = session.messages.filter((m) => m.role === "user").map((m) => m.content);
 
   const content = userTexts[0] || "未命名任务";
-  const goals = userTexts.length > 1
-    ? [userTexts[1]]
-    : [`完成${content}`];
-  const terminationConditions = userTexts.length > 2
-    ? [userTexts[2]]
-    : [`所有目标均已达成并验证通过`];
+  const goals = userTexts.length > 1 ? [userTexts[1]] : [`完成${content}`];
+  const terminationConditions = userTexts.length > 2 ? [userTexts[2]] : [`所有目标均已达成并验证通过`];
 
   return { content, goals, terminationConditions, postCompletionAction: "无" };
 }
@@ -178,21 +173,24 @@ function parseSummary(text: string): {
   const content = body.match(/内容:\s*(.+)/)?.[1]?.trim() || "";
   const goalsMatch = body.match(/目标:\s*\n([\s\S]*?)(?=终止条件:|$)/);
   const goals = goalsMatch
-    ? goalsMatch[1].split("\n").map((l) => l.replace(/^-\s*/, "").trim()).filter(Boolean)
+    ? goalsMatch[1]
+        .split("\n")
+        .map((l) => l.replace(/^-\s*/, "").trim())
+        .filter(Boolean)
     : [];
   const termMatch = body.match(/终止条件:\s*\n([\s\S]*?)(?=完成后动作:|$)/);
   const terminationConditions = termMatch
-    ? termMatch[1].split("\n").map((l) => l.replace(/^-\s*/, "").trim()).filter(Boolean)
+    ? termMatch[1]
+        .split("\n")
+        .map((l) => l.replace(/^-\s*/, "").trim())
+        .filter(Boolean)
     : [];
   const postCompletionAction = body.match(/完成后动作:\s*(.+)/)?.[1]?.trim() || "无";
 
   return { content, goals, terminationConditions, postCompletionAction };
 }
 
-function generateFallbackResponse(
-  input: string,
-  history: Array<{ role: string; content: string }>,
-): string {
+function generateFallbackResponse(input: string, history: Array<{ role: string; content: string }>): string {
   const userCount = history.filter((m) => m.role === "user").length;
   if (userCount <= 1) {
     return `好的，"${input}" 听起来是个不错的方向。\n\n请进一步告诉我：\n1. 这个任务的具体目标是什么？\n2. 什么样的结果算完成？\n3. 完成后需要做什么？`;

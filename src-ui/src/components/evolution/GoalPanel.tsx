@@ -21,10 +21,17 @@ export function EditableList({ title, items, dotColor, onSave, readOnly }: Edita
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
 
-  const startEdit = () => { setDraft([...items]); setEditing(true); };
+  const startEdit = () => {
+    setDraft([...items]);
+    setEditing(true);
+  };
   const addItem = () => setDraft([...draft, ""]);
   const removeItem = (i: number) => setDraft(draft.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, v: string) => { const d = [...draft]; d[i] = v; setDraft(d); };
+  const updateItem = (i: number, v: string) => {
+    const d = [...draft];
+    d[i] = v;
+    setDraft(d);
+  };
 
   const save = async () => {
     const filtered = draft.map((s) => s.trim()).filter(Boolean);
@@ -36,12 +43,19 @@ export function EditableList({ title, items, dotColor, onSave, readOnly }: Edita
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>{title}</h4>
+        <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>
+          {title}
+        </h4>
         {!editing && !readOnly && (
           <button
             onClick={startEdit}
             className="text-[10px] px-1.5 py-0.5 rounded"
-            style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
+            style={{
+              color: "var(--text-secondary)",
+              background: "var(--bg-tertiary)",
+              border: "none",
+              cursor: "pointer",
+            }}
           >
             编辑
           </button>
@@ -62,7 +76,12 @@ export function EditableList({ title, items, dotColor, onSave, readOnly }: Edita
                 value={item}
                 onChange={(e) => updateItem(i, e.target.value)}
                 className="flex-1 text-xs px-1.5 py-1 rounded font-mono"
-                style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)", outline: "none" }}
+                style={{
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border)",
+                  outline: "none",
+                }}
               />
               <button
                 onClick={() => removeItem(i)}
@@ -91,7 +110,12 @@ export function EditableList({ title, items, dotColor, onSave, readOnly }: Edita
             <button
               onClick={() => setEditing(false)}
               className="text-[10px] px-2 py-0.5 rounded"
-              style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "none", cursor: "pointer" }}
+              style={{
+                color: "var(--text-secondary)",
+                background: "var(--bg-tertiary)",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               取消
             </button>
@@ -132,13 +156,7 @@ export function GoalPanel({
   return (
     <div>
       {/* Goals */}
-      <EditableList
-        title="目标"
-        items={run.goals}
-        dotColor="var(--green)"
-        onSave={onSaveGoals}
-        readOnly={readOnly}
-      />
+      <EditableList title="目标" items={run.goals} dotColor="var(--green)" onSave={onSaveGoals} readOnly={readOnly} />
 
       {/* Termination Conditions */}
       <EditableList
@@ -173,7 +191,9 @@ export function GoalPanel({
       {run.goalStatus && run.goalStatus !== "unmet" && (
         <div className="border-t pt-3 space-y-2" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center gap-2">
-            <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>进度</h4>
+            <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>
+              进度
+            </h4>
             <span
               className="text-xs px-1.5 py-0.5 rounded-full font-medium"
               style={{
@@ -198,9 +218,11 @@ export function GoalPanel({
             </div>
           )}
 
-
           {run.goalLastEvalReason && (
-            <div className="text-xs p-2 rounded" style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}>
+            <div
+              className="text-xs p-2 rounded"
+              style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}
+            >
               {run.goalLastEvalReason}
             </div>
           )}
@@ -216,49 +238,62 @@ export function GoalPanel({
             </div>
           )}
 
-          {!readOnly && <div className="flex gap-2">
-            {run.goalStatus === "pursuing" && (
-              <>
-                <button
-                  className="text-xs px-2 py-1 rounded transition-colors"
-                  style={{ background: "var(--bg-primary)", color: "var(--yellow)", border: "1px solid var(--border)" }}
-                  onClick={() => onPauseGoal(run.id)}
+          {!readOnly && (
+            <div className="flex gap-2">
+              {run.goalStatus === "pursuing" && (
+                <>
+                  <button
+                    className="text-xs px-2 py-1 rounded transition-colors"
+                    style={{
+                      background: "var(--bg-primary)",
+                      color: "var(--yellow)",
+                      border: "1px solid var(--border)",
+                    }}
+                    onClick={() => onPauseGoal(run.id)}
+                  >
+                    暂停
+                  </button>
+                  <button
+                    className="text-xs px-2 py-1 rounded transition-colors"
+                    style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
+                    onClick={() => onClearGoal(run.id)}
+                  >
+                    清除
+                  </button>
+                </>
+              )}
+              {run.goalStatus === "paused" && (
+                <>
+                  <button
+                    className="text-xs px-2 py-1 rounded transition-colors"
+                    style={{
+                      background: "var(--bg-primary)",
+                      color: "var(--green)",
+                      border: "1px solid var(--border)",
+                    }}
+                    onClick={() => onResumeGoal(run.id)}
+                  >
+                    恢复
+                  </button>
+                  <button
+                    className="text-xs px-2 py-1 rounded transition-colors"
+                    style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
+                    onClick={() => onClearGoal(run.id)}
+                  >
+                    清除
+                  </button>
+                </>
+              )}
+              {(run.goalStatus === "achieved" || run.goalStatus === "budget_exhausted") && (
+                <span
+                  className="text-xs"
+                  style={{ color: run.goalStatus === "achieved" ? "var(--green)" : "var(--red)" }}
                 >
-                  暂停
-                </button>
-                <button
-                  className="text-xs px-2 py-1 rounded transition-colors"
-                  style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
-                  onClick={() => onClearGoal(run.id)}
-                >
-                  清除
-                </button>
-              </>
-            )}
-            {run.goalStatus === "paused" && (
-              <>
-                <button
-                  className="text-xs px-2 py-1 rounded transition-colors"
-                  style={{ background: "var(--bg-primary)", color: "var(--green)", border: "1px solid var(--border)" }}
-                  onClick={() => onResumeGoal(run.id)}
-                >
-                  恢复
-                </button>
-                <button
-                  className="text-xs px-2 py-1 rounded transition-colors"
-                  style={{ background: "var(--bg-primary)", color: "var(--red)", border: "1px solid var(--border)" }}
-                  onClick={() => onClearGoal(run.id)}
-                >
-                  清除
-                </button>
-              </>
-            )}
-            {(run.goalStatus === "achieved" || run.goalStatus === "budget_exhausted") && (
-              <span className="text-xs" style={{ color: run.goalStatus === "achieved" ? "var(--green)" : "var(--red)" }}>
-                {run.goalStatus === "achieved" ? "已达成" : "预算已用完"}
-              </span>
-            )}
-          </div>}
+                  {run.goalStatus === "achieved" ? "已达成" : "预算已用完"}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

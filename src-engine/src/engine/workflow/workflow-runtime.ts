@@ -316,7 +316,7 @@ export class WorkflowRuntime {
 
       const batch = stage.stages.slice(i, i + concurrency);
       const batchResults = await Promise.allSettled(
-        batch.map((s) => this.executeStage(s, context, task, execution, signal))
+        batch.map((s) => this.executeStage(s, context, task, execution, signal)),
       );
 
       for (const result of batchResults) {
@@ -487,9 +487,7 @@ export class WorkflowRuntime {
     _signal: AbortSignal,
   ): Promise<StageOutput | null> {
     // 获取被验证的目标输出
-    const targetOutput = stage.targetStageId
-      ? context.stageOutputs.get(stage.targetStageId)
-      : context.lastOutput;
+    const targetOutput = stage.targetStageId ? context.stageOutputs.get(stage.targetStageId) : context.lastOutput;
 
     if (!targetOutput) {
       console.warn(`[workflow] Adversarial stage "${stage.name}": no target output to verify`);
@@ -552,7 +550,11 @@ export class WorkflowRuntime {
           costUsd: cost,
         });
       } catch (err) {
-        const vote = { voterId, passed: false, reason: `Voter error: ${err instanceof Error ? err.message : String(err)}` };
+        const vote = {
+          voterId,
+          passed: false,
+          reason: `Voter error: ${err instanceof Error ? err.message : String(err)}`,
+        };
         votes.push(vote);
       }
     });
@@ -622,11 +624,7 @@ export class WorkflowRuntime {
   // ─── 工具方法 ─────────────────────────────────────────────────────────
 
   /** 构建 Agent 提示词，注入 workflow 上下文 */
-  private buildAgentPrompt(
-    stagePrompt: string,
-    context: WorkflowContext,
-    task: TaskDefinition,
-  ): string {
+  private buildAgentPrompt(stagePrompt: string, context: WorkflowContext, task: TaskDefinition): string {
     const parts: string[] = [];
 
     if (context.goals.length > 0) {

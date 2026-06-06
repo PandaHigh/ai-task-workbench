@@ -194,9 +194,10 @@ export class WeComBot {
     const userMessage = body.text?.content || body.voice?.content || "";
     if (!userMessage.trim()) return;
 
-    const wecomKey = body.chattype === "group"
-      ? `${SESSION_PREFIX_GROUP}${body.chatid}`
-      : `${SESSION_PREFIX_SINGLE}${body.from.userid}`;
+    const wecomKey =
+      body.chattype === "group"
+        ? `${SESSION_PREFIX_GROUP}${body.chatid}`
+        : `${SESSION_PREFIX_SINGLE}${body.from.userid}`;
 
     const sessionId = this.getOrCreateSessionId(wecomKey);
     const streamId = generateReqId("stream");
@@ -222,11 +223,7 @@ export class WeComBot {
     }
   }
 
-  private createWeComNotifyFn(
-    frame: WsFrame<TextMessage>,
-    streamId: string,
-    sessionId: string,
-  ): NotifyFn {
+  private createWeComNotifyFn(frame: WsFrame<TextMessage>, streamId: string, sessionId: string): NotifyFn {
     let accumulated = "";
     let lastSentLength = 0;
     let throttleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -234,9 +231,8 @@ export class WeComBot {
     const flushStream = async () => {
       if (!this.wsClient || !this._connected) return;
       if (accumulated.length > lastSentLength) {
-        const content = Buffer.from(accumulated).byteLength > MAX_STREAM_BYTES
-          ? accumulated.slice(0, MAX_STREAM_BYTES)
-          : accumulated;
+        const content =
+          Buffer.from(accumulated).byteLength > MAX_STREAM_BYTES ? accumulated.slice(0, MAX_STREAM_BYTES) : accumulated;
         try {
           await this.wsClient.replyStreamNonBlocking(frame, streamId, content, false);
         } catch {
@@ -280,9 +276,10 @@ export class WeComBot {
       } else if (method === "chat.complete") {
         cleanup();
         const finalContent = (params.message as { content?: string })?.content || accumulated;
-        const content = Buffer.from(finalContent).byteLength > MAX_STREAM_BYTES
-          ? finalContent.slice(0, MAX_STREAM_BYTES)
-          : finalContent;
+        const content =
+          Buffer.from(finalContent).byteLength > MAX_STREAM_BYTES
+            ? finalContent.slice(0, MAX_STREAM_BYTES)
+            : finalContent;
         this.wsClient?.replyStream(frame, streamId, content, true).catch(() => {});
       } else if (method === "chat.error") {
         cleanup();

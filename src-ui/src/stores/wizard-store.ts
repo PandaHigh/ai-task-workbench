@@ -64,8 +64,7 @@ export const useWizardStore = create<WizardStore>((set) => ({
   setMode: (mode) => set({ mode }),
   setWorkingDir: (dir) => set({ workingDir: dir }),
   setSessionId: (id) => set({ sessionId: id }),
-  addMessage: (msg) =>
-    set((state) => ({ messages: [...state.messages, msg] })),
+  addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   setTaskParams: (params) => set({ taskParams: params }),
   setValidation: (isValid, errors) => set({ isValid, errors }),
   setQuickContent: (quickContent) => set({ quickContent }),

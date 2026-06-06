@@ -50,7 +50,9 @@ export class QueueManager {
       return a.task.priority - b.task.priority;
     });
 
-    queue.forEach((entry, i) => { entry.position = i; });
+    queue.forEach((entry, i) => {
+      entry.position = i;
+    });
 
     this.persistQueue(runId);
     return task;
@@ -72,9 +74,9 @@ export class QueueManager {
     const queue = this.queues.get(runId);
     if (!queue || queue.length === 0) return null;
 
-    const idx = queue.findIndex(entry => {
+    const idx = queue.findIndex((entry) => {
       if (!entry.task.dependsOn || entry.task.dependsOn.length === 0) return true;
-      return entry.task.dependsOn.every(depId => completedTaskIds.has(depId));
+      return entry.task.dependsOn.every((depId) => completedTaskIds.has(depId));
     });
 
     if (idx === -1) return null;
@@ -157,7 +159,9 @@ export class QueueManager {
     if (index === -1) return false;
 
     queue.splice(index, 1);
-    queue.forEach((entry, i) => { entry.position = i; });
+    queue.forEach((entry, i) => {
+      entry.position = i;
+    });
     this.persistQueue(runId);
     return true;
   }
@@ -188,7 +192,9 @@ export class QueueManager {
       if (a.task.type !== "user_defined" && b.task.type === "user_defined") return 1;
       return a.task.priority - b.task.priority;
     });
-    queue.forEach((entry, i) => { entry.position = i; });
+    queue.forEach((entry, i) => {
+      entry.position = i;
+    });
     this.persistQueue(runId);
   }
 

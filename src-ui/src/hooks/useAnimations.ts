@@ -22,7 +22,12 @@ export function pageEnterStyle(): CSSProperties {
   return { animation: "fadeIn 0.4s ease-out" };
 }
 
-export function staggerItemStyle(index: number, baseDelay: number = STAGGER_BASE_DELAY, name = "slideUp", duration: number = STAGGER_DURATION): CSSProperties {
+export function staggerItemStyle(
+  index: number,
+  baseDelay: number = STAGGER_BASE_DELAY,
+  name = "slideUp",
+  duration: number = STAGGER_DURATION,
+): CSSProperties {
   return { animation: `${name} ${duration}s ease-out ${index * baseDelay}ms both` };
 }
 
@@ -36,7 +41,9 @@ export function shimmerStyle(): CSSProperties {
 
 type AnimName = "fadeIn" | "slideUp" | "slideDown" | "staggerFadeIn" | "pulse";
 
-export function useAnimationStyle(opts: { name?: AnimName; duration?: number; delay?: number; disabled?: boolean } = {}): CSSProperties {
+export function useAnimationStyle(
+  opts: { name?: AnimName; duration?: number; delay?: number; disabled?: boolean } = {},
+): CSSProperties {
   const reduced = useReducedMotion();
   const { name = "fadeIn", duration = STAGGER_DURATION, delay = 0, disabled = false } = opts;
   return useMemo(() => {
@@ -65,11 +72,16 @@ export function useTypewriter(fullText: string, speed = 30) {
     setDisplayed("");
     const id = setInterval(() => {
       idx.current += 1;
-      if (idx.current >= fullText.length) { setDisplayed(fullText); clearInterval(id); }
-      else setDisplayed(fullText.slice(0, idx.current));
+      if (idx.current >= fullText.length) {
+        setDisplayed(fullText);
+        clearInterval(id);
+      } else setDisplayed(fullText.slice(0, idx.current));
     }, speed);
     return () => clearInterval(id);
   }, [fullText, speed]);
-  const reset = useCallback(() => { idx.current = 0; setDisplayed(""); }, []);
+  const reset = useCallback(() => {
+    idx.current = 0;
+    setDisplayed("");
+  }, []);
   return { displayed, reset };
 }

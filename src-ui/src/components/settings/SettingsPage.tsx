@@ -39,14 +39,24 @@ export function SettingsPage() {
   const [publicUrl, setPublicUrl] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const isDirty = origValues != null && (
-    origValues.qualityThreshold !== qualityThreshold
-    || origValues.defaultTimeout !== defaultTimeout
-    || origValues.claudePath !== claudePath
-  );
+  const isDirty =
+    origValues != null &&
+    (origValues.qualityThreshold !== qualityThreshold ||
+      origValues.defaultTimeout !== defaultTimeout ||
+      origValues.claudePath !== claudePath);
 
-  const qtError = validateNumber(qualityThreshold, CONSTRAINTS.qualityThreshold.min, CONSTRAINTS.qualityThreshold.max, CONSTRAINTS.qualityThreshold.label);
-  const dtError = validateNumber(defaultTimeout, CONSTRAINTS.defaultTimeout.min, CONSTRAINTS.defaultTimeout.max, CONSTRAINTS.defaultTimeout.label);
+  const qtError = validateNumber(
+    qualityThreshold,
+    CONSTRAINTS.qualityThreshold.min,
+    CONSTRAINTS.qualityThreshold.max,
+    CONSTRAINTS.qualityThreshold.label,
+  );
+  const dtError = validateNumber(
+    defaultTimeout,
+    CONSTRAINTS.defaultTimeout.min,
+    CONSTRAINTS.defaultTimeout.max,
+    CONSTRAINTS.defaultTimeout.label,
+  );
 
   const validateClaudePath = useCallback((value: string) => {
     if (!value.trim()) {
@@ -94,7 +104,9 @@ export function SettingsPage() {
       setLoaded(true);
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [connected]);
 
   const handleSave = async () => {
@@ -119,7 +131,9 @@ export function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-md:p-4" style={pageEnterStyle()}>
-      <h2 className="text-lg font-semibold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>设置</h2>
+      <h2 className="text-lg font-semibold mb-6 max-md:mb-4" style={{ color: "var(--text-primary)" }}>
+        设置
+      </h2>
 
       {!loaded ? (
         <div className="max-w-lg space-y-6">
@@ -128,168 +142,231 @@ export function SettingsPage() {
           ))}
         </div>
       ) : (
-      <div className="max-w-lg space-y-6">
-        {/* Connection status */}
-        <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>连接状态</h3>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ background: connected ? "var(--green)" : "var(--red)" }} />
-            <span className="text-xs" style={{ color: connected ? "var(--green)" : "var(--red)" }}>
-              {connected ? "已连接" : "未连接"}
-            </span>
-          </div>
-        </div>
-
-        {/* Quality threshold */}
-        <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>质量要求（默认值）</h3>
-          <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            创建任务时的默认质量分数。当前: {(qualityThreshold * 100).toFixed(0)}%
-          </p>
-          <input type="range" min="0" max="100" value={qualityThreshold * 100}
-            onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
-            aria-label={`质量要求: 当前 ${(qualityThreshold * 100).toFixed(0)}%，范围 0% 到 100%`}
-            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(qualityThreshold * 100)}
-            className="w-full" />
-          <div className="flex items-center gap-2 mt-2">
-            <input type="number" min={CONSTRAINTS.qualityThreshold.min} max={CONSTRAINTS.qualityThreshold.max}
-              step={CONSTRAINTS.qualityThreshold.step}
-              value={qualityThreshold}
-              onChange={(e) => setQualityThreshold(Number(e.target.value))}
-              className="w-20 px-2 py-1 rounded text-xs outline-none"
-              style={{
-                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                border: qtError ? "1px solid var(--red)" : "1px solid var(--border)",
-              }}
-              aria-label="质量要求数值输入"
-            />
-            {qtError && <span className="text-xs" style={{ color: "var(--red)" }} role="alert">{qtError}</span>}
-          </div>
-        </div>
-
-        {/* Default timeout */}
-        <div className="glass-card p-4">
-          <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>任务默认超时</h3>
-          <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            创建任务时的默认超时时间。当前: {defaultTimeout} 分钟
-          </p>
-          <input type="range" min="5" max="180" value={defaultTimeout}
-            onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-            aria-label={`每个任务最长用时: 当前 ${defaultTimeout} 分钟，范围 5 到 180 分钟`}
-            aria-valuemin={5} aria-valuemax={180} aria-valuenow={defaultTimeout}
-            className="w-full" />
-          <div className="flex items-center gap-2 mt-2">
-            <input type="number" min={CONSTRAINTS.defaultTimeout.min} max={CONSTRAINTS.defaultTimeout.max}
-              step={CONSTRAINTS.defaultTimeout.step}
-              value={defaultTimeout}
-              onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-              className="w-20 px-2 py-1 rounded text-xs outline-none"
-              style={{
-                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                border: dtError ? "1px solid var(--red)" : "1px solid var(--border)",
-              }}
-              aria-label="最长用时数值输入"
-            />
-            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>分钟</span>
-            {dtError && <span className="text-xs" style={{ color: "var(--red)" }} role="alert">{dtError}</span>}
-          </div>
-        </div>
-
-        {/* Save button */}
-        <button onClick={handleSave} disabled={!isDirty || !!qtError || !!dtError}
-          className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40"
-          style={{ background: "var(--blue)", color: "#fff" }}>
-          {saved ? <span style={{ color: "var(--green)" }}>✓ 已保存</span> : isDirty ? "保存设置" : "未修改"}
-        </button>
-
-        {/* Skills Management */}
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>Skills 管理</h3>
-          <SkillsManager />
-        </div>
-
-        {/* Plugin Management */}
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>MCP 插件管理</h3>
-          <PluginManager />
-        </div>
-
-        {/* Orchestrator Profiles */}
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>编排配置</h3>
-          <ProfileManager />
-        </div>
-
-        {/* WeChat Work Bot */}
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>企业微信机器人</h3>
-          <WeComConfig />
-        </div>
-
-        {/* Advanced settings */}
-        <div className="mt-4">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
-          >
-            {showAdvanced ? "收起高级设置" : "高级设置"}
-          </button>
-        </div>
-
-        {showAdvanced && (
-          <div className="space-y-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
-            {/* Claude path */}
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>AI 程序位置</h3>
-              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-                如果你安装的 AI 程序不在默认路径，可以在这里修改
-              </p>
-              <input type="text" value={claudePath}
-                onChange={(e) => {
-                  setClaudePath(e.target.value);
-                  if (claudePathError) validateClaudePath(e.target.value);
-                }}
-                onBlur={() => validateClaudePath(claudePath)}
-                required
-                minLength={1}
-                className="w-full px-3 py-2 rounded text-xs outline-none"
-                style={{
-                  background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                  border: claudePathError ? "1px solid var(--red)" : "1px solid var(--border)",
-                }}
-                aria-invalid={!!claudePathError}
-                aria-describedby={claudePathError ? "claude-path-error" : undefined}
+        <div className="max-w-lg space-y-6">
+          {/* Connection status */}
+          <div className="glass-card p-4">
+            <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>
+              连接状态
+            </h3>
+            <div className="flex items-center gap-2">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ background: connected ? "var(--green)" : "var(--red)" }}
               />
-              {claudePathError && (
-                <p id="claude-path-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">{claudePathError}</p>
+              <span className="text-xs" style={{ color: connected ? "var(--green)" : "var(--red)" }}>
+                {connected ? "已连接" : "未连接"}
+              </span>
+            </div>
+          </div>
+
+          {/* Quality threshold */}
+          <div className="glass-card p-4">
+            <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>
+              质量要求（默认值）
+            </h3>
+            <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+              创建任务时的默认质量分数。当前: {(qualityThreshold * 100).toFixed(0)}%
+            </p>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={qualityThreshold * 100}
+              onChange={(e) => setQualityThreshold(Number(e.target.value) / 100)}
+              aria-label={`质量要求: 当前 ${(qualityThreshold * 100).toFixed(0)}%，范围 0% 到 100%`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(qualityThreshold * 100)}
+              className="w-full"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="number"
+                min={CONSTRAINTS.qualityThreshold.min}
+                max={CONSTRAINTS.qualityThreshold.max}
+                step={CONSTRAINTS.qualityThreshold.step}
+                value={qualityThreshold}
+                onChange={(e) => setQualityThreshold(Number(e.target.value))}
+                className="w-20 px-2 py-1 rounded text-xs outline-none"
+                style={{
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: qtError ? "1px solid var(--red)" : "1px solid var(--border)",
+                }}
+                aria-label="质量要求数值输入"
+              />
+              {qtError && (
+                <span className="text-xs" style={{ color: "var(--red)" }} role="alert">
+                  {qtError}
+                </span>
               )}
             </div>
+          </div>
 
-            {/* Share settings */}
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>分享设置</h3>
-              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-                如果你需要把任务分享给别人，填写公网访问地址
-              </p>
-              <input type="text" value={publicUrl}
-                onChange={(e) => setPublicUrl(e.target.value)}
-                placeholder="https://my-tunnel.ngrok.io"
-                className="w-full px-3 py-2 rounded text-xs outline-none"
+          {/* Default timeout */}
+          <div className="glass-card p-4">
+            <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>
+              任务默认超时
+            </h3>
+            <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+              创建任务时的默认超时时间。当前: {defaultTimeout} 分钟
+            </p>
+            <input
+              type="range"
+              min="5"
+              max="180"
+              value={defaultTimeout}
+              onChange={(e) => setDefaultTimeout(Number(e.target.value))}
+              aria-label={`每个任务最长用时: 当前 ${defaultTimeout} 分钟，范围 5 到 180 分钟`}
+              aria-valuemin={5}
+              aria-valuemax={180}
+              aria-valuenow={defaultTimeout}
+              className="w-full"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="number"
+                min={CONSTRAINTS.defaultTimeout.min}
+                max={CONSTRAINTS.defaultTimeout.max}
+                step={CONSTRAINTS.defaultTimeout.step}
+                value={defaultTimeout}
+                onChange={(e) => setDefaultTimeout(Number(e.target.value))}
+                className="w-20 px-2 py-1 rounded text-xs outline-none"
                 style={{
-                  background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                  border: "1px solid var(--border)",
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: dtError ? "1px solid var(--red)" : "1px solid var(--border)",
                 }}
+                aria-label="最长用时数值输入"
               />
-              <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
-                留空则使用 http://localhost:9731
-              </p>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                分钟
+              </span>
+              {dtError && (
+                <span className="text-xs" style={{ color: "var(--red)" }} role="alert">
+                  {dtError}
+                </span>
+              )}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={!isDirty || !!qtError || !!dtError}
+            className="px-6 py-2 rounded text-xs font-semibold disabled:opacity-40"
+            style={{ background: "var(--blue)", color: "#fff" }}
+          >
+            {saved ? <span style={{ color: "var(--green)" }}>✓ 已保存</span> : isDirty ? "保存设置" : "未修改"}
+          </button>
+
+          {/* Skills Management */}
+          <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>
+              Skills 管理
+            </h3>
+            <SkillsManager />
+          </div>
+
+          {/* Plugin Management */}
+          <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>
+              MCP 插件管理
+            </h3>
+            <PluginManager />
+          </div>
+
+          {/* Orchestrator Profiles */}
+          <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>
+              编排配置
+            </h3>
+            <ProfileManager />
+          </div>
+
+          {/* WeChat Work Bot */}
+          <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>
+              企业微信机器人
+            </h3>
+            <WeComConfig />
+          </div>
+
+          {/* Advanced settings */}
+          <div className="mt-4">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs underline"
+              style={{ color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              {showAdvanced ? "收起高级设置" : "高级设置"}
+            </button>
+          </div>
+
+          {showAdvanced && (
+            <div className="space-y-6" style={{ animation: "fadeIn 0.3s ease-out" }}>
+              {/* Claude path */}
+              <div className="glass-card p-4">
+                <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>
+                  AI 程序位置
+                </h3>
+                <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+                  如果你安装的 AI 程序不在默认路径，可以在这里修改
+                </p>
+                <input
+                  type="text"
+                  value={claudePath}
+                  onChange={(e) => {
+                    setClaudePath(e.target.value);
+                    if (claudePathError) validateClaudePath(e.target.value);
+                  }}
+                  onBlur={() => validateClaudePath(claudePath)}
+                  required
+                  minLength={1}
+                  className="w-full px-3 py-2 rounded text-xs outline-none"
+                  style={{
+                    background: "var(--bg-tertiary)",
+                    color: "var(--text-primary)",
+                    border: claudePathError ? "1px solid var(--red)" : "1px solid var(--border)",
+                  }}
+                  aria-invalid={!!claudePathError}
+                  aria-describedby={claudePathError ? "claude-path-error" : undefined}
+                />
+                {claudePathError && (
+                  <p id="claude-path-error" className="text-xs mt-1" style={{ color: "var(--red)" }} role="alert">
+                    {claudePathError}
+                  </p>
+                )}
+              </div>
+
+              {/* Share settings */}
+              <div className="glass-card p-4">
+                <h3 className="text-xs font-bold mb-3" style={{ color: "var(--text-secondary)" }}>
+                  分享设置
+                </h3>
+                <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+                  如果你需要把任务分享给别人，填写公网访问地址
+                </p>
+                <input
+                  type="text"
+                  value={publicUrl}
+                  onChange={(e) => setPublicUrl(e.target.value)}
+                  placeholder="https://my-tunnel.ngrok.io"
+                  className="w-full px-3 py-2 rounded text-xs outline-none"
+                  style={{
+                    background: "var(--bg-tertiary)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border)",
+                  }}
+                />
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+                  留空则使用 http://localhost:9731
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
-

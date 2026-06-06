@@ -51,7 +51,7 @@ function renderQuickCreate() {
   return render(
     <MemoryRouter>
       <QuickCreate />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -97,10 +97,13 @@ describe("QuickCreate", () => {
     await user.click(screen.getByText("创建任务"));
 
     await waitFor(() => {
-      expect(mockCall).toHaveBeenCalledWith("run.create", expect.objectContaining({
-        workingDir: "~/test-workspace",
-        goals: expect.arrayContaining(["完成: Fix the login page bug"]),
-      }));
+      expect(mockCall).toHaveBeenCalledWith(
+        "run.create",
+        expect.objectContaining({
+          workingDir: "~/test-workspace",
+          goals: expect.arrayContaining(["完成: Fix the login page bug"]),
+        }),
+      );
     });
 
     expect(mockAddTask).toHaveBeenCalledWith(run);

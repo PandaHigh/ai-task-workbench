@@ -21,10 +21,14 @@ const EXPIRY_OPTIONS: { value: ExpiryOption; label: string }[] = [
 function getExpiresAt(option: ExpiryOption): number | null {
   const now = Date.now();
   switch (option) {
-    case "never": return null;
-    case "1h": return now + 3600_000;
-    case "1d": return now + 86400_000;
-    case "7d": return now + 604800_000;
+    case "never":
+      return null;
+    case "1h":
+      return now + 3600_000;
+    case "1d":
+      return now + 86400_000;
+    case "7d":
+      return now + 604800_000;
   }
 }
 
@@ -56,7 +60,7 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
     if (!runId) return;
     setLoading(true);
     try {
-      const list = await call("share.list", { runId }) as ShareToken[];
+      const list = (await call("share.list", { runId })) as ShareToken[];
       setTokens(list || []);
     } catch (err) {
       console.warn("Failed to load share tokens:", err);
@@ -79,11 +83,11 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
     setCreating(true);
     try {
       const expiresAt = getExpiresAt(expiry);
-      const result = await call("share.create", {
+      const result = (await call("share.create", {
         runId,
         label: label.trim() || undefined,
         expiresAt: expiresAt ?? undefined,
-      }) as { token: string; url: string; createdAt: number };
+      })) as { token: string; url: string; createdAt: number };
       setCreatedUrl(result.url);
       toast.success("分享链接已创建");
       await loadTokens();
@@ -122,7 +126,7 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
       await call("share.revoke", { token });
       toast.success("已撤销");
       await loadTokens();
-      if (createdUrl && tokens.find(t => t.token === token)) {
+      if (createdUrl && tokens.find((t) => t.token === token)) {
         setCreatedUrl(null);
       }
     } catch (err) {
@@ -150,21 +154,35 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
       >
         {/* Header */}
         <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>分享管理</h3>
-          <button onClick={onClose} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)" }}>关闭</button>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            分享管理
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-xs px-2 py-1 rounded"
+            style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)" }}
+          >
+            关闭
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Create form */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>创建分享链接</h4>
+            <h4 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>
+              创建分享链接
+            </h4>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder={'标签（可选，如张三、外部审查）'}
+              placeholder={"标签（可选，如张三、外部审查）"}
               className="w-full px-3 py-2 rounded-lg text-xs outline-none"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              style={{
+                background: "var(--bg-tertiary)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border)",
+              }}
             />
             <div className="flex gap-2 flex-wrap">
               {EXPIRY_OPTIONS.map((opt) => (
@@ -198,15 +216,24 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
 
           {/* Created URL display */}
           {createdUrl && (
-            <div className="p-3 rounded-lg space-y-2" style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-              <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>链接已创建</p>
+            <div
+              className="p-3 rounded-lg space-y-2"
+              style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.2)" }}
+            >
+              <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>
+                链接已创建
+              </p>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   readOnly
                   value={createdUrl}
                   className="flex-1 px-2 py-1.5 rounded text-xs outline-none"
-                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                  style={{
+                    background: "var(--bg-tertiary)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border)",
+                  }}
                   onClick={(e) => (e.target as HTMLInputElement).select()}
                 />
                 <button
@@ -220,7 +247,11 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
                   <button
                     onClick={() => handleNativeShare(createdUrl)}
                     className="px-3 py-1.5 rounded text-xs font-semibold shrink-0"
-                    style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                    style={{
+                      background: "var(--bg-tertiary)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border)",
+                    }}
                   >
                     分享
                   </button>
@@ -236,10 +267,15 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
             </h4>
             {loading ? (
               <div className="flex justify-center py-4">
-                <div className="animate-spin w-5 h-5 border-2 border-t-transparent rounded-full" style={{ borderColor: "var(--blue)", borderTopColor: "transparent" }} />
+                <div
+                  className="animate-spin w-5 h-5 border-2 border-t-transparent rounded-full"
+                  style={{ borderColor: "var(--blue)", borderTopColor: "transparent" }}
+                />
               </div>
             ) : tokens.length === 0 ? (
-              <p className="text-xs text-center py-4" style={{ color: "var(--text-secondary)" }}>还没有分享链接</p>
+              <p className="text-xs text-center py-4" style={{ color: "var(--text-secondary)" }}>
+                还没有分享链接
+              </p>
             ) : (
               <div className="space-y-2">
                 {tokens.map((t) => {
@@ -261,12 +297,18 @@ export function SharePanel({ open, onClose, runId, call }: SharePanelProps) {
                             {t.token.slice(0, 8)}...
                           </span>
                           {t.label && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] shrink-0" style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}>
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[10px] shrink-0"
+                              style={{ background: "rgba(77, 107, 254, 0.15)", color: "var(--blue)" }}
+                            >
                               {t.label}
                             </span>
                           )}
                           {isExpired && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] shrink-0" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--red)" }}>
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[10px] shrink-0"
+                              style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--red)" }}
+                            >
                               已过期
                             </span>
                           )}

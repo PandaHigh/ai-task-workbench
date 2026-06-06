@@ -37,8 +37,12 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       if (!text) return null;
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--blue)" }}>CC&gt;</span>
-          <pre className={preCls} style={{ color: "var(--text-primary)" }}>{text}</pre>
+          <span className={labelCls} style={{ color: "var(--blue)" }}>
+            CC&gt;
+          </span>
+          <pre className={preCls} style={{ color: "var(--text-primary)" }}>
+            {text}
+          </pre>
         </div>
       );
     }
@@ -47,8 +51,12 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       if (!text) return null;
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--green)" }}>&gt;</span>
-          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>{text}</pre>
+          <span className={labelCls} style={{ color: "var(--green)" }}>
+            &gt;
+          </span>
+          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>
+            {text}
+          </pre>
         </div>
       );
     }
@@ -56,8 +64,12 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       const input = formatContent(message.content);
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--yellow)" }}>TOOL</span>
-          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>{input}</pre>
+          <span className={labelCls} style={{ color: "var(--yellow)" }}>
+            TOOL
+          </span>
+          <pre className={preCls} style={{ color: "var(--text-secondary)" }}>
+            {input}
+          </pre>
         </div>
       );
     }
@@ -67,8 +79,12 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       const truncated = output.length > 500 ? output.slice(0, 500) + "..." : output;
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--blue-light)" }}>OUT</span>
-          <pre className={preCls} style={{ color: "var(--text-muted)" }}>{truncated}</pre>
+          <span className={labelCls} style={{ color: "var(--blue-light)" }}>
+            OUT
+          </span>
+          <pre className={preCls} style={{ color: "var(--text-muted)" }}>
+            {truncated}
+          </pre>
         </div>
       );
     }
@@ -76,7 +92,9 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       if (message.subtype === "success") {
         return (
           <div className={`${baseCls} items-center`}>
-            <span className={labelCls} style={{ color: "var(--green)" }}>OK</span>
+            <span className={labelCls} style={{ color: "var(--green)" }}>
+              OK
+            </span>
             <span className="font-mono text-xs" style={{ color: "var(--green)", opacity: 0.7 }}>
               {message.duration_ms ? `${(message.duration_ms / 1000).toFixed(1)}s` : ""}
               {message.num_turns ? ` ${message.num_turns} turns` : ""}
@@ -87,7 +105,9 @@ function MessageBubble({ message }: { message: StreamMessage }) {
       }
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--red)" }}>ERR</span>
+          <span className={labelCls} style={{ color: "var(--red)" }}>
+            ERR
+          </span>
           <pre className={preCls} style={{ color: "var(--red)" }}>
             {message.error || message.result || "Unknown error"}
           </pre>
@@ -97,7 +117,9 @@ function MessageBubble({ message }: { message: StreamMessage }) {
     case "system":
       return (
         <div className={baseCls}>
-          <span className={labelCls} style={{ color: "var(--purple)" }}>SYS</span>
+          <span className={labelCls} style={{ color: "var(--purple)" }}>
+            SYS
+          </span>
           <pre className={preCls} style={{ color: "var(--text-muted)" }}>
             {formatContent(message.content)}
           </pre>

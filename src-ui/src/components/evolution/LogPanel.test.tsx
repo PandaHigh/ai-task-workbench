@@ -13,7 +13,13 @@ vi.mock("../../hooks/useEngine", () => ({
 describe("LogPanel", () => {
   const defaultLogs = [
     { id: 1, timestamp: Date.now() - 2000, level: "info" as const, source: "engine" as const, message: "Started task" },
-    { id: 2, timestamp: Date.now() - 1000, level: "error" as const, source: "engine" as const, message: "Something failed" },
+    {
+      id: 2,
+      timestamp: Date.now() - 1000,
+      level: "error" as const,
+      source: "engine" as const,
+      message: "Something failed",
+    },
     { id: 3, timestamp: Date.now(), level: "success" as const, source: "engine" as const, message: "Task completed" },
   ];
 

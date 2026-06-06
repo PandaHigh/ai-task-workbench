@@ -1,11 +1,11 @@
 /** Brainstorming phases for the master agent's task creation flow. */
 export type BrainstormPhase =
-  | "contextualizing"  // Understanding project context, working directory, existing code
-  | "exploring"        // Asking clarifying questions about goals, constraints
-  | "approaches"       // Proposing 2-3 approaches with trade-offs
-  | "designing"        // Presenting structured task plan for approval
-  | "approved"         // User approved, ready to create tasks
-  | "inactive";        // Not in brainstorming mode
+  | "contextualizing" // Understanding project context, working directory, existing code
+  | "exploring" // Asking clarifying questions about goals, constraints
+  | "approaches" // Proposing 2-3 approaches with trade-offs
+  | "designing" // Presenting structured task plan for approval
+  | "approved" // User approved, ready to create tasks
+  | "inactive"; // Not in brainstorming mode
 
 export interface BrainstormContext {
   workingDir?: string;

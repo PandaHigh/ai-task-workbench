@@ -26,7 +26,17 @@ function ToolCallBadge({ tc }: { tc: ToolCallInfo }) {
       }}
     >
       {tc.status === "executing" && (
-        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "2px solid var(--text-secondary)", borderTopColor: "transparent", animation: "spin 0.6s linear infinite" }} />
+        <span
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            border: "2px solid var(--text-secondary)",
+            borderTopColor: "transparent",
+            animation: "spin 0.6s linear infinite",
+          }}
+        />
       )}
       {tc.status === "completed" && "✓ "}
       {tc.status === "error" && "✗ "}
@@ -105,9 +115,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <span className="markdown-body text-xs" dangerouslySetInnerHTML={{ __html: htmlContent }} />
         )}
-        {message.isStreaming && (
-          <span className="typewriter-cursor" />
-        )}
+        {message.isStreaming && <span className="typewriter-cursor" />}
       </div>
     </div>
   );

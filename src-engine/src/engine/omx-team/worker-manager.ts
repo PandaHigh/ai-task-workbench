@@ -163,7 +163,9 @@ export class OmxAmpWorkerManager {
           try {
             const msg = JSON.parse(line) as WorkerMessage;
             this.handleWorkerMessage(msg);
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       });
 
@@ -236,8 +238,16 @@ export class OmxAmpWorkerManager {
     for (const [_id, proc] of this.workers) {
       try {
         proc.kill(isWin ? undefined : "SIGTERM");
-        setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 5000);
-      } catch { /* already dead */ }
+        setTimeout(() => {
+          try {
+            proc.kill();
+          } catch {
+            /* already dead */
+          }
+        }, 5000);
+      } catch {
+        /* already dead */
+      }
     }
     this.workers.clear();
     this.pending.clear();

@@ -31,7 +31,9 @@ describe("evolution-store", () => {
     });
 
     it("should not use caller-provided id", () => {
-      useEvolutionStore.getState().addLog({ id: 999, timestamp: 100, level: "info", source: "engine", message: "msg" } as never);
+      useEvolutionStore
+        .getState()
+        .addLog({ id: 999, timestamp: 100, level: "info", source: "engine", message: "msg" } as never);
 
       const logs = useEvolutionStore.getState().logs;
       expect(logs[0].id).toBe(1);
@@ -47,7 +49,16 @@ describe("evolution-store", () => {
 
   describe("agentProgress", () => {
     it("should update agent progress", () => {
-      const progress = { runId: "r1", taskId: "t1", role: "developer", progress: 50, phase: "coding", files: [], message: "working", timestamp: 1 };
+      const progress = {
+        runId: "r1",
+        taskId: "t1",
+        role: "developer",
+        progress: 50,
+        phase: "coding",
+        files: [],
+        message: "working",
+        timestamp: 1,
+      };
       useEvolutionStore.getState().updateAgentProgress("developer", progress);
       expect(useEvolutionStore.getState().agentProgress.developer.phase).toBe("coding");
     });
@@ -58,7 +69,19 @@ describe("evolution-store", () => {
       const store = useEvolutionStore.getState();
       store.addLog({ timestamp: 1, level: "info", source: "engine", message: "msg" });
       store.setRunning(true);
-      store.setQueue([{ id: "t1", content: "task", type: "user_defined", priority: 5, status: "pending", timeoutMinutes: 60, runId: "r1", promptJson: "", createdAt: Date.now() }]);
+      store.setQueue([
+        {
+          id: "t1",
+          content: "task",
+          type: "user_defined",
+          priority: 5,
+          status: "pending",
+          timeoutMinutes: 60,
+          runId: "r1",
+          promptJson: "",
+          createdAt: Date.now(),
+        },
+      ]);
 
       store.reset();
 

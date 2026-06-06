@@ -4,13 +4,16 @@
  * 引导 AI 分析任务特征，评估各维度复杂度，输出结构化的路由决策。
  */
 
-export function buildRouterPrompt(taskContent: string, context: {
-  workingDir: string;
-  completedTaskCount: number;
-  costUsedUsd: number;
-  costBudgetUsd: number;
-  hasGoals: boolean;
-}): string {
+export function buildRouterPrompt(
+  taskContent: string,
+  context: {
+    workingDir: string;
+    completedTaskCount: number;
+    costUsedUsd: number;
+    costBudgetUsd: number;
+    hasGoals: boolean;
+  },
+): string {
   return `你是一个任务复杂度评估器。分析以下任务，评估其复杂度并推荐执行策略。
 
 ## 任务内容
@@ -82,12 +85,25 @@ export function buildQuickRoutePrompt(taskContent: string, suggestedTemplate: st
 }
 
 /** 内置模板的关键词匹配规则 */
-export const TEMPLATE_KEYWORDS: Record<string, {
-  keywords: string[];
-  priority: number;  // 优先级，数字越大优先级越高
-}> = {
+export const TEMPLATE_KEYWORDS: Record<
+  string,
+  {
+    keywords: string[];
+    priority: number; // 优先级，数字越大优先级越高
+  }
+> = {
   "security-audit": {
-    keywords: ["安全审计", "安全审查", "安全扫描", "漏洞扫描", "security audit", "vulnerability", "auth check", "权限检查", "认证检查"],
+    keywords: [
+      "安全审计",
+      "安全审查",
+      "安全扫描",
+      "漏洞扫描",
+      "security audit",
+      "vulnerability",
+      "auth check",
+      "权限检查",
+      "认证检查",
+    ],
     priority: 3,
   },
   "code-review": {
@@ -95,10 +111,21 @@ export const TEMPLATE_KEYWORDS: Record<string, {
     priority: 2,
   },
   "bug-sweep": {
-    keywords: ["bug巡检", "缺陷扫描", "bug sweep", "find bugs", "查找缺陷", "发现bug", "bug hunt", "查找所有 bug", "查找bug", "bug和缺陷"],
+    keywords: [
+      "bug巡检",
+      "缺陷扫描",
+      "bug sweep",
+      "find bugs",
+      "查找缺陷",
+      "发现bug",
+      "bug hunt",
+      "查找所有 bug",
+      "查找bug",
+      "bug和缺陷",
+    ],
     priority: 2,
   },
-  "migration": {
+  migration: {
     keywords: ["迁移", "migration", "重构", "refactor", "rewrite", "重写", "port", "代码迁移"],
     priority: 2,
   },

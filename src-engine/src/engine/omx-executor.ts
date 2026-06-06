@@ -7,7 +7,15 @@
  * All other logic (handleEmptyQueue, evaluateGoal, scoreTask, etc.) is preserved.
  */
 
-import type { TaskDefinition, ExecutionRun, TaskContext, GoalEvaluation, ScoreDetails, TaskStatus, CheckpointType } from "@ai-workbench/shared";
+import type {
+  TaskDefinition,
+  ExecutionRun,
+  TaskContext,
+  GoalEvaluation,
+  ScoreDetails,
+  TaskStatus,
+  CheckpointType,
+} from "@ai-workbench/shared";
 import { CCClient } from "../cc-integration/cc-client.js";
 import { GitManager } from "../git/git-manager.js";
 import { Store } from "../db/store.js";
@@ -23,7 +31,6 @@ import type { ComplexityAssessment, RoutingContext } from "./router/index.js";
 
 // AgentExecutor removed — OMX pipeline uses OmxAmpPipeline instead
 import { BranchStrategy } from "../git/branch-strategy.js";
-
 
 import { errorToMessage } from "../lib/error-utils.js";
 import { classifyError, getRetryStrategy, TaskError } from "../lib/error-types.js";
@@ -95,7 +102,16 @@ export class Executor {
       maxConcurrentTasks: 1,
     };
     try {
-      const keys = ["qualityThreshold", "maxEvaluationCycles", "maxBudgetUsd", "stagnationWindow", "maxTurns", "maxAutoRetries", "branchStrategy", "maxConcurrentTasks"] as const;
+      const keys = [
+        "qualityThreshold",
+        "maxEvaluationCycles",
+        "maxBudgetUsd",
+        "stagnationWindow",
+        "maxTurns",
+        "maxAutoRetries",
+        "branchStrategy",
+        "maxConcurrentTasks",
+      ] as const;
       for (const key of keys) {
         const val = this.store.getConfig(key) as number | undefined;
         if (val !== undefined && val !== null) {
@@ -138,9 +154,10 @@ export class Executor {
 
       while (this.running) {
         const completedTaskIds = new Set<string>(
-          this.store.listTasks(run.id)
-            .filter(t => t.status === "completed")
-            .map(t => t.id)
+          this.store
+            .listTasks(run.id)
+            .filter((t) => t.status === "completed")
+            .map((t) => t.id),
         );
 
         const task = this.queueManager.dequeueWithDeps(run.id, completedTaskIds);
@@ -152,16 +169,28 @@ export class Executor {
         }
 
         if (run.autonomyLevel === "supervised") {
-          this.log(run.id, "engine", "info", `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`);
+          this.log(
+            run.id,
+            "engine",
+            "info",
+            `Supervised mode — awaiting approval for task: ${task.content.substring(0, 60)}`,
+          );
           const decision = await this.checkApproval(
-            "risky_commit", run, task,
+            "risky_commit",
+            run,
+            task,
             `Supervised mode: approve execution of "${task.content.substring(0, 80)}"?`,
             { taskContent: task.content },
           );
           if (!decision || decision.action === "reject") {
             this.log(run.id, "engine", "info", "Task rejected by human in supervised mode");
             this.store.updateTask(run.id, task.id, { status: "cancelled", completedAt: Date.now() });
-            this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "cancelled", reason: "Rejected in supervised mode" });
+            this.broadcast("task.status", {
+              taskId: task.id,
+              runId: run.id,
+              status: "cancelled",
+              reason: "Rejected in supervised mode",
+            });
             continue;
           }
         }
@@ -174,8 +203,18 @@ export class Executor {
 
         const taskCost = this.recalculateCost(run.id);
         if (taskCost > this.config.maxBudgetUsd) {
-          this.log(run.id, "engine", "warn", `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`);
-          this.broadcast("run.status", { runId: run.id, status: "budget_exceeded", cost: taskCost, budget: this.config.maxBudgetUsd });
+          this.log(
+            run.id,
+            "engine",
+            "warn",
+            `Budget exceeded after task: $${taskCost.toFixed(2)} > $${this.config.maxBudgetUsd}. Stopping.`,
+          );
+          this.broadcast("run.status", {
+            runId: run.id,
+            status: "budget_exceeded",
+            cost: taskCost,
+            budget: this.config.maxBudgetUsd,
+          });
           this.stop();
           await this.finalize(run, `Budget exceeded after task ($${taskCost.toFixed(2)}).`);
           break;
@@ -192,9 +231,10 @@ export class Executor {
 
   private async runParallelTasks(run: ExecutionRun, firstTask: TaskDefinition): Promise<void> {
     const completedTaskIds = new Set<string>(
-      this.store.listTasks(run.id)
-        .filter(t => t.status === "completed")
-        .map(t => t.id)
+      this.store
+        .listTasks(run.id)
+        .filter((t) => t.status === "completed")
+        .map((t) => t.id),
     );
 
     const readyTasks = [firstTask];
@@ -224,11 +264,20 @@ export class Executor {
       let routeAssessment: ComplexityAssessment | null = null;
       try {
         routeAssessment = await this.taskRouter.analyze(firstTask, routingCtx);
-        this.log(run.id, "router", "info",
+        this.log(
+          run.id,
+          "router",
+          "info",
           `Task routed: ${routeAssessment.strategy.type}${routeAssessment.strategy.type === "builtin" ? `:${(routeAssessment.strategy as { type: "builtin"; templateName: string }).templateName}` : ""} (confidence: ${(routeAssessment.confidence * 100).toFixed(0)}%, ${routeAssessment.reason})`,
-          firstTask.id);
+          firstTask.id,
+        );
       } catch (routeErr) {
-        this.log(run.id, "router", "warn", `Routing analysis failed: ${routeErr instanceof Error ? routeErr.message : String(routeErr)}`);
+        this.log(
+          run.id,
+          "router",
+          "warn",
+          `Routing analysis failed: ${routeErr instanceof Error ? routeErr.message : String(routeErr)}`,
+        );
       }
 
       // Route to appropriate execution path
@@ -256,7 +305,12 @@ export class Executor {
       maxFixAttempts: 3,
     };
 
-    this.log(run.id, "engine", "info", `[team] Starting Team execution: ${readyTasks.length} tasks, ${this.maxConcurrency} workers`);
+    this.log(
+      run.id,
+      "engine",
+      "info",
+      `[team] Starting Team execution: ${readyTasks.length} tasks, ${this.maxConcurrency} workers`,
+    );
 
     // Create worktrees for each task (isolation)
     if (useFeatureBranch) {
@@ -266,10 +320,20 @@ export class Executor {
           task.branchName = result.branchName;
           task.worktreePath = result.worktreePath;
           this.store.updateTask(run.id, task.id, { branchName: result.branchName, worktreePath: result.worktreePath });
-          this.log(run.id, "engine", "info", `[team] Created worktree for task ${task.id.substring(0, 6)}: ${result.branchName}`);
+          this.log(
+            run.id,
+            "engine",
+            "info",
+            `[team] Created worktree for task ${task.id.substring(0, 6)}: ${result.branchName}`,
+          );
         } catch (e) {
           // If worktree creation fails, task stays in run.workingDir (shared)
-          this.log(run.id, "engine", "warn", `Failed to create worktree for task ${task.id.substring(0, 6)}: ${e instanceof Error ? e.message : String(e)}`);
+          this.log(
+            run.id,
+            "engine",
+            "warn",
+            `Failed to create worktree for task ${task.id.substring(0, 6)}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }
@@ -295,8 +359,12 @@ export class Executor {
       const team = new OmxAmpTeamOrchestrator(this.ccClient, this.createPersistingNotify(run.id), teamConfig);
       const teamResult = await team.execute(readyTasks, run, context, abortSignal);
 
-      this.log(run.id, "engine", "info",
-        `[team] Completed: ${teamResult.completedTasks} succeeded, ${teamResult.failedTasks} failed, cost=$${teamResult.totalCostUsd.toFixed(4)}`);
+      this.log(
+        run.id,
+        "engine",
+        "info",
+        `[team] Completed: ${teamResult.completedTasks} succeeded, ${teamResult.failedTasks} failed, cost=$${teamResult.totalCostUsd.toFixed(4)}`,
+      );
 
       run.totalTasksCompleted += teamResult.completedTasks;
       this.store.saveRun(run);
@@ -316,10 +384,20 @@ export class Executor {
               if (mergeResult.success) {
                 this.log(run.id, "engine", "info", `[team] Merged branch ${task.branchName}`);
               } else {
-                this.log(run.id, "engine", "warn", `[team] Merge conflicts on ${task.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+                this.log(
+                  run.id,
+                  "engine",
+                  "warn",
+                  `[team] Merge conflicts on ${task.branchName}: ${mergeResult.conflicts?.join(", ")}`,
+                );
               }
             } catch (e) {
-              this.log(run.id, "engine", "warn", `Failed to merge branch ${task.branchName}: ${e instanceof Error ? e.message : String(e)}`);
+              this.log(
+                run.id,
+                "engine",
+                "warn",
+                `Failed to merge branch ${task.branchName}: ${e instanceof Error ? e.message : String(e)}`,
+              );
             }
           }
         }
@@ -336,7 +414,11 @@ export class Executor {
           // Lightweight scoring: trust worker result, no extra CC call
           const teamData = teamResult.taskOutputs?.get(task.id);
           const score: ScoreDetails = {
-            overall: 0.85, goalAlignment: 0.85, correctness: 0.85, completeness: 0.85, quality: 0.85,
+            overall: 0.85,
+            goalAlignment: 0.85,
+            correctness: 0.85,
+            completeness: 0.85,
+            quality: 0.85,
             passed: true,
             reasoning: teamData?.output
               ? `Team worker completed: ${teamData.output.substring(0, 100)}`
@@ -350,21 +432,42 @@ export class Executor {
           // Git commit
           try {
             const commitHash = await gitManager.autoCommit(task.id, task.content);
-            this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
+            this.log(
+              run.id,
+              "git",
+              "info",
+              `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`,
+              task.id,
+            );
             this.store.appendCommit(run.id, {
-              taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
-              isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
+              taskId: task.id,
+              runId: run.id,
+              hash: commitHash || "",
+              message: task.content,
+              isAiCommit: true,
+              timestamp: Date.now(),
+              additions: 0,
+              deletions: 0,
             });
-            this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
+            this.broadcast("git.commit", {
+              taskId: task.id,
+              runId: run.id,
+              hash: commitHash,
+              message: task.content,
+              isAiCommit: true,
+            });
           } catch (e) {
             this.log(run.id, "git", "warn", `Commit failed: ${e instanceof Error ? e.message : String(e)}`, task.id);
           }
         } else {
           // Failed task — record lesson
           this.store.appendLesson(run.id, {
-            runId: run.id, taskId: task.id, category: "failure",
+            runId: run.id,
+            taskId: task.id,
+            category: "failure",
             lesson: `Team task "${task.content.substring(0, 50)}" failed.`,
-            score: 0, createdAt: Date.now(),
+            score: 0,
+            createdAt: Date.now(),
           });
         }
 
@@ -384,7 +487,9 @@ export class Executor {
           if (task.branchName && task.worktreePath) {
             try {
               await BranchStrategy.cleanupBranch(run.workingDir, task.branchName, task.worktreePath);
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+              /* ignore */
+            }
           }
         }
       }
@@ -406,10 +511,20 @@ export class Executor {
 
   private async handleEmptyQueue(run: ExecutionRun): Promise<boolean> {
     this.evaluationCycles++;
-    this.log(run.id, "engine", "info", `Queue empty — evaluating goals (cycle ${this.evaluationCycles}/${this.config.maxEvaluationCycles})`);
+    this.log(
+      run.id,
+      "engine",
+      "info",
+      `Queue empty — evaluating goals (cycle ${this.evaluationCycles}/${this.config.maxEvaluationCycles})`,
+    );
 
     if (this.evaluationCycles > this.config.maxEvaluationCycles) {
-      this.log(run.id, "engine", "warn", `Reached max evaluation cycles (${this.config.maxEvaluationCycles}). Stopping.`);
+      this.log(
+        run.id,
+        "engine",
+        "warn",
+        `Reached max evaluation cycles (${this.config.maxEvaluationCycles}). Stopping.`,
+      );
       await this.finalize(run, "Max evaluation cycles reached. Partial progress may have been made.");
       return false;
     }
@@ -420,7 +535,11 @@ export class Executor {
     } catch (err) {
       const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Goal evaluation failed: ${msg}. Cooling down and retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
+      try {
+        await this.sleep(CYCLE_COOLDOWN_MS);
+      } catch {
+        return false;
+      }
       return true;
     }
 
@@ -442,7 +561,9 @@ export class Executor {
       this.log(run.id, "engine", "warn", "Progress stalled — requesting human guidance");
       const lessons = this.store.getLessons(run.id, "failure").slice(-5);
       const decision = await this.checkApproval(
-        "goal_stagnation", run, null,
+        "goal_stagnation",
+        run,
+        null,
         "Progress stalled at " + (evaluation.overallProgress * 100).toFixed(0) + "%. Continue, stop, or redirect?",
         { progressHistory: this.progressHistory.slice(-10), evaluation, lessons },
       );
@@ -466,11 +587,16 @@ export class Executor {
 
     if (evaluation.isComplete) {
       // Check if user added new pending tasks before finalizing
-      const pendingTasks = this.store.listTasks(run.id).filter(t => t.status === "pending");
+      const pendingTasks = this.store.listTasks(run.id).filter((t) => t.status === "pending");
       if (pendingTasks.length > 0) {
-        this.log(run.id, "engine", "info", `Goals complete but ${pendingTasks.length} pending task(s) remain — continuing`);
+        this.log(
+          run.id,
+          "engine",
+          "info",
+          `Goals complete but ${pendingTasks.length} pending task(s) remain — continuing`,
+        );
         for (const t of pendingTasks) {
-          if (!this.queueManager.list(run.id).some(q => q.id === t.id)) {
+          if (!this.queueManager.list(run.id).some((q) => q.id === t.id)) {
             this.queueManager.restore(run.id, t);
           }
         }
@@ -482,14 +608,23 @@ export class Executor {
       return false;
     }
 
-    this.log(run.id, "engine", "info", `Goals not met (${(evaluation.overallProgress * 100).toFixed(0)}%). Generating smart tasks...`);
+    this.log(
+      run.id,
+      "engine",
+      "info",
+      `Goals not met (${(evaluation.overallProgress * 100).toFixed(0)}%). Generating smart tasks...`,
+    );
     let smartTasks: Array<{ content: string; priority: number; reasoning: string }>;
     try {
       smartTasks = await this.generateSmartTasks(run, evaluation);
     } catch (err) {
       const msg = errorToMessage(err);
       this.log(run.id, "engine", "warn", `Smart task generation failed: ${msg}. Retrying next cycle.`);
-      try { await this.sleep(CYCLE_COOLDOWN_MS); } catch { return false; }
+      try {
+        await this.sleep(CYCLE_COOLDOWN_MS);
+      } catch {
+        return false;
+      }
       return true;
     }
 
@@ -535,7 +670,7 @@ export class Executor {
     const recent = this.progressHistory.slice(-this.config.stagnationWindow);
     const first = recent[0];
     const last = recent[recent.length - 1];
-    return (last - first) < 0.05;
+    return last - first < 0.05;
   }
 
   private recalculateCost(runId: string): number {
@@ -596,7 +731,7 @@ export class Executor {
       let output = "";
       for await (const msg of stream) {
         if (msg.type === "assistant") {
-          const content = (msg as unknown as Record<string, unknown>);
+          const content = msg as unknown as Record<string, unknown>;
           if (typeof content.content === "string") output += content.content;
           else if (content.message && typeof (content.message as Record<string, unknown>).content === "object") {
             const blocks = (content.message as Record<string, unknown>).content as Array<Record<string, unknown>>;
@@ -654,10 +789,18 @@ export class Executor {
     if (useFeatureBranch) {
       try {
         branchResult = await BranchStrategy.createTaskBranch(run.workingDir, task.id);
-        this.store.updateTask(run.id, task.id, { branchName: branchResult.branchName, worktreePath: branchResult.worktreePath });
+        this.store.updateTask(run.id, task.id, {
+          branchName: branchResult.branchName,
+          worktreePath: branchResult.worktreePath,
+        });
         this.log(run.id, "engine", "info", `Created feature branch: ${branchResult.branchName}`);
       } catch (err) {
-        this.log(run.id, "engine", "warn", `Failed to create feature branch, falling back to direct: ${err instanceof Error ? err.message : err}`);
+        this.log(
+          run.id,
+          "engine",
+          "warn",
+          `Failed to create feature branch, falling back to direct: ${err instanceof Error ? err.message : err}`,
+        );
       }
     }
 
@@ -675,7 +818,13 @@ export class Executor {
       const pipeline = new OmxAmpPipeline(this.ccClient, this.createPersistingNotify(run.id), pipelineWorkingDir);
       const pipelineResult = await pipeline.run(task, context, abortController.signal);
 
-      this.log(run.id, "pipeline", "info", `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`, task.id);
+      this.log(
+        run.id,
+        "pipeline",
+        "info",
+        `Pipeline completed in ${pipelineResult.durationMs}ms (${pipelineResult.iterations} iteration${pipelineResult.iterations > 1 ? "s" : ""}), cost $${pipelineResult.totalCostUsd.toFixed(4)}`,
+        task.id,
+      );
       run.totalCostUsd = this.recalculateCost(run.id) + pipelineResult.totalCostUsd;
       this.cachedCost = null;
 
@@ -710,7 +859,15 @@ export class Executor {
         } catch (scoringErr) {
           const scoringMsg = errorToMessage(scoringErr);
           this.log(run.id, "scorer", "warn", `Scoring failed: ${scoringMsg} — reverting to be safe`, task.id);
-          score = { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: `Scoring CC failed: ${scoringMsg}` };
+          score = {
+            overall: 0,
+            goalAlignment: 0,
+            correctness: 0,
+            completeness: 0,
+            quality: 0,
+            passed: false,
+            reasoning: `Scoring CC failed: ${scoringMsg}`,
+          };
         }
       }
 
@@ -718,8 +875,13 @@ export class Executor {
       this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score });
       this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
 
-      this.log(run.id, "scorer", score.passed ? "info" : "warn",
-        `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`, task.id);
+      this.log(
+        run.id,
+        "scorer",
+        score.passed ? "info" : "warn",
+        `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`,
+        task.id,
+      );
 
       // Checkpoint: borderline_score
       const scoreDiff = Math.abs(score.overall - this.config.qualityThreshold);
@@ -727,7 +889,9 @@ export class Executor {
         this.log(run.id, "engine", "info", "Borderline score — requesting human decision", task.id);
         const diffStats = await this.getDiffStats(gitManager);
         const decision = await this.checkApproval(
-          "borderline_score", run, task,
+          "borderline_score",
+          run,
+          task,
           "Score near threshold. Commit or revert?",
           { score, diffStats, taskContent: task.content },
         );
@@ -744,13 +908,13 @@ export class Executor {
       // Checkpoint: risky_commit
       if (score.passed) {
         const diffStats = await this.getDiffStats(gitManager);
-        const isRisky = diffStats.filesChanged > 10
-          || diffStats.linesChanged > 200
-          || diffStats.hasCriticalFiles;
+        const isRisky = diffStats.filesChanged > 10 || diffStats.linesChanged > 200 || diffStats.hasCriticalFiles;
         if (isRisky) {
           this.log(run.id, "engine", "info", "Risky commit — requesting human review", task.id);
           const decision = await this.checkApproval(
-            "risky_commit", run, task,
+            "risky_commit",
+            run,
+            task,
             "Large change: " + diffStats.filesChanged + " files, " + diffStats.linesChanged + " lines. Review?",
             { diffStats, taskContent: task.content },
           );
@@ -771,19 +935,47 @@ export class Executor {
             if (mergeResult.success) {
               this.log(run.id, "engine", "info", `Merged feature branch: ${branchResult.branchName}`);
             } else {
-              this.log(run.id, "engine", "warn", `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+              this.log(
+                run.id,
+                "engine",
+                "warn",
+                `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`,
+              );
             }
           } catch (err) {
-            this.log(run.id, "engine", "error", `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`);
+            this.log(
+              run.id,
+              "engine",
+              "error",
+              `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`,
+            );
           }
         }
         const commitHash = await gitManager.autoCommit(task.id, task.content);
-        this.log(run.id, "git", "info", `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`, task.id);
+        this.log(
+          run.id,
+          "git",
+          "info",
+          `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`,
+          task.id,
+        );
         this.store.appendCommit(run.id, {
-          taskId: task.id, runId: run.id, hash: commitHash || "", message: task.content,
-          isAiCommit: true, timestamp: Date.now(), additions: 0, deletions: 0,
+          taskId: task.id,
+          runId: run.id,
+          hash: commitHash || "",
+          message: task.content,
+          isAiCommit: true,
+          timestamp: Date.now(),
+          additions: 0,
+          deletions: 0,
         });
-        this.broadcast("git.commit", { taskId: task.id, runId: run.id, hash: commitHash, message: task.content, isAiCommit: true });
+        this.broadcast("git.commit", {
+          taskId: task.id,
+          runId: run.id,
+          hash: commitHash,
+          message: task.content,
+          isAiCommit: true,
+        });
         this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
       } else {
@@ -797,13 +989,20 @@ export class Executor {
           this.log(run.id, "git", "error", `Revert failed: ${errorToMessage(revertErr)}`, task.id);
         }
         this.store.appendLesson(run.id, {
-          runId: run.id, taskId: task.id, category: "failure",
+          runId: run.id,
+          taskId: task.id,
+          category: "failure",
           lesson: `Task "${task.content.substring(0, 50)}" scored ${(score.overall * 100).toFixed(0)}%. Reason: ${score.reasoning}`,
-          score: score.overall, createdAt: Date.now(),
+          score: score.overall,
+          createdAt: Date.now(),
         });
         const finalStatus: TaskStatus = revertSucceeded ? "reverted" : "failed";
         const failReason = `Score: ${(score.overall * 100).toFixed(0)}% (threshold: ${(this.config.qualityThreshold * 100).toFixed(0)}%). ${score.reasoning}${!revertSucceeded ? " | Revert also failed" : ""}`;
-        this.store.updateTask(run.id, task.id, { status: finalStatus, completedAt: Date.now(), errorMessage: failReason });
+        this.store.updateTask(run.id, task.id, {
+          status: finalStatus,
+          completedAt: Date.now(),
+          errorMessage: failReason,
+        });
         this.broadcast("task.status", { taskId: task.id, runId: run.id, status: finalStatus, reason: failReason });
       }
     } catch (err) {
@@ -816,9 +1015,13 @@ export class Executor {
       if (strategy.shouldRetry && currentRetries < strategy.maxRetries) {
         const backoffMs = Math.min(strategy.backoffMs * Math.pow(2, currentRetries), 300000);
         const categoryLabel = taskErr.category;
-        this.log(run.id, "engine", "warn",
+        this.log(
+          run.id,
+          "engine",
+          "warn",
           `${categoryLabel} error (retry ${currentRetries + 1}/${strategy.maxRetries}): ${taskErr.message.substring(0, 100)}. Retrying in ${backoffMs / 1000}s.`,
-          task.id);
+          task.id,
+        );
 
         this.store.updateTask(run.id, task.id, {
           status: "pending",
@@ -832,13 +1035,28 @@ export class Executor {
           timeoutMinutes: task.timeoutMinutes,
         });
         this.store.saveTask(run.id, requeued);
-        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "pending", reason: `Auto-retry ${currentRetries + 1}/${strategy.maxRetries} (${categoryLabel})` });
+        this.broadcast("task.status", {
+          taskId: task.id,
+          runId: run.id,
+          status: "pending",
+          reason: `Auto-retry ${currentRetries + 1}/${strategy.maxRetries} (${categoryLabel})`,
+        });
 
         if (strategy.pauseRunMs > 0) {
           this.log(run.id, "engine", "warn", `Pausing run for ${strategy.pauseRunMs / 1000}s (${categoryLabel})`);
-          try { await this.sleep(strategy.pauseRunMs); } catch (sleepErr) { if (!(sleepErr instanceof Error && sleepErr.message === "Stopped")) console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr); }
+          try {
+            await this.sleep(strategy.pauseRunMs);
+          } catch (sleepErr) {
+            if (!(sleepErr instanceof Error && sleepErr.message === "Stopped"))
+              console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr);
+          }
         }
-        try { await this.sleep(backoffMs); } catch (sleepErr) { if (!(sleepErr instanceof Error && sleepErr.message === "Stopped")) console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr); }
+        try {
+          await this.sleep(backoffMs);
+        } catch (sleepErr) {
+          if (!(sleepErr instanceof Error && sleepErr.message === "Stopped"))
+            console.warn("[executor] sleep interrupted:", sleepErr instanceof Error ? sleepErr.message : sleepErr);
+        }
       } else if (taskErr.category === "quota_exceeded") {
         this.log(run.id, "engine", "error", `Quota exceeded: ${taskErr.message}`);
         this.stop();
@@ -856,10 +1074,20 @@ export class Executor {
           if (mergeResult.success) {
             this.log(run.id, "engine", "info", `Merged feature branch: ${branchResult.branchName}`);
           } else {
-            this.log(run.id, "engine", "warn", `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`);
+            this.log(
+              run.id,
+              "engine",
+              "warn",
+              `Merge conflicts on ${branchResult.branchName}: ${mergeResult.conflicts?.join(", ")}`,
+            );
           }
         } catch (err) {
-          this.log(run.id, "engine", "error", `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`);
+          this.log(
+            run.id,
+            "engine",
+            "error",
+            `Failed to merge feature branch: ${err instanceof Error ? err.message : err}`,
+          );
         } finally {
           await BranchStrategy.cleanupBranch(run.workingDir, branchResult.branchName, branchResult.worktreePath);
         }
@@ -868,7 +1096,10 @@ export class Executor {
   }
 
   private async handleFailedTask(
-    run: ExecutionRun, task: TaskDefinition, taskErr: TaskError, gitManager: GitManager,
+    run: ExecutionRun,
+    task: TaskDefinition,
+    taskErr: TaskError,
+    gitManager: GitManager,
   ): Promise<void> {
     try {
       await gitManager.checkoutClean();
@@ -883,9 +1114,12 @@ export class Executor {
       completedAt: Date.now(),
     });
     this.store.appendLesson(run.id, {
-      runId: run.id, taskId: task.id, category: "failure",
+      runId: run.id,
+      taskId: task.id,
+      category: "failure",
       lesson: `Task "${task.content.substring(0, 60)}" failed: ${taskErr.category}${phaseInfo} — ${taskErr.message.substring(0, 120)}`,
-      score: 0, createdAt: Date.now(),
+      score: 0,
+      createdAt: Date.now(),
     });
     this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: taskErr.message });
   }
@@ -900,8 +1134,10 @@ export class Executor {
       goals: run.goals,
       terminationConditions: run.terminationConditions,
       lastTenCommits: lastTenCommits.map((c) => ({
-        hash: c.hash, message: c.message,
-        timestamp: new Date(c.date).getTime(), isAiCommit: c.isAiCommit,
+        hash: c.hash,
+        message: c.message,
+        timestamp: new Date(c.date).getTime(),
+        isAiCommit: c.isAiCommit,
       })),
       nextFiveTasks,
       lessonsLearned: lessons,
@@ -981,7 +1217,13 @@ Respond ONLY with valid JSON:
       run.goalEvaluationCycles = evaluationCycles;
       run.goalLastEvalReason = "Evaluation parse failed";
       this.store.saveRun(run);
-      return { isComplete: false, progressReport: "Evaluation parse failed", completedGoals: [], remainingGoals: run.goals, overallProgress: 0 };
+      return {
+        isComplete: false,
+        progressReport: "Evaluation parse failed",
+        completedGoals: [],
+        remainingGoals: run.goals,
+        overallProgress: 0,
+      };
     }
   }
 
@@ -993,11 +1235,20 @@ Respond ONLY with valid JSON:
     try {
       const parsed = JSON.parse(extractJson(scoreResult.result));
       if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid score result");
-      const overall = (parsed.goalAlignment || 0) + (parsed.correctness || 0) + (parsed.completeness || 0) + (parsed.quality || 0);
+      const overall =
+        (parsed.goalAlignment || 0) + (parsed.correctness || 0) + (parsed.completeness || 0) + (parsed.quality || 0);
       return { ...parsed, overall, passed: overall >= this.config.qualityThreshold } as ScoreDetails;
     } catch (scoreErr) {
       console.warn("[executor] failed to parse score result:", errorToMessage(scoreErr));
-      return { overall: 0, goalAlignment: 0, correctness: 0, completeness: 0, quality: 0, passed: false, reasoning: "Failed to parse score" };
+      return {
+        overall: 0,
+        goalAlignment: 0,
+        correctness: 0,
+        completeness: 0,
+        quality: 0,
+        passed: false,
+        reasoning: "Failed to parse score",
+      };
     }
   }
 
@@ -1052,9 +1303,13 @@ Respond ONLY with valid JSON:
     }
   }
 
-  private async generateSmartTasks(run: ExecutionRun, evaluation: GoalEvaluation): Promise<Array<{ content: string; priority: number; reasoning: string }>> {
+  private async generateSmartTasks(
+    run: ExecutionRun,
+    evaluation: GoalEvaluation,
+  ): Promise<Array<{ content: string; priority: number; reasoning: string }>> {
     const lessons = this.store.getLessons(run.id, "failure").slice(-5);
-    const lessonStr = lessons.length > 0 ? `\n\nLessons from failures:\n${lessons.map((l) => `- ${l.lesson}`).join("\n")}` : "";
+    const lessonStr =
+      lessons.length > 0 ? `\n\nLessons from failures:\n${lessons.map((l) => `- ${l.lesson}`).join("\n")}` : "";
     const result = await this.ccClient.executeTask(
       `Generate next tasks for this project.\nGoals:\n${run.goals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nRemaining:\n${evaluation.remainingGoals.map((g, i) => `${i + 1}. ${sanitizePromptInput(g)}`).join("\n")}\nProgress: ${evaluation.progressReport}${lessonStr}\nGenerate 1-3 tasks. Respond ONLY with JSON array:\n[{ "content": "task description", "priority": 1_to_10, "reasoning": "why" }]`,
       { workingDir: run.workingDir, timeoutMinutes: 5, maxTurns: 10, allowedTools: ["Read", "Glob", "Grep", "Bash"] },
@@ -1065,7 +1320,13 @@ Respond ONLY with valid JSON:
       return tasks;
     } catch (genErr) {
       console.warn("[executor] failed to parse smart task generation result:", errorToMessage(genErr));
-      return [{ content: `Work on: ${evaluation.remainingGoals[0] || "project goals"}`, priority: 5, reasoning: "Fallback task" }];
+      return [
+        {
+          content: `Work on: ${evaluation.remainingGoals[0] || "project goals"}`,
+          priority: 5,
+          reasoning: "Fallback task",
+        },
+      ];
     }
   }
 
@@ -1180,13 +1441,24 @@ Respond ONLY with valid JSON:
 
     try {
       const decision = await this.approvalGate.waitForApproval(
-        run.id, task?.id, checkpointType, summary, contextData, timeoutMs,
+        run.id,
+        task?.id,
+        checkpointType,
+        summary,
+        contextData,
+        timeoutMs,
       );
 
       this.broadcast("approval.resolved", {
         approvalId: this.approvalGate.pendingApprovalId,
         runId: run.id,
-        status: decision.timedOut ? "timed_out" : decision.action === "approve" ? "approved" : decision.action === "reject" ? "rejected" : "modified",
+        status: decision.timedOut
+          ? "timed_out"
+          : decision.action === "approve"
+            ? "approved"
+            : decision.action === "reject"
+              ? "rejected"
+              : "modified",
       });
 
       return decision;
@@ -1210,5 +1482,4 @@ Respond ONLY with valid JSON:
   }> {
     return gitManager.getDiffStats();
   }
-
 }

@@ -66,15 +66,23 @@ export class GoalEvaluator {
         maxTurns: 1,
         systemPrompt: EVALUATOR_SYSTEM_PROMPT,
         disallowedTools: [
-          "AskUserQuestion", "Bash", "Read", "Write", "Edit",
-          "Glob", "Grep", "WebSearch", "WebFetch", "Agent",
+          "AskUserQuestion",
+          "Bash",
+          "Read",
+          "Write",
+          "Edit",
+          "Glob",
+          "Grep",
+          "WebSearch",
+          "WebFetch",
+          "Agent",
         ],
       });
 
       let responseText = "";
       for await (const msg of stream) {
         if (msg.type === "assistant") {
-          const content = (msg as unknown as Record<string, unknown>);
+          const content = msg as unknown as Record<string, unknown>;
           if (typeof content.content === "string") responseText += content.content;
           else if (content.message && typeof (content.message as Record<string, unknown>).content === "object") {
             const blocks = (content.message as Record<string, unknown>).content as Array<Record<string, unknown>>;
@@ -174,10 +182,10 @@ ${(run.goalEvidence ?? []).join("\n") || "无"}
         achieved: !!parsed.achieved,
         progress: typeof parsed.progress === "number" ? Math.max(0, Math.min(1, parsed.progress)) : 0.5,
         reason: typeof parsed.reason === "string" ? parsed.reason : "",
-        evidence: Array.isArray(parsed.evidence) ? parsed.evidence as string[] : [],
+        evidence: Array.isArray(parsed.evidence) ? (parsed.evidence as string[]) : [],
         milestones,
-        completedGoals: Array.isArray(parsed.completedGoals) ? parsed.completedGoals as string[] : [],
-        remainingGoals: Array.isArray(parsed.remainingGoals) ? parsed.remainingGoals as string[] : run.goals,
+        completedGoals: Array.isArray(parsed.completedGoals) ? (parsed.completedGoals as string[]) : [],
+        remainingGoals: Array.isArray(parsed.remainingGoals) ? (parsed.remainingGoals as string[]) : run.goals,
         suggestedStrategy: strategyValues.includes(parsed.suggestedStrategy) ? parsed.suggestedStrategy : "continue",
         strategyReason: typeof parsed.strategyReason === "string" ? parsed.strategyReason : "",
       };

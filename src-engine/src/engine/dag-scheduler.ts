@@ -54,9 +54,7 @@ export class DAGScheduler {
       const task = this.tasks.get(taskId);
       if (!task || task.status !== "pending") continue;
 
-      const allDepsMet = [...deps].every(
-        (depId) => this.completed.has(depId) || this.skipped.has(depId)
-      );
+      const allDepsMet = [...deps].every((depId) => this.completed.has(depId) || this.skipped.has(depId));
       if (!allDepsMet) continue;
 
       // Evaluate condition if present — don't skip, just exclude from ready

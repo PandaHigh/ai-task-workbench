@@ -11,7 +11,12 @@ vi.mock("../../stores/approval-store", () => ({
 }));
 
 vi.mock("../../lib/engine-client", () => ({
-  engineClient: { call: (...args: any[]) => { callsMap.call ??= vi.fn(); return callsMap.call(...args); } },
+  engineClient: {
+    call: (...args: any[]) => {
+      callsMap.call ??= vi.fn();
+      return callsMap.call(...args);
+    },
+  },
 }));
 
 vi.mock("../common/Toast", () => ({
@@ -63,14 +68,18 @@ describe("ApprovalPanel", () => {
   it("should call approve on button click", async () => {
     mockPendingApprovals = [makeApproval()];
     render(<ApprovalPanel />);
-    await act(async () => { fireEvent.click(screen.getByText("通过 (Y)")); });
+    await act(async () => {
+      fireEvent.click(screen.getByText("通过 (Y)"));
+    });
     expect(callsMap.call).toHaveBeenCalledWith("approval.respond", expect.objectContaining({ action: "approve" }));
   });
 
   it("should call reject on button click", async () => {
     mockPendingApprovals = [makeApproval()];
     render(<ApprovalPanel />);
-    await act(async () => { fireEvent.click(screen.getByText("拒绝 (N)")); });
+    await act(async () => {
+      fireEvent.click(screen.getByText("拒绝 (N)"));
+    });
     expect(callsMap.call).toHaveBeenCalledWith("approval.respond", expect.objectContaining({ action: "reject" }));
   });
 
@@ -87,20 +96,24 @@ describe("ApprovalPanel", () => {
   });
 
   it("should show score for borderline_score checkpoint", () => {
-    mockPendingApprovals = [makeApproval({
-      checkpointType: "borderline_score",
-      contextData: { score: { overall: 0.65, passed: true, reasoning: "Acceptable quality" } },
-    })];
+    mockPendingApprovals = [
+      makeApproval({
+        checkpointType: "borderline_score",
+        contextData: { score: { overall: 0.65, passed: true, reasoning: "Acceptable quality" } },
+      }),
+    ];
     render(<ApprovalPanel />);
     expect(screen.getByText("65%")).toBeInTheDocument();
     expect(screen.getByText("PASS")).toBeInTheDocument();
   });
 
   it("should show diff stats for risky_commit checkpoint", () => {
-    mockPendingApprovals = [makeApproval({
-      checkpointType: "risky_commit",
-      contextData: { diffStats: { filesChanged: 15, linesChanged: 200, hasCriticalFiles: true } },
-    })];
+    mockPendingApprovals = [
+      makeApproval({
+        checkpointType: "risky_commit",
+        contextData: { diffStats: { filesChanged: 15, linesChanged: 200, hasCriticalFiles: true } },
+      }),
+    ];
     render(<ApprovalPanel />);
     expect(screen.getByText("15")).toBeInTheDocument();
     expect(screen.getByText("200")).toBeInTheDocument();
@@ -116,14 +129,18 @@ describe("ApprovalPanel", () => {
   it("should respond to Y keyboard shortcut", async () => {
     mockPendingApprovals = [makeApproval()];
     render(<ApprovalPanel />);
-    await act(async () => { fireEvent.keyDown(window, { key: "y" }); });
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "y" });
+    });
     expect(callsMap.call).toHaveBeenCalledWith("approval.respond", expect.objectContaining({ action: "approve" }));
   });
 
   it("should respond to N keyboard shortcut", async () => {
     mockPendingApprovals = [makeApproval()];
     render(<ApprovalPanel />);
-    await act(async () => { fireEvent.keyDown(window, { key: "n" }); });
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "n" });
+    });
     expect(callsMap.call).toHaveBeenCalledWith("approval.respond", expect.objectContaining({ action: "reject" }));
   });
 
@@ -132,7 +149,9 @@ describe("ApprovalPanel", () => {
     render(<ApprovalPanel />);
     const input = screen.getByPlaceholderText("输入附加指令（可选）...");
     fireEvent.focus(input);
-    await act(async () => { fireEvent.keyDown(input, { key: "y" }); });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: "y" });
+    });
     expect(callsMap.call).not.toHaveBeenCalled();
   });
 });

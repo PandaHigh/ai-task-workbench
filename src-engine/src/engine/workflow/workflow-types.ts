@@ -8,11 +8,11 @@
 // ─── 阶段类型 ────────────────────────────────────────────────────────────
 
 export type WorkflowStageType =
-  | "agent"        // 单 Agent 执行
-  | "parallel"     // 子阶段并行
-  | "sequence"     // 子阶段顺序
-  | "loop"         // 条件循环
-  | "condition"    // 条件分支
+  | "agent" // 单 Agent 执行
+  | "parallel" // 子阶段并行
+  | "sequence" // 子阶段顺序
+  | "loop" // 条件循环
+  | "condition" // 条件分支
   | "adversarial"; // 对抗性验证
 
 // ─── 阶段定义 ────────────────────────────────────────────────────────────
@@ -98,13 +98,7 @@ export interface AdversarialStage extends BaseStage {
   targetStageId?: string;
 }
 
-export type WorkflowStage =
-  | AgentStage
-  | ParallelStage
-  | SequenceStage
-  | LoopStage
-  | ConditionStage
-  | AdversarialStage;
+export type WorkflowStage = AgentStage | ParallelStage | SequenceStage | LoopStage | ConditionStage | AdversarialStage;
 
 // ─── Workflow 定义 ───────────────────────────────────────────────────────
 

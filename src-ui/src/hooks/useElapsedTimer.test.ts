@@ -36,7 +36,9 @@ describe("useElapsedTimer", () => {
     const { result } = renderHook(() => useElapsedTimer(start));
     expect(result.current).toBe("30s");
 
-    act(() => { vi.advanceTimersByTime(10_000); });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
     expect(result.current).toBe("40s");
   });
 

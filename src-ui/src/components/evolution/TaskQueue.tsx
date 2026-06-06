@@ -133,7 +133,11 @@ export function TaskQueue({
               onFocus={() => setFocusIdx(i)}
               className="group px-3 py-2 rounded text-xs cursor-grab active:cursor-grabbing"
               style={{
-                background: activeTaskIds.includes(task.id) ? "rgba(77, 107, 254, 0.1)" : dragIdx === i ? "rgba(77, 107, 254, 0.05)" : "var(--bg-tertiary)",
+                background: activeTaskIds.includes(task.id)
+                  ? "rgba(77, 107, 254, 0.1)"
+                  : dragIdx === i
+                    ? "rgba(77, 107, 254, 0.05)"
+                    : "var(--bg-tertiary)",
                 border: activeTaskIds.includes(task.id) ? "1px solid var(--blue)" : "1px solid transparent",
                 opacity: dragIdx !== null && dragIdx !== i ? 0.7 : dragIdx === i ? 1 : undefined,
                 transform: dragIdx === i ? "scale(1.02) rotate(1deg)" : undefined,
@@ -153,9 +157,14 @@ export function TaskQueue({
                 >
                   {i + 1}
                 </span>
-                <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
+                <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>
+                  {task.content}
+                </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditTask(task);
+                  }}
                   className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
                   style={{ color: "var(--blue)", border: "1px solid transparent" }}
                   aria-label="编辑任务"
@@ -164,7 +173,10 @@ export function TaskQueue({
                   编辑
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id, task.content); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteTask(task.id, task.content);
+                  }}
                   className="shrink-0 opacity-0 group-hover:opacity-100 duration-200 hover:opacity-100 text-[11px] px-1.5 py-0.5 rounded font-medium"
                   style={{ color: "var(--red)", border: "1px solid transparent" }}
                   aria-label="删除任务"
@@ -187,10 +199,17 @@ export function TaskQueue({
           <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)" }}>
             {runningTasks.map((task) => (
               <div key={task.id} className="mb-1.5 last:mb-0">
-                <div className="px-2 py-1.5 rounded text-xs" style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}>
+                <div
+                  className="px-2 py-1.5 rounded text-xs"
+                  style={{ background: "rgba(77, 107, 254, 0.1)", border: "1px solid var(--blue)" }}
+                >
                   <div className="flex items-center gap-2">
-                    <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>&#9679;</span>
-                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{task.content}</span>
+                    <span className="shrink-0 text-[10px] animate-pulse" style={{ color: "var(--blue)" }}>
+                      &#9679;
+                    </span>
+                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>
+                      {task.content}
+                    </span>
                   </div>
                   <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
                     <span style={{ color: "var(--blue)" }}>工作中</span>
@@ -211,7 +230,10 @@ export function TaskQueue({
 
         {/* Completed tasks */}
         {completedTasks.length > 0 && (
-          <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
+          <div
+            className="border-t px-2 py-2"
+            style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}
+          >
             <h4 className="text-xs font-bold mb-1" style={{ color: "var(--green)" }}>
               已完成 ({completedTasks.length})
             </h4>
@@ -223,8 +245,12 @@ export function TaskQueue({
                   style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.15)" }}
                 >
                   <div className="flex items-start gap-2">
-                    <span className="shrink-0 text-[10px] mt-0.5" style={{ color: "var(--green)" }}>&#10003;</span>
-                    <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{t.content}</span>
+                    <span className="shrink-0 text-[10px] mt-0.5" style={{ color: "var(--green)" }}>
+                      &#10003;
+                    </span>
+                    <span className="flex-1 whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>
+                      {t.content}
+                    </span>
                   </div>
                   <div className="mt-0.5 flex gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
                     <span>{t.type === "user_defined" ? "用户" : "AI"}</span>
@@ -238,7 +264,10 @@ export function TaskQueue({
 
         {/* Failed tasks with retry */}
         {failedTasks.length > 0 && (
-          <div className="border-t px-2 py-2" style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}>
+          <div
+            className="border-t px-2 py-2"
+            style={{ borderColor: "var(--border)", maxHeight: "200px", overflowY: "auto" }}
+          >
             <h4 className="text-xs font-bold mb-1" style={{ color: "var(--red)" }}>
               出错了 ({failedTasks.length})
             </h4>
@@ -250,7 +279,9 @@ export function TaskQueue({
                   style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)" }}
                 >
                   <div className="flex items-center justify-between gap-1">
-                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>{t.content}</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>
+                      {t.content}
+                    </span>
                     <div className="flex gap-1">
                       <button
                         onClick={() => onRetry(t.id)}
@@ -269,7 +300,11 @@ export function TaskQueue({
                     </div>
                   </div>
                   {t.errorMessage && (
-                    <p className="mt-0.5 text-[10px] truncate" style={{ color: "var(--text-secondary)" }} title={t.errorMessage}>
+                    <p
+                      className="mt-0.5 text-[10px] truncate"
+                      style={{ color: "var(--text-secondary)" }}
+                      title={t.errorMessage}
+                    >
                       {t.errorMessage}
                     </p>
                   )}
@@ -279,7 +314,6 @@ export function TaskQueue({
           </div>
         )}
       </div>
-
     </div>
   );
 }

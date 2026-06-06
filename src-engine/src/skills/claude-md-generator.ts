@@ -6,13 +6,18 @@ export function generateClaudeMd(workingDir: string, context: TaskContext): void
   const goals = context.goals.map((g, i) => `${i + 1}. ${g}`).join("\n");
   const terms = context.terminationConditions.map((c, i) => `${i + 1}. ${c}`).join("\n");
 
-  const recentCommits = context.lastTenCommits.length > 0
-    ? context.lastTenCommits.map((c) => `- ${c.hash.substring(0, 7)} ${c.message}`).join("\n")
-    : "(无)";
+  const recentCommits =
+    context.lastTenCommits.length > 0
+      ? context.lastTenCommits.map((c) => `- ${c.hash.substring(0, 7)} ${c.message}`).join("\n")
+      : "(无)";
 
-  const lessons = context.lessonsLearned.length > 0
-    ? context.lessonsLearned.slice(-5).map((l) => `- [${l.category}] ${l.lesson}`).join("\n")
-    : "(无)";
+  const lessons =
+    context.lessonsLearned.length > 0
+      ? context.lessonsLearned
+          .slice(-5)
+          .map((l) => `- [${l.category}] ${l.lesson}`)
+          .join("\n")
+      : "(无)";
 
   const content = `# 任务指导
 

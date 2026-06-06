@@ -12,34 +12,44 @@ export function ApprovalPanel() {
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
-  const respond = useCallback(async (action: "approve" | "reject" | "modify") => {
-    if (pendingApprovals.length === 0 || submitting) return;
-    const approval = pendingApprovals[0];
-    setSubmitting(true);
-    try {
-      await engineClient.call("approval.respond", {
-        runId: approval.runId,
-        approvalId: approval.id,
-        action,
-        instructions: action === "modify" ? instructions : undefined,
-      });
-      removeApproval(approval.id);
-      setInstructions("");
-    } catch (err) {
-      toast.error(`操作失败: ${err instanceof Error ? err.message : "未知错误"}`);
-    } finally {
-      setSubmitting(false);
-    }
-  }, [pendingApprovals, submitting, instructions, removeApproval, toast]);
+  const respond = useCallback(
+    async (action: "approve" | "reject" | "modify") => {
+      if (pendingApprovals.length === 0 || submitting) return;
+      const approval = pendingApprovals[0];
+      setSubmitting(true);
+      try {
+        await engineClient.call("approval.respond", {
+          runId: approval.runId,
+          approvalId: approval.id,
+          action,
+          instructions: action === "modify" ? instructions : undefined,
+        });
+        removeApproval(approval.id);
+        setInstructions("");
+      } catch (err) {
+        toast.error(`操作失败: ${err instanceof Error ? err.message : "未知错误"}`);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [pendingApprovals, submitting, instructions, removeApproval, toast],
+  );
 
   // Register Y/N/M keyboard shortcuts
   useEffect(() => {
     if (pendingApprovals.length === 0) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "y" || e.key === "Y") { e.preventDefault(); respond("approve"); }
-      else if (e.key === "n" || e.key === "N") { e.preventDefault(); respond("reject"); }
-      else if (e.key === "m" || e.key === "M") { e.preventDefault(); respond("modify"); }
+      if (e.key === "y" || e.key === "Y") {
+        e.preventDefault();
+        respond("approve");
+      } else if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        respond("reject");
+      } else if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        respond("modify");
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -79,10 +89,7 @@ export function ApprovalPanel() {
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span
-              className="inline-block w-2 h-2 rounded-full animate-pulse"
-              style={{ background: "var(--yellow)" }}
-            />
+            <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--yellow)" }} />
             <span className="font-mono text-sm font-bold" style={{ color: "var(--yellow)" }}>
               {checkpointLabel[approval.checkpointType] ?? approval.checkpointType}
             </span>
@@ -106,13 +113,27 @@ export function ApprovalPanel() {
         {approval.checkpointType === "borderline_score" && contextData.score ? (
           <div className="rounded-lg p-3 mb-3 font-mono text-xs" style={{ background: "var(--bg-tertiary)" }}>
             <div className="flex gap-4" style={{ color: "var(--text-secondary)" }}>
-              <span>评分: <span style={{ color: "var(--yellow)" }}>{((contextData.score as Record<string, number>).overall * 100).toFixed(0)}%</span></span>
-              <span>状态: <span style={{ color: ((contextData.score as Record<string, boolean>).passed ? "var(--green)" : "var(--red)") }}>
-                {((contextData.score as Record<string, boolean>).passed ? "PASS" : "FAIL")}
-              </span></span>
+              <span>
+                评分:{" "}
+                <span style={{ color: "var(--yellow)" }}>
+                  {((contextData.score as Record<string, number>).overall * 100).toFixed(0)}%
+                </span>
+              </span>
+              <span>
+                状态:{" "}
+                <span
+                  style={{
+                    color: (contextData.score as Record<string, boolean>).passed ? "var(--green)" : "var(--red)",
+                  }}
+                >
+                  {(contextData.score as Record<string, boolean>).passed ? "PASS" : "FAIL"}
+                </span>
+              </span>
             </div>
             {Boolean((contextData.score as Record<string, string>).reasoning) ? (
-              <p className="mt-1" style={{ color: "var(--text-muted)" }}>{(contextData.score as Record<string, string>).reasoning}</p>
+              <p className="mt-1" style={{ color: "var(--text-muted)" }}>
+                {(contextData.score as Record<string, string>).reasoning}
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -120,8 +141,18 @@ export function ApprovalPanel() {
         {approval.checkpointType === "risky_commit" && contextData.diffStats ? (
           <div className="rounded-lg p-3 mb-3 font-mono text-xs" style={{ background: "var(--bg-tertiary)" }}>
             <div className="flex gap-4" style={{ color: "var(--text-secondary)" }}>
-              <span>变更文件: <span style={{ color: "var(--yellow)" }}>{(contextData.diffStats as Record<string, number>).filesChanged}</span></span>
-              <span>变更行数: <span style={{ color: "var(--yellow)" }}>{(contextData.diffStats as Record<string, number>).linesChanged}</span></span>
+              <span>
+                变更文件:{" "}
+                <span style={{ color: "var(--yellow)" }}>
+                  {(contextData.diffStats as Record<string, number>).filesChanged}
+                </span>
+              </span>
+              <span>
+                变更行数:{" "}
+                <span style={{ color: "var(--yellow)" }}>
+                  {(contextData.diffStats as Record<string, number>).linesChanged}
+                </span>
+              </span>
               {(contextData.diffStats as Record<string, boolean>).hasCriticalFiles ? (
                 <span style={{ color: "var(--red)" }}>涉及关键文件</span>
               ) : null}
@@ -130,9 +161,14 @@ export function ApprovalPanel() {
         ) : null}
 
         {approval.checkpointType === "goal_stagnation" && (
-          <div className="rounded-lg p-3 mb-3 font-mono text-xs" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>
+          <div
+            className="rounded-lg p-3 mb-3 font-mono text-xs"
+            style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+          >
             <p>AI 已遇到瓶颈，需要你的方向性指导。可以选择：</p>
-            <p className="mt-1" style={{ color: "var(--text-muted)" }}>继续执行 / 停止运行 / 注入新方向指令</p>
+            <p className="mt-1" style={{ color: "var(--text-muted)" }}>
+              继续执行 / 停止运行 / 注入新方向指令
+            </p>
           </div>
         )}
 

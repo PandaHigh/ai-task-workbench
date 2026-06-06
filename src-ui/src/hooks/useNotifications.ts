@@ -5,7 +5,15 @@ import { useEvolutionStore } from "../stores/evolution-store";
 import { useApprovalStore } from "../stores/approval-store";
 import { useChatStore } from "../stores/chat-store";
 import { useWorkflowStore } from "../stores/workflow-store";
-import type { ExecutionRun, TaskDefinition, GoalStatus, ApprovalRequest, CheckpointType, ApprovalStatus, AgentProgress } from "@ai-workbench/shared";
+import type {
+  ExecutionRun,
+  TaskDefinition,
+  GoalStatus,
+  ApprovalRequest,
+  CheckpointType,
+  ApprovalStatus,
+  AgentProgress,
+} from "@ai-workbench/shared";
 
 export function useNotifications() {
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -22,7 +30,8 @@ export function useNotifications() {
           if (status === "completed") updates.completedAt = Date.now();
           updateTask(runId, updates);
           if (status === "running") setRunning(true);
-          if (status === "completed" || status === "failed" || status === "paused" || status === "budget_exceeded") setRunning(false);
+          if (status === "completed" || status === "failed" || status === "paused" || status === "budget_exceeded")
+            setRunning(false);
           break;
         }
         case "task.status": {
@@ -52,7 +61,10 @@ export function useNotifications() {
           break;
         }
         case "task.scored": {
-          const { taskId, score } = params as { taskId: string; score: { overall: number; passed: boolean; reasoning?: string } };
+          const { taskId, score } = params as {
+            taskId: string;
+            score: { overall: number; passed: boolean; reasoning?: string };
+          };
           addLog({
             timestamp: Date.now(),
             level: score.passed ? "info" : "warn",
@@ -149,7 +161,10 @@ export function useNotifications() {
           break;
         }
         case "task.stream": {
-          const { taskId, message } = params as { taskId: string; message: { type: string; subtype?: string; content?: unknown } };
+          const { taskId, message } = params as {
+            taskId: string;
+            message: { type: string; subtype?: string; content?: unknown };
+          };
           const { appendStreamMessage } = useApprovalStore.getState();
           appendStreamMessage(taskId, message);
           break;
@@ -157,7 +172,9 @@ export function useNotifications() {
         case "comment.created": {
           const { userId, taskId } = params as { userId: string; taskId: string };
           addLog({
-            timestamp: Date.now(), level: "info", source: "engine",
+            timestamp: Date.now(),
+            level: "info",
+            source: "engine",
             message: `${userId} 评论了任务 ${taskId.substring(0, 6)}`,
           });
           break;
@@ -208,13 +225,28 @@ export function useNotifications() {
         // ─── Router & Workflow notifications ─────────────────────────
 
         case "router.decision": {
-          const { decision } = params as { decision: { taskId?: string; taskSummary: string; strategy: { type: string; templateName?: string }; level: string; reason: string; confidence: number; timestamp: number } };
+          const { decision } = params as {
+            decision: {
+              taskId?: string;
+              taskSummary: string;
+              strategy: { type: string; templateName?: string };
+              level: string;
+              reason: string;
+              confidence: number;
+              timestamp: number;
+            };
+          };
           useWorkflowStore.getState().addRouterDecision(decision);
           break;
         }
 
         case "workflow.started": {
-          const { executionId, definitionId, definitionName, stageCount } = params as { executionId: string; definitionId: string; definitionName: string; stageCount: number };
+          const { executionId, definitionId, definitionName, stageCount } = params as {
+            executionId: string;
+            definitionId: string;
+            definitionName: string;
+            stageCount: number;
+          };
           const stages = Array.from({ length: stageCount }, (_, i) => ({
             stageId: `stage-${i}`,
             stageName: `阶段 ${i + 1}`,
@@ -238,13 +270,36 @@ export function useNotifications() {
         case "workflow.phase.started":
         case "workflow.phase.completed":
         case "workflow.phase.failed": {
-          const { executionId, stageId, stageName } = params as { executionId: string; stageId: string; stageName: string; durationMs?: number; costUsd?: number };
+          const { executionId, stageId, stageName } = params as {
+            executionId: string;
+            stageId: string;
+            stageName: string;
+            durationMs?: number;
+            costUsd?: number;
+          };
           const wfStore = useWorkflowStore.getState();
           const existing = wfStore.activeWorkflows.get(executionId);
           if (existing) {
-            const stageStatus = method === "workflow.phase.failed" ? "failed" as const : method === "workflow.phase.started" ? "running" as const : "passed" as const;
+            const stageStatus =
+              method === "workflow.phase.failed"
+                ? ("failed" as const)
+                : method === "workflow.phase.started"
+                  ? ("running" as const)
+                  : ("passed" as const);
             const stages = existing.stages.map((s) =>
-              s.stageId === stageId ? { ...s, status: stageStatus, stageName: stageName || s.stageName, ...(method === "workflow.phase.completed" ? { durationMs: (params as { durationMs?: number }).durationMs, costUsd: (params as { costUsd?: number }).costUsd } : {}) } : s
+              s.stageId === stageId
+                ? {
+                    ...s,
+                    status: stageStatus,
+                    stageName: stageName || s.stageName,
+                    ...(method === "workflow.phase.completed"
+                      ? {
+                          durationMs: (params as { durationMs?: number }).durationMs,
+                          costUsd: (params as { costUsd?: number }).costUsd,
+                        }
+                      : {}),
+                  }
+                : s,
             );
             wfStore.updateWorkflowProgress({ executionId, stages });
           }
@@ -272,7 +327,13 @@ export function useNotifications() {
         }
 
         case "workflow.completed": {
-          const { executionId, status, totalDurationMs, totalCostUsd, totalAgents } = params as { executionId: string; status: string; totalDurationMs: number; totalCostUsd: number; totalAgents: number };
+          const { executionId, status, totalDurationMs, totalCostUsd, totalAgents } = params as {
+            executionId: string;
+            status: string;
+            totalDurationMs: number;
+            totalCostUsd: number;
+            totalAgents: number;
+          };
           useWorkflowStore.getState().updateWorkflowProgress({
             executionId,
             status: status as "completed" | "failed" | "cancelled",

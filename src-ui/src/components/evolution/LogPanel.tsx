@@ -13,10 +13,14 @@ interface LogEntry {
 
 function levelColor(level: string): string {
   switch (level) {
-    case "error": return "var(--red)";
-    case "warn": return "var(--yellow)";
-    case "info": return "var(--blue)";
-    default: return "var(--text-secondary)";
+    case "error":
+      return "var(--red)";
+    case "warn":
+      return "var(--yellow)";
+    case "info":
+      return "var(--blue)";
+    default:
+      return "var(--text-secondary)";
   }
 }
 
@@ -40,22 +44,14 @@ export function LogPanel({ logs, activeTaskIds }: LogPanelProps) {
   const displayLogs = filteredLogs.length > 0 ? filteredLogs : logs;
 
   const visibleLogs = useMemo(() => {
-    return displayLogs.length > MAX_VISIBLE_LOGS
-      ? displayLogs.slice(-MAX_VISIBLE_LOGS)
-      : displayLogs;
+    return displayLogs.length > MAX_VISIBLE_LOGS ? displayLogs.slice(-MAX_VISIBLE_LOGS) : displayLogs;
   }, [displayLogs]);
 
   const hasMore = displayLogs.length > MAX_VISIBLE_LOGS;
   const skippedCount = displayLogs.length - visibleLogs.length;
 
   if (logs.length === 0 && activeTaskIds.length === 0) {
-    return (
-      <EmptyState
-        title="等待任务执行"
-        description="启动后日志将实时显示在这里"
-        variant="logs"
-      />
-    );
+    return <EmptyState title="等待任务执行" description="启动后日志将实时显示在这里" variant="logs" />;
   }
 
   return (
@@ -73,7 +69,10 @@ export function LogPanel({ logs, activeTaskIds }: LogPanelProps) {
         </div>
       )}
       {hasMore && (
-        <div className="text-xs py-1 px-2 rounded" style={{ color: "var(--text-secondary)", background: "var(--bg-secondary, rgba(255,255,255,0.05))" }}>
+        <div
+          className="text-xs py-1 px-2 rounded"
+          style={{ color: "var(--text-secondary)", background: "var(--bg-secondary, rgba(255,255,255,0.05))" }}
+        >
           显示最近 {visibleLogs.length} 条 (共 {displayLogs.length} 条，已省略 {skippedCount} 条早期日志)
         </div>
       )}

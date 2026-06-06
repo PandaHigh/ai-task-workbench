@@ -22,7 +22,7 @@ describe("LogSearchBar", () => {
     onFilteredChange.mockClear();
     fireEvent.change(screen.getByLabelText("搜索日志"), { target: { value: "conflict" } });
     expect(onFilteredChange).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ message: "Conflict detected" })])
+      expect.arrayContaining([expect.objectContaining({ message: "Conflict detected" })]),
     );
   });
 

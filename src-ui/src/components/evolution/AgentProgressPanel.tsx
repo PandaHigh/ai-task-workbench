@@ -1,10 +1,10 @@
 import { useEvolutionStore } from "../../stores/evolution-store";
 
 const ROLE_META: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  planner:   { label: "规划师", icon: "📋", color: "var(--blue)",            bg: "rgba(77,107,254,0.1)" },
-  developer: { label: "开发者", icon: "💻", color: "var(--green)",           bg: "rgba(16,185,129,0.1)" },
-  tester:    { label: "测试员", icon: "🧪", color: "var(--yellow)",          bg: "rgba(234,179,8,0.1)" },
-  reviewer:  { label: "审查员", icon: "🔍", color: "var(--purple, #8b5cf6)", bg: "rgba(139,92,246,0.1)" },
+  planner: { label: "规划师", icon: "📋", color: "var(--blue)", bg: "rgba(77,107,254,0.1)" },
+  developer: { label: "开发者", icon: "💻", color: "var(--green)", bg: "rgba(16,185,129,0.1)" },
+  tester: { label: "测试员", icon: "🧪", color: "var(--yellow)", bg: "rgba(234,179,8,0.1)" },
+  reviewer: { label: "审查员", icon: "🔍", color: "var(--purple, #8b5cf6)", bg: "rgba(139,92,246,0.1)" },
 };
 
 export function AgentProgressPanel() {
@@ -19,7 +19,12 @@ export function AgentProgressPanel() {
       </div>
       <div className="space-y-2">
         {entries.map(([role, progress]) => {
-          const meta = ROLE_META[role] ?? { label: role, icon: "🤖", color: "var(--text-secondary)", bg: "var(--bg-tertiary)" };
+          const meta = ROLE_META[role] ?? {
+            label: role,
+            icon: "🤖",
+            color: "var(--text-secondary)",
+            bg: "var(--bg-tertiary)",
+          };
           const pct = Math.round(progress.progress);
           return (
             <div
@@ -32,14 +37,14 @@ export function AgentProgressPanel() {
                 <span className="text-xs font-semibold" style={{ color: meta.color }}>
                   {meta.label}
                 </span>
-                <span className="text-[10px] ml-auto px-1.5 py-0.5 rounded-full" style={{ background: `${meta.color}18`, color: meta.color }}>
+                <span
+                  className="text-[10px] ml-auto px-1.5 py-0.5 rounded-full"
+                  style={{ background: `${meta.color}18`, color: meta.color }}
+                >
                   {pct}%
                 </span>
               </div>
-              <div
-                className="w-full h-2 rounded-full overflow-hidden"
-                style={{ background: "var(--bg-primary)" }}
-              >
+              <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
                 <div
                   role="progressbar"
                   aria-valuenow={pct}

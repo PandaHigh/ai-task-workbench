@@ -4,8 +4,9 @@ import { render, screen } from "@testing-library/react";
 const mockAgentProgress: Record<string, { progress: number; phase: string }> = {};
 
 vi.mock("../../stores/evolution-store", () => ({
-  useEvolutionStore: (selector: (s: { agentProgress: Record<string, { progress: number; phase: string }> }) => unknown) =>
-    selector({ agentProgress: mockAgentProgress }),
+  useEvolutionStore: (
+    selector: (s: { agentProgress: Record<string, { progress: number; phase: string }> }) => unknown,
+  ) => selector({ agentProgress: mockAgentProgress }),
 }));
 
 import { AgentProgressPanel } from "./AgentProgressPanel";

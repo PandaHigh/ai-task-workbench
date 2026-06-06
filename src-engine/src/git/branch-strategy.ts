@@ -11,10 +11,7 @@ export class BranchStrategy {
    * Create a feature branch and worktree for a task.
    * Returns the branch name and worktree path.
    */
-  static async createTaskBranch(
-    workingDir: string,
-    taskId: string,
-  ): Promise<BranchResult> {
+  static async createTaskBranch(workingDir: string, taskId: string): Promise<BranchResult> {
     const git = simpleGit(workingDir);
     const shortId = taskId.substring(0, 8);
     const timestamp = Date.now().toString(36);
@@ -37,14 +34,18 @@ export class BranchStrategy {
       await git.raw(["worktree", "add", "--checkout", worktreePath, branchName]);
     } catch (e) {
       // Cleanup the branch we just created
-      try { await git.deleteLocalBranch(branchName); } catch {}
+      try {
+        await git.deleteLocalBranch(branchName);
+      } catch {}
       // Fallback: checkout the branch in main working dir
       await git.checkout(branchName);
       return { branchName, worktreePath: workingDir };
     }
 
     // Ensure main working dir stays on the original branch
-    try { await git.checkout(currentBranch); } catch {}
+    try {
+      await git.checkout(currentBranch);
+    } catch {}
 
     return { branchName, worktreePath };
   }
@@ -74,18 +75,14 @@ export class BranchStrategy {
         await git.merge(["--abort"]).catch(() => {});
         return { success: false, conflicts: status.conflicted };
       }
-      return { success: false, conflicts: [(err instanceof Error ? err.message : String(err))] };
+      return { success: false, conflicts: [err instanceof Error ? err.message : String(err)] };
     }
   }
 
   /**
    * Clean up a task branch and its worktree.
    */
-  static async cleanupBranch(
-    workingDir: string,
-    branchName: string,
-    worktreePath: string,
-  ): Promise<void> {
+  static async cleanupBranch(workingDir: string, branchName: string, worktreePath: string): Promise<void> {
     const git = simpleGit(workingDir);
     const fs = await import("fs");
 

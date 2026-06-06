@@ -20,10 +20,14 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
     try {
       const result = (await call("comment.list", { runId, taskId })) as { comments: TaskComment[] };
       setComments(result.comments);
-    } catch (err) { console.warn("[TaskComments] load failed:", err instanceof Error ? err.message : err); }
+    } catch (err) {
+      console.warn("[TaskComments] load failed:", err instanceof Error ? err.message : err);
+    }
   }, [runId, taskId, call]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
@@ -49,8 +53,12 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
           {comments.map((c) => (
             <div key={c.id} className="rounded p-2 text-xs" style={{ background: "var(--bg-tertiary)" }}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium" style={{ color: "var(--blue)" }}>{c.displayName}</span>
-                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{formatTimestamp(c.createdAt)}</span>
+                <span className="font-medium" style={{ color: "var(--blue)" }}>
+                  {c.displayName}
+                </span>
+                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                  {formatTimestamp(c.createdAt)}
+                </span>
               </div>
               <p style={{ color: "var(--text-primary)" }}>{c.content}</p>
             </div>
@@ -63,7 +71,9 @@ export function TaskComments({ runId, taskId }: TaskCommentsProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="添加评论..."
-          onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) handleSubmit(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && text.trim()) handleSubmit();
+          }}
           className="flex-1 rounded px-2 py-1 text-xs font-mono outline-none"
           style={{
             background: "var(--bg-tertiary)",

@@ -87,9 +87,10 @@ export class LoopUntilDry {
       const roundStart = Date.now();
 
       // 构建提示词，包含已有发现以帮助去重
-      const existingContext = allDiscoveries.length > 0
-        ? `\n\n## 已有发现（请勿重复这些）\n${allDiscoveries.map((d) => `- ${d.title}: ${d.description.substring(0, 100)}`).join("\n")}`
-        : "";
+      const existingContext =
+        allDiscoveries.length > 0
+          ? `\n\n## 已有发现（请勿重复这些）\n${allDiscoveries.map((d) => `- ${d.title}: ${d.description.substring(0, 100)}`).join("\n")}`
+          : "";
 
       const prompt = `${options.finderPrompt}${existingContext}${options.taskContext ? `\n\n## 任务上下文\n${options.taskContext}` : ""}
 
@@ -189,6 +190,9 @@ BUG-001 | security | 0.9 | SQL注入风险 | 用户输入未参数化`;
 
   private discoveryKey(d: Discovery): string {
     // Normalize title for deduplication
-    return d.title.toLowerCase().replace(/[^a-z0-9一-鿿]/g, "").substring(0, 50);
+    return d.title
+      .toLowerCase()
+      .replace(/[^a-z0-9一-鿿]/g, "")
+      .substring(0, 50);
   }
 }

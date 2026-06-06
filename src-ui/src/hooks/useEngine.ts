@@ -60,12 +60,9 @@ export function useEngine() {
     };
   }, []);
 
-  const call = useCallback(
-    (method: string, params?: Record<string, unknown>, timeoutMs?: number) => {
-      return engineClient.call(method, params, timeoutMs);
-    },
-    [],
-  );
+  const call = useCallback((method: string, params?: Record<string, unknown>, timeoutMs?: number) => {
+    return engineClient.call(method, params, timeoutMs);
+  }, []);
 
   return { connected, call };
 }

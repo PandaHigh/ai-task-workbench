@@ -30,7 +30,6 @@ export class PluginRegistry {
   private filePath: string;
 
   constructor(dataDir: string) {
-
     ensureDir(dataDir);
     this.filePath = path.join(dataDir, "plugins.json");
     this.load();

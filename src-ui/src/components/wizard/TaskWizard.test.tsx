@@ -46,7 +46,7 @@ function renderWizard() {
         <Route path="/wizard" element={<TaskWizard />} />
         <Route path="/" element={<div>Home</div>} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -85,5 +85,4 @@ describe("TaskWizard", () => {
       expect(tablists.length).toBeGreaterThan(0);
     });
   });
-
 });

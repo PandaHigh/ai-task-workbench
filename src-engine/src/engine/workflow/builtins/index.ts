@@ -22,9 +22,7 @@ export const BUILTIN_WORKFLOWS: WorkflowDefinition[] = [
 ];
 
 /** 注册所有内置 workflow 到 store */
-export async function registerBuiltinWorkflows(
-  register: (def: WorkflowDefinition) => Promise<void>,
-): Promise<void> {
+export async function registerBuiltinWorkflows(register: (def: WorkflowDefinition) => Promise<void>): Promise<void> {
   for (const def of BUILTIN_WORKFLOWS) {
     await register(def);
   }

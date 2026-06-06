@@ -77,10 +77,25 @@ function validateRunId(runId: string): void {
 // ─── Working dir validation ────────────────────────────────────────────
 
 const SYSTEM_DIRS = [
-  "/etc", "/usr", "/bin", "/sbin", "/var", "/sys", "/proc", "/dev",
-  "/boot", "/lib", "/lib64", "/snap", "/nix",
-  "/System", "/Library", "/Applications",
-  "C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)",
+  "/etc",
+  "/usr",
+  "/bin",
+  "/sbin",
+  "/var",
+  "/sys",
+  "/proc",
+  "/dev",
+  "/boot",
+  "/lib",
+  "/lib64",
+  "/snap",
+  "/nix",
+  "/System",
+  "/Library",
+  "/Applications",
+  "C:\\Windows",
+  "C:\\Program Files",
+  "C:\\Program Files (x86)",
   "C:\\ProgramData",
 ].map((d) => normalize(d.toLowerCase()));
 
@@ -91,16 +106,16 @@ function validateWorkingDir(dir: string): string {
   if (dir.includes("\0")) throw new RpcValidationError("Invalid directory path");
   // Expand ~/ to home directory (both / and \ variants for Windows)
   const homeDir = homedir();
-  const expanded = dir.startsWith("~/") || dir.startsWith("~\\")
-    ? homeDir + dir.slice(1)
-    : dir === "~"
-    ? homeDir
-    : dir;
+  const expanded = dir.startsWith("~/") || dir.startsWith("~\\") ? homeDir + dir.slice(1) : dir === "~" ? homeDir : dir;
   const resolved = resolve(expanded);
   const normalizedLower = normalize(resolved.toLowerCase());
 
   for (const sysDir of SYSTEM_DIRS) {
-    if (normalizedLower === sysDir || normalizedLower.startsWith(sysDir + "/") || normalizedLower.startsWith(sysDir + "\\")) {
+    if (
+      normalizedLower === sysDir ||
+      normalizedLower.startsWith(sysDir + "/") ||
+      normalizedLower.startsWith(sysDir + "\\")
+    ) {
       throw new Error(`workingDir cannot point to a system directory: ${resolved}`);
     }
   }
@@ -178,7 +193,6 @@ export function shutdown(): void {
   }
 }
 
-
 export function recoverStaleRuns(): { runsReset: number; tasksReset: number; approvalsReset: number } {
   let runsReset = 0;
   let tasksReset = 0;
@@ -194,7 +208,7 @@ export function recoverStaleRuns(): { runsReset: number; tasksReset: number; app
     }
     const tasks = store.listTasks(run.id);
     for (const task of tasks) {
-      if (transientStatuses.includes(task.status as typeof transientStatuses[number])) {
+      if (transientStatuses.includes(task.status as (typeof transientStatuses)[number])) {
         store.updateTask(run.id, task.id, {
           status: "pending",
           errorMessage: `Crash recovery: task was ${task.status} at engine restart`,
@@ -236,9 +250,7 @@ export const methodHandlers: Record<string, MethodHandler> = {
   },
 
   "run.create": async (params) => {
-    const safeWorkingDir = validateWorkingDir(
-      requireNonEmptyString(params, "workingDir"),
-    );
+    const safeWorkingDir = validateWorkingDir(requireNonEmptyString(params, "workingDir"));
     const goals = Array.isArray(params.goals) ? params.goals : [];
     const terminationConditions = Array.isArray(params.terminationConditions) ? params.terminationConditions : [];
     if (goals.length === 0) {
@@ -260,7 +272,10 @@ export const methodHandlers: Record<string, MethodHandler> = {
     };
 
     if (params.useDefaultLocation === true) {
-      const ts = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
+      const ts = new Date()
+        .toISOString()
+        .replace(/[-:T.]/g, "")
+        .slice(0, 14);
       const subfolder = `run-${ts}-${run.id.substring(0, 8)}`;
       const subfolderPath = join(safeWorkingDir, subfolder);
       mkdirSync(subfolderPath, { recursive: true });
@@ -343,7 +358,8 @@ export const methodHandlers: Record<string, MethodHandler> = {
       run.goals = params.goals;
     }
     if (Array.isArray(params.terminationConditions)) {
-      if (params.terminationConditions.length === 0) throw new RpcValidationError("terminationConditions must be non-empty");
+      if (params.terminationConditions.length === 0)
+        throw new RpcValidationError("terminationConditions must be non-empty");
       run.terminationConditions = params.terminationConditions;
     }
     store.saveRun(run);
@@ -386,12 +402,21 @@ export const methodHandlers: Record<string, MethodHandler> = {
       ...(typeof params.modelHint === "string" && { modelHint: params.modelHint }),
     });
     store.saveTask(runId, task);
-    sessionManager.recordActivity({ userId: "system", runId, action: "task.created", details: { taskId: task.id, content: content.substring(0, 80) } });
+    sessionManager.recordActivity({
+      userId: "system",
+      runId,
+      action: "task.created",
+      details: { taskId: task.id, content: content.substring(0, 80) },
+    });
     notify("queue.updated", { runId, queue: queueManager.list(runId) });
 
     // Auto-restart executor when adding tasks to a completed/failed run
     const currentRun = store.getRun(runId);
-    if (currentRun && (currentRun.status === "completed" || currentRun.status === "failed") && !activeExecutors.has(runId)) {
+    if (
+      currentRun &&
+      (currentRun.status === "completed" || currentRun.status === "failed") &&
+      !activeExecutors.has(runId)
+    ) {
       currentRun.status = "running";
       currentRun.completedAt = undefined;
       currentRun.finalReport = undefined;
@@ -399,7 +424,11 @@ export const methodHandlers: Record<string, MethodHandler> = {
       notify("run.status", { runId, status: "running" });
       const executor = new Executor(queueManager, notify, runId, store);
       activeExecutors.set(runId, executor);
-      setImmediate(() => executor.start(currentRun).finally(() => { activeExecutors.delete(runId); }));
+      setImmediate(() =>
+        executor.start(currentRun).finally(() => {
+          activeExecutors.delete(runId);
+        }),
+      );
     }
 
     return task;
@@ -517,12 +546,20 @@ export const methodHandlers: Record<string, MethodHandler> = {
       throw new RpcValidationError(`Task ${taskId} status '${task.status}' — can only retry failed/reverted/cancelled`);
     }
     store.updateTask(runId, taskId, {
-      status: "pending", score: undefined, scoreDetails: undefined,
-      result: undefined, errorMessage: undefined, completedAt: undefined,
-      durationMs: undefined, costUsd: undefined,
+      status: "pending",
+      score: undefined,
+      scoreDetails: undefined,
+      result: undefined,
+      errorMessage: undefined,
+      completedAt: undefined,
+      durationMs: undefined,
+      costUsd: undefined,
     });
     const restored = queueManager.enqueue(runId, {
-      content: task.content, type: task.type, priority: task.priority, timeoutMinutes: task.timeoutMinutes,
+      content: task.content,
+      type: task.type,
+      priority: task.priority,
+      timeoutMinutes: task.timeoutMinutes,
     });
     store.saveTask(runId, restored);
     if (run.status !== "running" && !activeExecutors.has(runId)) {
@@ -532,7 +569,11 @@ export const methodHandlers: Record<string, MethodHandler> = {
       const ex = new Executor(queueManager, notify, runId, store);
       activeExecutors.set(runId, ex);
       // Defer executor start so the RPC response (queue refresh) is sent first
-      setImmediate(() => ex.start(run).finally(() => { activeExecutors.delete(runId); }));
+      setImmediate(() =>
+        ex.start(run).finally(() => {
+          activeExecutors.delete(runId);
+        }),
+      );
     }
     return { taskId, status: "pending", newQueueTaskId: restored.id };
   },
@@ -560,8 +601,20 @@ export const methodHandlers: Record<string, MethodHandler> = {
     }
     const updates: Partial<import("@ai-workbench/shared").TaskDefinition> = {};
     if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
-    if (typeof params.priority === "number" && Number.isFinite(params.priority) && params.priority >= 1 && params.priority <= 10) updates.priority = params.priority;
-    if (typeof params.timeoutMinutes === "number" && Number.isFinite(params.timeoutMinutes) && params.timeoutMinutes >= 1 && params.timeoutMinutes <= 1440) updates.timeoutMinutes = params.timeoutMinutes;
+    if (
+      typeof params.priority === "number" &&
+      Number.isFinite(params.priority) &&
+      params.priority >= 1 &&
+      params.priority <= 10
+    )
+      updates.priority = params.priority;
+    if (
+      typeof params.timeoutMinutes === "number" &&
+      Number.isFinite(params.timeoutMinutes) &&
+      params.timeoutMinutes >= 1 &&
+      params.timeoutMinutes <= 1440
+    )
+      updates.timeoutMinutes = params.timeoutMinutes;
     if (Object.keys(updates).length === 0) throw new RpcValidationError("No valid fields to update");
     store.updateTask(runId, taskId, updates);
     // Sync the in-memory queue entry with updated fields
@@ -647,7 +700,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
         throw new RpcValidationError(`config '${key}' must be a finite number, got: ${value}`);
       }
       if (value < constraints.min || value > constraints.max) {
-        throw new RpcValidationError(`config '${key}' must be between ${constraints.min} and ${constraints.max}, got: ${value}`);
+        throw new RpcValidationError(
+          `config '${key}' must be between ${constraints.min} and ${constraints.max}, got: ${value}`,
+        );
       }
     }
     store.setConfig(key, value);
@@ -691,14 +746,18 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const frontendMatch = url.match(/^(https?:\/\/[^/#]+)\/#\/share\/([a-f0-9-]+)$/i);
     const match = apiMatch || frontendMatch;
     if (!match) {
-      throw new RpcValidationError("Invalid share URL format. Expected: http://<host>:<port>/api/share/<token> or http://<host>:<port>/#/share/<token>");
+      throw new RpcValidationError(
+        "Invalid share URL format. Expected: http://<host>:<port>/api/share/<token> or http://<host>:<port>/#/share/<token>",
+      );
     }
     const [, , remoteToken] = match;
 
     // Check if this is a local token (same engine)
     const localShare = shareStore.getByToken(remoteToken);
     if (!localShare) {
-      throw new RpcValidationError("Remote share subscriptions are no longer supported. Only local share tokens can be subscribed.");
+      throw new RpcValidationError(
+        "Remote share subscriptions are no longer supported. Only local share tokens can be subscribed.",
+      );
     }
     const localData = store.getRun(localShare.runId);
     if (!localData) throw new RpcValidationError(`Local share token found but run ${localShare.runId} does not exist`);
@@ -785,7 +844,12 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (!resolved) {
       throw new RpcValidationError(`Approval ${approvalId} not found or already resolved`);
     }
-    sessionManager.recordActivity({ userId: "system", runId, action: "approval.responded", details: { approvalId, action } });
+    sessionManager.recordActivity({
+      userId: "system",
+      runId,
+      action: "approval.responded",
+      details: { approvalId, action },
+    });
     return { approvalId, resolved: true };
   },
 
@@ -827,7 +891,9 @@ export const methodHandlers: Record<string, MethodHandler> = {
     const comment = sessionManager.addComment({ taskId, runId, userId, displayName, content });
 
     const event = sessionManager.recordActivity({
-      userId, runId, action: "comment.created",
+      userId,
+      runId,
+      action: "comment.created",
       details: { taskId, commentId: comment.id },
     });
 
@@ -884,7 +950,6 @@ export const methodHandlers: Record<string, MethodHandler> = {
     if (maxFixIterations) store.setConfig(`${runId}:maxFixIterations`, maxFixIterations);
     return { runId, mode: mode || store.getConfig(`${runId}:crewMode`) || DEFAULT_CREW_CONFIG.mode, saved: true };
   },
-
 
   // ─── Plugin / MCP Server ───────────────────────────────────────────────
 
@@ -976,7 +1041,6 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { deleted };
   },
 
-
   // ─── Real-time Intervention ──────────────────────────────────────────────
 
   "task.intervene": async (params) => {
@@ -1021,11 +1085,15 @@ export const methodHandlers: Record<string, MethodHandler> = {
       priority: 1,
     });
     store.saveTask(runId, injectedTask);
-    sessionManager.recordActivity({ userId: "system", runId, action: "task.injected", details: { targetTaskId: taskId, instruction: instruction.substring(0, 100) } });
+    sessionManager.recordActivity({
+      userId: "system",
+      runId,
+      action: "task.injected",
+      details: { targetTaskId: taskId, instruction: instruction.substring(0, 100) },
+    });
     notify("queue.updated", { runId, queue: queueManager.list(runId) });
     return { injected: true, newTaskId: injectedTask.id };
   },
-
 };
 
 // ─── Method metadata for master agent (optional enrichment) ─────────────
@@ -1302,9 +1370,7 @@ const masterAgent = new MasterAgent();
 
 methodHandlers["chat.send"] = async (params) => {
   const message = requireNonEmptyString(params, "message");
-  const sessionId = typeof params.sessionId === "string" && params.sessionId
-    ? params.sessionId
-    : crypto.randomUUID();
+  const sessionId = typeof params.sessionId === "string" && params.sessionId ? params.sessionId : crypto.randomUUID();
 
   // Fire-and-forget: agent streams results via notifications
   masterAgent.handleMessage(sessionId, message, notify).catch((err) => {
@@ -1430,7 +1496,16 @@ async function ensureWorkflowInit(): Promise<void> {
 methodHandlers["workflow.list"] = async () => {
   await ensureWorkflowInit();
   const defs = workflowStore.list();
-  return { workflows: defs.map((d) => ({ id: d.id, name: d.name, description: d.description, tags: d.tags, isBuiltIn: d.isBuiltIn, useCase: d.useCase })) };
+  return {
+    workflows: defs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      tags: d.tags,
+      isBuiltIn: d.isBuiltIn,
+      useCase: d.useCase,
+    })),
+  };
 };
 
 methodMeta["workflow.list"] = {
@@ -1531,9 +1606,7 @@ methodHandlers["workflow.status"] = async (params) => {
 
 methodMeta["workflow.status"] = {
   description: "查询 workflow 执行状态",
-  params: [
-    { name: "runId", type: "string", required: false, description: "过滤指定 run 的执行记录" },
-  ],
+  params: [{ name: "runId", type: "string", required: false, description: "过滤指定 run 的执行记录" }],
   category: "workflow",
 };
 
@@ -1549,9 +1622,7 @@ methodHandlers["workflow.save"] = async (params) => {
 
 methodMeta["workflow.save"] = {
   description: "保存一个 workflow 定义供复用",
-  params: [
-    { name: "definition", type: "object", required: true, description: "WorkflowDefinition 对象" },
-  ],
+  params: [{ name: "definition", type: "object", required: true, description: "WorkflowDefinition 对象" }],
   category: "workflow",
 };
 
@@ -1599,22 +1670,26 @@ methodHandlers["loop.cancel"] = async (params) => {
 
 methodMeta["loop.cancel"] = {
   description: "取消一个循环任务",
-  params: [
-    { name: "loopId", type: "string", required: true, description: "循环任务 ID" },
-  ],
+  params: [{ name: "loopId", type: "string", required: true, description: "循环任务 ID" }],
   category: "loop",
 };
 
 methodHandlers["loop.list"] = async (params) => {
   const runId = typeof params.runId === "string" ? params.runId : undefined;
   const loops = loopScheduler.list(runId);
-  return { loops: loops.map((l) => ({ id: l.id, runId: l.runId, active: l.active, currentIntervalSec: l.currentIntervalSec, executionCount: l.history.length })) };
+  return {
+    loops: loops.map((l) => ({
+      id: l.id,
+      runId: l.runId,
+      active: l.active,
+      currentIntervalSec: l.currentIntervalSec,
+      executionCount: l.history.length,
+    })),
+  };
 };
 
 methodMeta["loop.list"] = {
   description: "列出循环任务",
-  params: [
-    { name: "runId", type: "string", required: false, description: "过滤指定 run" },
-  ],
+  params: [{ name: "runId", type: "string", required: false, description: "过滤指定 run" }],
   category: "loop",
 };

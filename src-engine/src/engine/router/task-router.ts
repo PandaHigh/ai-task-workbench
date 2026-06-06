@@ -98,15 +98,23 @@ export class TaskRouter {
         maxTurns: 1,
         systemPrompt: "你是一个任务复杂度评估器。只输出 JSON，不输出其他文字。",
         disallowedTools: [
-          "AskUserQuestion", "Bash", "Read", "Write", "Edit",
-          "Glob", "Grep", "WebSearch", "WebFetch", "Agent",
+          "AskUserQuestion",
+          "Bash",
+          "Read",
+          "Write",
+          "Edit",
+          "Glob",
+          "Grep",
+          "WebSearch",
+          "WebFetch",
+          "Agent",
         ],
       });
 
       let responseText = "";
       for await (const msg of stream) {
         if (msg.type === "assistant") {
-          const content = (msg as unknown as Record<string, unknown>);
+          const content = msg as unknown as Record<string, unknown>;
           if (typeof content.content === "string") {
             responseText += content.content;
           } else if (content.message && typeof (content.message as Record<string, unknown>).content === "object") {
@@ -126,7 +134,10 @@ export class TaskRouter {
       return this.parseAssessment(responseText);
     } catch (err) {
       // 评估失败时降级为默认策略（omx-pipeline）
-      console.warn("[task-router] Complexity analysis failed, falling back to omx-pipeline:", err instanceof Error ? err.message : String(err));
+      console.warn(
+        "[task-router] Complexity analysis failed, falling back to omx-pipeline:",
+        err instanceof Error ? err.message : String(err),
+      );
       return {
         level: "moderate",
         strategy: { type: "builtin", templateName: "omx-pipeline" },
@@ -153,7 +164,11 @@ export class TaskRouter {
     try {
       const parsed = JSON.parse(jsonMatch[1]);
 
-      const level = this.validateEnum<ComplexityLevel>(parsed.level, ["simple", "moderate", "complex", "massive"], "moderate");
+      const level = this.validateEnum<ComplexityLevel>(
+        parsed.level,
+        ["simple", "moderate", "complex", "massive"],
+        "moderate",
+      );
       const strategy = this.parseStrategy(parsed.strategy);
       const confidence = typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5;
       const dimensions = this.parseDimensions(parsed.dimensions);
@@ -190,7 +205,7 @@ export class TaskRouter {
       return { scope: 0.5, uncertainty: 0.5, risk: 0.5, parallelism: 0.3, verificationNeed: 0.3 };
     }
     const d = raw as Record<string, number>;
-    const clamp = (v: unknown) => typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0.5;
+    const clamp = (v: unknown) => (typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0.5);
     return {
       scope: clamp(d.scope),
       uncertainty: clamp(d.uncertainty),
@@ -212,12 +227,40 @@ export class TaskRouter {
     _context: RoutingContext,
   ): ComplexityAssessment {
     // 根据模板名推断复杂度和维度
-    const templateProfiles: Record<string, { level: ComplexityLevel; dimensions: ComplexityDimensions; agents: number; cost: number }> = {
-      "security-audit": { level: "complex", dimensions: { scope: 0.8, uncertainty: 0.4, risk: 0.9, parallelism: 0.8, verificationNeed: 0.9 }, agents: 8, cost: 3.0 },
-      "code-review":    { level: "complex", dimensions: { scope: 0.6, uncertainty: 0.3, risk: 0.6, parallelism: 0.7, verificationNeed: 0.7 }, agents: 5, cost: 2.0 },
-      "bug-sweep":      { level: "complex", dimensions: { scope: 0.7, uncertainty: 0.6, risk: 0.5, parallelism: 0.7, verificationNeed: 0.8 }, agents: 6, cost: 2.5 },
-      "migration":      { level: "massive", dimensions: { scope: 0.9, uncertainty: 0.5, risk: 0.7, parallelism: 0.9, verificationNeed: 0.7 }, agents: 15, cost: 10.0 },
-      "dead-code":      { level: "complex", dimensions: { scope: 0.7, uncertainty: 0.3, risk: 0.3, parallelism: 0.8, verificationNeed: 0.6 }, agents: 5, cost: 2.0 },
+    const templateProfiles: Record<
+      string,
+      { level: ComplexityLevel; dimensions: ComplexityDimensions; agents: number; cost: number }
+    > = {
+      "security-audit": {
+        level: "complex",
+        dimensions: { scope: 0.8, uncertainty: 0.4, risk: 0.9, parallelism: 0.8, verificationNeed: 0.9 },
+        agents: 8,
+        cost: 3.0,
+      },
+      "code-review": {
+        level: "complex",
+        dimensions: { scope: 0.6, uncertainty: 0.3, risk: 0.6, parallelism: 0.7, verificationNeed: 0.7 },
+        agents: 5,
+        cost: 2.0,
+      },
+      "bug-sweep": {
+        level: "complex",
+        dimensions: { scope: 0.7, uncertainty: 0.6, risk: 0.5, parallelism: 0.7, verificationNeed: 0.8 },
+        agents: 6,
+        cost: 2.5,
+      },
+      migration: {
+        level: "massive",
+        dimensions: { scope: 0.9, uncertainty: 0.5, risk: 0.7, parallelism: 0.9, verificationNeed: 0.7 },
+        agents: 15,
+        cost: 10.0,
+      },
+      "dead-code": {
+        level: "complex",
+        dimensions: { scope: 0.7, uncertainty: 0.3, risk: 0.3, parallelism: 0.8, verificationNeed: 0.6 },
+        agents: 5,
+        cost: 2.0,
+      },
     };
 
     const profile = templateProfiles[templateName] ?? {

@@ -6,7 +6,8 @@ const SIZES = { sm: 16, md: 24, lg: 40 };
 
 export function Spinner({ size = "md" }: SpinnerProps) {
   const s = SIZES[size];
-  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const prefersReducedMotion =
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <div
       style={{

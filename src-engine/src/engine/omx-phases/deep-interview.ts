@@ -80,10 +80,13 @@ export async function runDeepInterview(
 
 export function canSkipInterview(task: TaskDefinition): boolean {
   const content = task.content.toLowerCase();
-  const isShortAndSpecific = content.length < 500 && (
-    content.includes("fix") || content.includes("add") ||
-    content.includes("update") || content.includes("remove") ||
-    content.includes("rename") || content.includes("change")
-  );
+  const isShortAndSpecific =
+    content.length < 500 &&
+    (content.includes("fix") ||
+      content.includes("add") ||
+      content.includes("update") ||
+      content.includes("remove") ||
+      content.includes("rename") ||
+      content.includes("change"));
   return isShortAndSpecific;
 }

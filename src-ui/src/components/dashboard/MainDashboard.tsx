@@ -50,9 +50,13 @@ export function MainDashboard() {
               <button
                 onClick={() => setRightTab("tasks")}
                 style={{
-                  fontSize: 12, fontWeight: rightTab === "tasks" ? 600 : 400,
+                  fontSize: 12,
+                  fontWeight: rightTab === "tasks" ? 600 : 400,
                   color: rightTab === "tasks" ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: "none", border: "none", cursor: "pointer", padding: 0,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
                 }}
               >
                 任务 · {tasks.length}
@@ -60,9 +64,13 @@ export function MainDashboard() {
               <button
                 onClick={() => setRightTab("workflows")}
                 style={{
-                  fontSize: 12, fontWeight: rightTab === "workflows" ? 600 : 400,
+                  fontSize: 12,
+                  fontWeight: rightTab === "workflows" ? 600 : 400,
                   color: rightTab === "workflows" ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: "none", border: "none", cursor: "pointer", padding: 0,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
                 }}
               >
                 工作流{hasActiveWorkflows ? ` · ${activeWorkflows.size}` : ""}
@@ -70,10 +78,24 @@ export function MainDashboard() {
             </div>
             <button
               onClick={() => setShowTasks(false)}
-              style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2 }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-tertiary)",
+                cursor: "pointer",
+                padding: 2,
+              }}
               aria-label="收起面板"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              >
                 <line x1="3" y1="3" x2="11" y2="11" />
                 <line x1="11" y1="3" x2="3" y2="11" />
               </svg>
@@ -90,11 +112,12 @@ export function MainDashboard() {
                     暂无任务，通过 AI 助手创建
                   </p>
                 )}
-                {!loading && tasks.map((task, i) => (
-                  <div key={task.id} style={staggerItemStyle(i, 30)}>
-                    <TaskCard task={task} onDelete={() => loadTasks()} />
-                  </div>
-                ))}
+                {!loading &&
+                  tasks.map((task, i) => (
+                    <div key={task.id} style={staggerItemStyle(i, 30)}>
+                      <TaskCard task={task} onDelete={() => loadTasks()} />
+                    </div>
+                  ))}
               </div>
             ) : (
               <WorkflowPanel />
@@ -116,7 +139,15 @@ export function MainDashboard() {
           }}
           aria-label="展开任务面板"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="var(--text-secondary)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          >
             <rect x="1" y="1" width="12" height="12" rx="2" />
             <line x1="9.5" y1="1" x2="9.5" y2="13" />
           </svg>

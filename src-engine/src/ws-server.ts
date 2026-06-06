@@ -140,7 +140,10 @@ export class WsServer {
         try {
           client.send(data);
         } catch (sendErr) {
-          console.warn("[ws] failed to send to client, removing:", sendErr instanceof Error ? sendErr.message : sendErr);
+          console.warn(
+            "[ws] failed to send to client, removing:",
+            sendErr instanceof Error ? sendErr.message : sendErr,
+          );
           stale.push(client);
         }
       }
@@ -221,9 +224,12 @@ export class WsServer {
   private setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
     const origin = req.headers.origin || "";
     const allowed = ["localhost", "127.0.0.1"];
-    const extraOrigins = process.env.CORS_ORIGINS?.split(",").map(s => s.trim()).filter(Boolean) ?? [];
+    const extraOrigins =
+      process.env.CORS_ORIGINS?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [];
     const allAllowed = [...allowed, ...extraOrigins];
-    if (allAllowed.some(allowed => origin.includes(allowed)) || !origin) {
+    if (allAllowed.some((allowed) => origin.includes(allowed)) || !origin) {
       res.setHeader("Access-Control-Allow-Origin", origin || "*");
     }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -233,11 +239,20 @@ export class WsServer {
 
   private async handleDownload(res: ServerResponse, url: string): Promise<void> {
     const runId = url.replace("/api/runs/", "").replace("/download", "");
-    if (!runId) { this.sendJson(res, 400, { error: "Missing runId" }); return; }
+    if (!runId) {
+      this.sendJson(res, 400, { error: "Missing runId" });
+      return;
+    }
 
     const run = this.store.getRun(runId);
-    if (!run) { this.sendJson(res, 404, { error: "Run not found" }); return; }
-    if (!run.workingDir) { this.sendJson(res, 400, { error: "Run has no working directory" }); return; }
+    if (!run) {
+      this.sendJson(res, 404, { error: "Run not found" });
+      return;
+    }
+    if (!run.workingDir) {
+      this.sendJson(res, 400, { error: "Run has no working directory" });
+      return;
+    }
 
     const dirName = path.basename(run.workingDir);
     const zipFileName = `${dirName}-${run.id.substring(0, 8)}.zip`;
@@ -284,7 +299,10 @@ export class WsServer {
       switch (resource) {
         case "run": {
           const run = this.store.getRun(runId);
-          if (!run) { this.sendJson(res, 404, { error: "Run not found" }); return; }
+          if (!run) {
+            this.sendJson(res, 404, { error: "Run not found" });
+            return;
+          }
           const { workingDir: _, ...safe } = run;
           this.sendJson(res, 200, safe);
           break;
@@ -353,15 +371,26 @@ export class WsServer {
             break;
           }
           case "task.retry": {
-            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            if (!params.taskId) {
+              this.sendJson(res, 400, { error: "Missing taskId" });
+              return;
+            }
             const tasks = this.store.listTasks(runId);
             const task = tasks.find((t: { id: string }) => t.id === params.taskId);
-            if (!task) { this.sendJson(res, 404, { error: "Task not found" }); return; }
+            if (!task) {
+              this.sendJson(res, 404, { error: "Task not found" });
+              return;
+            }
             const resetTask = {
               ...task,
-              status: "pending" as const, score: undefined, scoreDetails: undefined,
-              result: undefined, errorMessage: undefined, completedAt: undefined,
-              durationMs: undefined, costUsd: undefined,
+              status: "pending" as const,
+              score: undefined,
+              scoreDetails: undefined,
+              result: undefined,
+              errorMessage: undefined,
+              completedAt: undefined,
+              durationMs: undefined,
+              costUsd: undefined,
             };
             this.store.updateTask(runId, params.taskId, resetTask);
             this.queueManager.restore(runId, resetTask);
@@ -377,7 +406,10 @@ export class WsServer {
             this.sendJson(res, 200, { status: "accepted" });
             break;
           case "queue.reorder": {
-            if (!Array.isArray(params.taskIds)) { this.sendJson(res, 400, { error: "Missing taskIds" }); return; }
+            if (!Array.isArray(params.taskIds)) {
+              this.sendJson(res, 400, { error: "Missing taskIds" });
+              return;
+            }
             this.queueManager.reorder(runId, params.taskIds);
             this.broadcast("queue.updated", { runId, queue: this.queueManager.list(runId) });
             this.sendJson(res, 200, { runId, order: params.taskIds });
@@ -385,24 +417,35 @@ export class WsServer {
           }
           case "task.setTimeout": {
             if (!params.taskId || typeof params.minutes !== "number") {
-              this.sendJson(res, 400, { error: "Missing taskId or minutes" }); return;
+              this.sendJson(res, 400, { error: "Missing taskId or minutes" });
+              return;
             }
             this.store.updateTask(runId, params.taskId, { timeoutMinutes: params.minutes });
             this.sendJson(res, 200, { taskId: params.taskId, timeoutMinutes: params.minutes });
             break;
           }
           case "task.update": {
-            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            if (!params.taskId) {
+              this.sendJson(res, 400, { error: "Missing taskId" });
+              return;
+            }
             const task = this.store.getTask(runId, params.taskId);
-            if (!task) { this.sendJson(res, 404, { error: "Task not found" }); return; }
+            if (!task) {
+              this.sendJson(res, 404, { error: "Task not found" });
+              return;
+            }
             if (!["pending", "queued"].includes(task.status)) {
-              this.sendJson(res, 400, { error: `Cannot edit task with status: ${task.status}` }); return;
+              this.sendJson(res, 400, { error: `Cannot edit task with status: ${task.status}` });
+              return;
             }
             const updates: Record<string, unknown> = {};
             if (typeof params.content === "string" && params.content.trim()) updates.content = params.content.trim();
             if (typeof params.priority === "number") updates.priority = params.priority;
             if (typeof params.timeoutMinutes === "number") updates.timeoutMinutes = params.timeoutMinutes;
-            if (Object.keys(updates).length === 0) { this.sendJson(res, 400, { error: "No valid fields to update" }); return; }
+            if (Object.keys(updates).length === 0) {
+              this.sendJson(res, 400, { error: "No valid fields to update" });
+              return;
+            }
             this.store.updateTask(runId, params.taskId, updates);
             const queueList = this.queueManager.list(runId);
             const queueEntry = queueList.find((t: { id: string }) => t.id === params.taskId);
@@ -414,7 +457,10 @@ export class WsServer {
             break;
           }
           case "queue.remove": {
-            if (!params.taskId) { this.sendJson(res, 400, { error: "Missing taskId" }); return; }
+            if (!params.taskId) {
+              this.sendJson(res, 400, { error: "Missing taskId" });
+              return;
+            }
             const removed = this.queueManager.remove(runId, params.taskId);
             this.store.deleteTask(runId, params.taskId);
             this.broadcast("queue.updated", { runId, queue: this.queueManager.list(runId) });
@@ -433,16 +479,19 @@ export class WsServer {
   private serveFrontend(req: IncomingMessage, res: ServerResponse, url: string): void {
     // In dev mode, proxy to Vite dev server so the browser stays on port 9731
     if (process.env.NODE_ENV !== "production") {
-      const proxyReq = httpRequest({
-        hostname: "localhost",
-        port: 1420,
-        path: url,
-        method: req.method,
-        headers: { ...req.headers, host: "localhost:1420" },
-      }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-        proxyRes.pipe(res);
-      });
+      const proxyReq = httpRequest(
+        {
+          hostname: "localhost",
+          port: 1420,
+          path: url,
+          method: req.method,
+          headers: { ...req.headers, host: "localhost:1420" },
+        },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+          proxyRes.pipe(res);
+        },
+      );
       proxyReq.on("error", () => {
         res.writeHead(502, { "Content-Type": "text/plain" });
         res.end("Vite dev server not available");
@@ -486,24 +535,24 @@ export class WsServer {
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes: Record<string, string> = {
       ".html": "text/html; charset=utf-8",
-      ".js":   "application/javascript; charset=utf-8",
-      ".mjs":  "application/javascript; charset=utf-8",
-      ".css":  "text/css; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".mjs": "application/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
       ".json": "application/json; charset=utf-8",
-      ".png":  "image/png",
-      ".jpg":  "image/jpeg",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
       ".jpeg": "image/jpeg",
-      ".gif":  "image/gif",
-      ".svg":  "image/svg+xml",
-      ".ico":  "image/x-icon",
+      ".gif": "image/gif",
+      ".svg": "image/svg+xml",
+      ".ico": "image/x-icon",
       ".woff": "font/woff",
       ".woff2": "font/woff2",
-      ".ttf":  "font/ttf",
-      ".eot":  "application/vnd.ms-fontobject",
+      ".ttf": "font/ttf",
+      ".eot": "application/vnd.ms-fontobject",
       ".webp": "image/webp",
       ".webm": "video/webm",
-      ".mp4":  "video/mp4",
-      ".map":  "application/json",
+      ".mp4": "video/mp4",
+      ".map": "application/json",
     };
     const contentType = mimeTypes[ext] || "application/octet-stream";
 
@@ -516,7 +565,9 @@ export class WsServer {
       res.end(data);
     } catch {
       res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: cd src-ui &amp;&amp; npm run build</p></body></html>");
+      res.end(
+        "<!DOCTYPE html><html><body><h1>AI Task Workbench</h1><p>Frontend not built. Run: cd src-ui &amp;&amp; npm run build</p></body></html>",
+      );
     }
   }
 
@@ -532,7 +583,10 @@ export class WsServer {
     try {
       message = JSON.parse(raw);
     } catch (parseErr) {
-      console.warn("[ws] received non-JSON message from client:", parseErr instanceof Error ? parseErr.message : String(parseErr));
+      console.warn(
+        "[ws] received non-JSON message from client:",
+        parseErr instanceof Error ? parseErr.message : String(parseErr),
+      );
       this.send(ws, { jsonrpc: "2.0", id: 0, error: RPC_ERRORS.PARSE_ERROR });
       return;
     }
@@ -553,7 +607,11 @@ export class WsServer {
       }
       const share = this.shareStore.getByToken(token);
       if (!share) {
-        this.send(ws, { jsonrpc: "2.0", id: req.id, error: { code: -32602, message: "Invalid or expired share token" } });
+        this.send(ws, {
+          jsonrpc: "2.0",
+          id: req.id,
+          error: { code: -32602, message: "Invalid or expired share token" },
+        });
         return;
       }
       this.shareClients.set(ws, { token, runId: share.runId });
@@ -613,7 +671,10 @@ export class WsServer {
       try {
         ws.send(JSON.stringify(message));
       } catch (sendErr) {
-        console.warn("[ws] failed to send response to client, removing:", sendErr instanceof Error ? sendErr.message : sendErr);
+        console.warn(
+          "[ws] failed to send response to client, removing:",
+          sendErr instanceof Error ? sendErr.message : sendErr,
+        );
         this.clients.delete(ws);
       }
     }

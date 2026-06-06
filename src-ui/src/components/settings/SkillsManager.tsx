@@ -106,19 +106,26 @@ export function SkillsManager() {
           内置 Skills ({builtinSkills.length})
         </h3>
         {builtinSkills.length === 0 ? (
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>暂无内置 skills</p>
+          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            暂无内置 skills
+          </p>
         ) : (
           <div className="space-y-2">
             {builtinSkills.map((skill) => (
-              <div key={skill.name} className="flex items-start justify-between gap-2 p-2 rounded"
-                style={{ background: "var(--bg-tertiary)" }}>
+              <div
+                key={skill.name}
+                className="flex items-start justify-between gap-2 p-2 rounded"
+                style={{ background: "var(--bg-tertiary)" }}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
                       {skill.name}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ background: "var(--blue)", color: "#fff", opacity: 0.7 }}>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded"
+                      style={{ background: "var(--blue)", color: "#fff", opacity: 0.7 }}
+                    >
                       内置
                     </span>
                   </div>
@@ -163,10 +170,19 @@ export function SkillsManager() {
         </div>
 
         {customSkills.length === 0 ? (
-          <div className="text-center py-4"
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleUpload(e.dataTransfer.files); }}
-            style={{ border: "1px dashed var(--border)", borderRadius: 8 }}>
+          <div
+            className="text-center py-4"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUpload(e.dataTransfer.files);
+            }}
+            style={{ border: "1px dashed var(--border)", borderRadius: 8 }}
+          >
             <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               暂无自定义 skills
             </p>
@@ -177,15 +193,20 @@ export function SkillsManager() {
         ) : (
           <div className="space-y-2">
             {customSkills.map((skill) => (
-              <div key={skill.name} className="flex items-start justify-between gap-2 p-2 rounded"
-                style={{ background: "var(--bg-tertiary)" }}>
+              <div
+                key={skill.name}
+                className="flex items-start justify-between gap-2 p-2 rounded"
+                style={{ background: "var(--bg-tertiary)" }}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
                       {skill.name}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ background: "var(--border)", color: "var(--text-secondary)" }}>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded"
+                      style={{ background: "var(--border)", color: "var(--text-secondary)" }}
+                    >
                       自定义
                     </span>
                   </div>

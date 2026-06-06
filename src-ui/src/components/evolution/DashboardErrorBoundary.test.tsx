@@ -16,7 +16,7 @@ describe("DashboardErrorBoundary", () => {
     render(
       <DashboardErrorBoundary>
         <ThrowingComponent shouldThrow={false} />
-      </DashboardErrorBoundary>
+      </DashboardErrorBoundary>,
     );
     expect(screen.getByText("Normal content")).toBeInTheDocument();
   });
@@ -25,7 +25,7 @@ describe("DashboardErrorBoundary", () => {
     render(
       <DashboardErrorBoundary name="测试组件">
         <ThrowingComponent shouldThrow={true} />
-      </DashboardErrorBoundary>
+      </DashboardErrorBoundary>,
     );
     expect(screen.getByText("测试组件 加载出错")).toBeInTheDocument();
     expect(screen.getByText("Test error")).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe("DashboardErrorBoundary", () => {
     render(
       <DashboardErrorBoundary>
         <ThrowingComponent shouldThrow={true} />
-      </DashboardErrorBoundary>
+      </DashboardErrorBoundary>,
     );
     expect(screen.getByText("重试")).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("DashboardErrorBoundary", () => {
     render(
       <DashboardErrorBoundary>
         <ThrowingComponent shouldThrow={true} />
-      </DashboardErrorBoundary>
+      </DashboardErrorBoundary>,
     );
     expect(screen.getByText("加载出错")).toBeInTheDocument();
   });

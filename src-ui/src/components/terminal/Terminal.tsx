@@ -31,10 +31,22 @@ export function Terminal({ children, className = "" }: TerminalProps) {
 }
 
 const ANSI_COLORS: Record<number, string> = {
-  30: "#1b1f24", 31: "var(--red)", 32: "var(--green)", 33: "var(--yellow)",
-  34: "var(--blue)", 35: "var(--purple)", 36: "#39c5cf", 37: "var(--text-primary)",
-  90: "var(--text-secondary)", 91: "#ff7b72", 92: "var(--green)", 93: "var(--yellow)",
-  94: "var(--blue)", 95: "var(--purple)", 96: "#39c5cf", 97: "var(--text-primary)",
+  30: "#1b1f24",
+  31: "var(--red)",
+  32: "var(--green)",
+  33: "var(--yellow)",
+  34: "var(--blue)",
+  35: "var(--purple)",
+  36: "#39c5cf",
+  37: "var(--text-primary)",
+  90: "var(--text-secondary)",
+  91: "#ff7b72",
+  92: "var(--green)",
+  93: "var(--yellow)",
+  94: "var(--blue)",
+  95: "var(--purple)",
+  96: "#39c5cf",
+  97: "var(--text-primary)",
 };
 
 function parseAnsi(text: string): { text: string; color?: string }[] {

@@ -47,7 +47,10 @@ export function TaskCreateForm({
         style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "2px solid var(--blue)" }}
         autoFocus={autoFocus}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (canSubmit) handleSubmit(); }
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (canSubmit) handleSubmit();
+          }
           if (e.key === "Escape") onCancel?.();
         }}
         data-testid="task-content-input"
@@ -60,11 +63,17 @@ export function TaskCreateForm({
             value={priority}
             onChange={(e) => setPriority(Number(e.target.value))}
             className="px-1.5 py-0.5 rounded text-[10px] outline-none"
-            style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
             data-testid="priority-select"
           >
             {Array.from({ length: 10 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>P{i + 1}</option>
+              <option key={i + 1} value={i + 1}>
+                P{i + 1}
+              </option>
             ))}
           </select>
         </div>
@@ -74,23 +83,44 @@ export function TaskCreateForm({
             value={timeoutMinutes}
             onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
             className="px-1.5 py-0.5 rounded text-[10px] outline-none"
-            style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
             data-testid="timeout-select"
           >
             {[15, 30, 60, 90, 120, 180].map((v) => (
-              <option key={v} value={v}>{v}分钟</option>
+              <option key={v} value={v}>
+                {v}分钟
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      <p className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Ctrl+Enter 快速提交</p>
+      <p className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
+        Ctrl+Enter 快速提交
+      </p>
 
       <div className="flex gap-2 justify-end">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>取消</button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded-lg text-xs"
+            style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+          >
+            取消
+          </button>
         )}
-        <button type="button" onClick={handleSubmit} disabled={!canSubmit} className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ background: "var(--green)", color: "#fff" }}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+          style={{ background: "var(--green)", color: "#fff" }}
+        >
           {submitLabel}
         </button>
       </div>

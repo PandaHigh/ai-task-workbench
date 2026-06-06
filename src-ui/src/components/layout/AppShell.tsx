@@ -34,9 +34,14 @@ export function AppShell({ children }: AppShellProps) {
       <a
         href="#main-content"
         style={{
-          position: "absolute", left: "-9999px", top: 0,
-          background: "var(--blue)", color: "#fff", padding: "4px 12px",
-          zIndex: 99999, fontSize: "13px",
+          position: "absolute",
+          left: "-9999px",
+          top: 0,
+          background: "var(--blue)",
+          color: "#fff",
+          padding: "4px 12px",
+          zIndex: 99999,
+          fontSize: "13px",
         }}
         onFocus={(e) => (e.currentTarget.style.left = "0")}
         onBlur={(e) => (e.currentTarget.style.left = "-9999px")}

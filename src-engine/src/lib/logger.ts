@@ -9,8 +9,16 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 export const log = {
-  debug: (msg: string, ...args: unknown[]) => { if (shouldLog("debug")) console.log(`[debug] ${msg}`, ...args); },
-  info: (msg: string, ...args: unknown[]) => { if (shouldLog("info")) console.log(`[info] ${msg}`, ...args); },
-  warn: (msg: string, ...args: unknown[]) => { if (shouldLog("warn")) console.warn(`[warn] ${msg}`, ...args); },
-  error: (msg: string, ...args: unknown[]) => { if (shouldLog("error")) console.error(`[error] ${msg}`, ...args); },
+  debug: (msg: string, ...args: unknown[]) => {
+    if (shouldLog("debug")) console.log(`[debug] ${msg}`, ...args);
+  },
+  info: (msg: string, ...args: unknown[]) => {
+    if (shouldLog("info")) console.log(`[info] ${msg}`, ...args);
+  },
+  warn: (msg: string, ...args: unknown[]) => {
+    if (shouldLog("warn")) console.warn(`[warn] ${msg}`, ...args);
+  },
+  error: (msg: string, ...args: unknown[]) => {
+    if (shouldLog("error")) console.error(`[error] ${msg}`, ...args);
+  },
 };

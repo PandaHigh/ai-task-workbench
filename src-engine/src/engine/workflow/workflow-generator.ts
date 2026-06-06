@@ -6,7 +6,14 @@
  */
 
 import { CCClient } from "../../cc-integration/cc-client.js";
-import { WorkflowBuilder, agentStage, parallelStages, sequenceStages, loopStages, adversarialStage } from "./workflow-builder.js";
+import {
+  WorkflowBuilder,
+  agentStage,
+  parallelStages,
+  sequenceStages,
+  loopStages,
+  adversarialStage,
+} from "./workflow-builder.js";
 import type { WorkflowDefinition, WorkflowStage } from "./workflow-types.js";
 import type { TaskDefinition } from "@ai-workbench/shared";
 
@@ -37,15 +44,23 @@ export class WorkflowGenerator {
       maxTurns: 1,
       systemPrompt: GENERATOR_SYSTEM_PROMPT,
       disallowedTools: [
-        "AskUserQuestion", "Bash", "Read", "Write", "Edit",
-        "Glob", "Grep", "WebSearch", "WebFetch", "Agent",
+        "AskUserQuestion",
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "WebSearch",
+        "WebFetch",
+        "Agent",
       ],
     });
 
     let responseText = "";
     for await (const msg of stream) {
       if (msg.type === "assistant") {
-        const content = (msg as unknown as Record<string, unknown>);
+        const content = msg as unknown as Record<string, unknown>;
         if (typeof content.content === "string") responseText += content.content;
         else if (content.message && typeof (content.message as Record<string, unknown>).content === "object") {
           const blocks = (content.message as Record<string, unknown>).content as Array<Record<string, unknown>>;
@@ -63,7 +78,9 @@ export class WorkflowGenerator {
   }
 
   private buildGeneratorPrompt(task: TaskDefinition, options: GenerateOptions): string {
-    const templates = options.availableTemplates?.join(", ") ?? "omx-pipeline, security-audit, code-review, bug-sweep, migration, dead-code";
+    const templates =
+      options.availableTemplates?.join(", ") ??
+      "omx-pipeline, security-audit, code-review, bug-sweep, migration, dead-code";
 
     return `请为以下任务设计一个 WorkflowDefinition。
 
@@ -152,8 +169,7 @@ product-manager, metis, momus, oracle
     const builder = WorkflowBuilder.create(
       `dynamic-${Date.now()}`,
       typeof parsed.name === "string" ? parsed.name : "动态工作流",
-    )
-      .description(typeof parsed.description === "string" ? parsed.description : "AI 动态生成的工作流");
+    ).description(typeof parsed.description === "string" ? parsed.description : "AI 动态生成的工作流");
 
     if (Array.isArray(parsed.tags)) {
       builder.tags(parsed.tags as string[]);
@@ -188,7 +204,9 @@ product-manager, metis, momus, oracle
 
       case "parallel": {
         const subStages = Array.isArray(def.stages)
-          ? (def.stages as Record<string, unknown>[]).map((s) => this.parseStageDef(s)).filter(Boolean) as WorkflowStage[]
+          ? ((def.stages as Record<string, unknown>[])
+              .map((s) => this.parseStageDef(s))
+              .filter(Boolean) as WorkflowStage[])
           : [];
         return parallelStages(name, subStages, {
           maxConcurrency: typeof def.maxConcurrency === "number" ? def.maxConcurrency : undefined,
@@ -198,7 +216,9 @@ product-manager, metis, momus, oracle
 
       case "sequence": {
         const subStages = Array.isArray(def.stages)
-          ? (def.stages as Record<string, unknown>[]).map((s) => this.parseStageDef(s)).filter(Boolean) as WorkflowStage[]
+          ? ((def.stages as Record<string, unknown>[])
+              .map((s) => this.parseStageDef(s))
+              .filter(Boolean) as WorkflowStage[])
           : [];
         return sequenceStages(name, subStages, {
           gateThreshold,
@@ -209,7 +229,9 @@ product-manager, metis, momus, oracle
 
       case "loop": {
         const bodyStages = Array.isArray(def.body)
-          ? (def.body as Record<string, unknown>[]).map((s) => this.parseStageDef(s)).filter(Boolean) as WorkflowStage[]
+          ? ((def.body as Record<string, unknown>[])
+              .map((s) => this.parseStageDef(s))
+              .filter(Boolean) as WorkflowStage[])
           : [];
         return loopStages(name, bodyStages, typeof def.maxIterations === "number" ? def.maxIterations : 5, {
           consensus: typeof def.consensus === "boolean" ? def.consensus : undefined,
@@ -238,12 +260,14 @@ product-manager, metis, momus, oracle
     // 解析失败时返回一个简单的单 Agent workflow
     return WorkflowBuilder.create(`fallback-${Date.now()}`, "降级工作流")
       .description("AI 生成失败，降级为单 Agent 执行")
-      .stage(agentStage({
-        type: "agent",
-        name: "执行任务",
-        role: "executor",
-        prompt: task.content,
-      }))
+      .stage(
+        agentStage({
+          type: "agent",
+          name: "执行任务",
+          role: "executor",
+          prompt: task.content,
+        }),
+      )
       .build();
   }
 }

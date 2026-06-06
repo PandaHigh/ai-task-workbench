@@ -4,9 +4,7 @@ import { render, screen } from "@testing-library/react";
 vi.mock("react-router-dom", () => ({
   useLocation: () => ({ pathname: "/" }),
   useNavigate: () => vi.fn(),
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <span data-href={to}>{children}</span>
-  ),
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <span data-href={to}>{children}</span>,
 }));
 
 vi.mock("../../hooks/useEngine", () => ({
@@ -26,16 +24,14 @@ import { Sidebar } from "./Sidebar";
 describe("Sidebar", () => {
   it("should render navigation labels", () => {
     render(<Sidebar />);
-    expect(screen.getByText("首页")).toBeInTheDocument();
-    expect(screen.getByText("创建任务")).toBeInTheDocument();
+    expect(screen.getByText("AI 助手")).toBeInTheDocument();
     expect(screen.getByText("设置")).toBeInTheDocument();
   });
 
   it("should render navigation elements", () => {
     const { container } = render(<Sidebar />);
     // Navigation labels exist even if wrapped differently
-    expect(container.textContent).toContain("首页");
-    expect(container.textContent).toContain("创建任务");
+    expect(container.textContent).toContain("AI 助手");
     expect(container.textContent).toContain("设置");
   });
 

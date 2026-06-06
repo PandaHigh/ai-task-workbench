@@ -27,32 +27,48 @@ export function ShareDashboard() {
   }, [run?.id, reset]);
 
   // Sync share data to evolution store
-  useEffect(() => { setQueue(queue); }, [queue, setQueue]);
-  useEffect(() => { setCommits(commits); }, [commits, setCommits]);
-  useEffect(() => { setLessons(lessons); }, [lessons, setLessons]);
-  useEffect(() => { setLogs(logs); }, [logs, setLogs]);
+  useEffect(() => {
+    setQueue(queue);
+  }, [queue, setQueue]);
+  useEffect(() => {
+    setCommits(commits);
+  }, [commits, setCommits]);
+  useEffect(() => {
+    setLessons(lessons);
+  }, [lessons, setLessons]);
+  useEffect(() => {
+    setLogs(logs);
+  }, [logs, setLogs]);
   useEffect(() => {
     if (run) setRunning(run.status === "running");
   }, [run?.status, setRunning]);
 
   // Wrap share call to include runId for task methods
-  const shareCall = useCallback(async (method: string, params?: Record<string, unknown>) => {
-    const runId = run?.id;
-    if (method === "task.create" && runId) {
-      return call("task.create", { ...params });
-    }
-    if (method === "task.retry" && runId) {
-      return call("task.retry", { taskId: (params as Record<string, unknown>)?.taskId });
-    }
-    return call(method, params);
-  }, [call, run?.id]);
+  const shareCall = useCallback(
+    async (method: string, params?: Record<string, unknown>) => {
+      const runId = run?.id;
+      if (method === "task.create" && runId) {
+        return call("task.create", { ...params });
+      }
+      if (method === "task.retry" && runId) {
+        return call("task.retry", { taskId: (params as Record<string, unknown>)?.taskId });
+      }
+      return call(method, params);
+    },
+    [call, run?.id],
+  );
 
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full mx-auto mb-4" style={{ borderColor: "var(--blue)", borderTopColor: "transparent" }} />
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>加载分享看板...</p>
+          <div
+            className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full mx-auto mb-4"
+            style={{ borderColor: "var(--blue)", borderTopColor: "transparent" }}
+          />
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            加载分享看板...
+          </p>
         </div>
       </div>
     );
@@ -63,7 +79,9 @@ export function ShareDashboard() {
     return (
       <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
         <div className="text-center max-w-md px-6">
-          <div className="text-4xl mb-4" style={{ opacity: 0.3 }}>{isExpired ? "🔒" : ":("}</div>
+          <div className="text-4xl mb-4" style={{ opacity: 0.3 }}>
+            {isExpired ? "🔒" : ":("}
+          </div>
           <p className="text-sm font-semibold mb-2" style={{ color: isExpired ? "var(--yellow)" : "var(--red)" }}>
             {isExpired ? "此分享链接已过期" : "加载失败"}
           </p>

@@ -4,23 +4,12 @@ import { useEngine } from "../../hooks/useEngine";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 
-const QUICK_HINTS = [
-  "查看我的任务",
-  "创建一个新任务",
-  "某个任务的进度如何？",
-];
+const QUICK_HINTS = ["查看我的任务", "创建一个新任务", "某个任务的进度如何？"];
 
 export function MasterChat() {
   const { connected, call } = useEngine();
-  const {
-    messages,
-    sessionId,
-    isLoading,
-    setSessionId,
-    addUserMessage,
-    startAssistantMessage,
-    clearChat,
-  } = useChatStore();
+  const { messages, sessionId, isLoading, setSessionId, addUserMessage, startAssistantMessage, clearChat } =
+    useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -28,25 +17,28 @@ export function MasterChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = useCallback(async (content: string) => {
-    if (!connected) return;
+  const handleSend = useCallback(
+    async (content: string) => {
+      if (!connected) return;
 
-    addUserMessage(content);
+      addUserMessage(content);
 
-    let sid = sessionId;
-    if (!sid) {
-      sid = crypto.randomUUID();
-      setSessionId(sid);
-    }
+      let sid = sessionId;
+      if (!sid) {
+        sid = crypto.randomUUID();
+        setSessionId(sid);
+      }
 
-    startAssistantMessage();
+      startAssistantMessage();
 
-    try {
-      await call("chat.send", { message: content, sessionId: sid });
-    } catch (err) {
-      useChatStore.getState().setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [connected, call, sessionId, setSessionId, addUserMessage, startAssistantMessage]);
+      try {
+        await call("chat.send", { message: content, sessionId: sid });
+      } catch (err) {
+        useChatStore.getState().setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [connected, call, sessionId, setSessionId, addUserMessage, startAssistantMessage],
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-primary)" }}>
@@ -61,13 +53,20 @@ export function MasterChat() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="var(--blue)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M14 10c0 .6-.4 1-1 1H5l-3 3V3c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v7z" />
           </svg>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>AI 助手</span>
-          {!connected && (
-            <span style={{ fontSize: 10, color: "var(--red)" }}>未连接</span>
-          )}
+          {!connected && <span style={{ fontSize: 10, color: "var(--red)" }}>未连接</span>}
         </div>
         {messages.length > 0 && (
           <button

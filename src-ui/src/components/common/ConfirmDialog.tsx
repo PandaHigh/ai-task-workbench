@@ -78,7 +78,7 @@ export function ConfirmDialog({
 
       if (e.key === "Tab" && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         );
         if (focusable.length === 0) return;
 
@@ -94,7 +94,7 @@ export function ConfirmDialog({
         }
       }
     },
-    [onCancel]
+    [onCancel],
   );
 
   if (!mounted) return null;
@@ -138,10 +138,7 @@ export function ConfirmDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3
-          id={titleId}
-          style={{ margin: "0 0 12px", fontSize: "16px", color: "var(--text-primary)" }}
-        >
+        <h3 id={titleId} style={{ margin: "0 0 12px", fontSize: "16px", color: "var(--text-primary)" }}>
           {title}
         </h3>
         <p

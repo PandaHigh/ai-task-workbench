@@ -88,7 +88,13 @@ export class AgentExecutor {
       this.notify("task.stream", { taskId, message });
 
       // Emit structured agent progress
-      const progress = this.parseProgress(message, role, taskId, collectedMessages.length, ccOptions.maxTurns ?? role.maxTurns);
+      const progress = this.parseProgress(
+        message,
+        role,
+        taskId,
+        collectedMessages.length,
+        ccOptions.maxTurns ?? role.maxTurns,
+      );
       if (progress) {
         this.notify("agent.progress", progress as unknown as Record<string, unknown>);
       }
@@ -116,15 +122,10 @@ export class AgentExecutor {
       .filter(Boolean);
 
     // Prefer the last assistant message (richest content) over the result summary
-    const bestResult =
-      assistantTexts.length > 0
-        ? assistantTexts[assistantTexts.length - 1]
-        : streamResult;
+    const bestResult = assistantTexts.length > 0 ? assistantTexts[assistantTexts.length - 1] : streamResult;
 
     if (!bestResult) {
-      throw new Error(
-        `Agent "${role.id}" completed without producing a result`,
-      );
+      throw new Error(`Agent "${role.id}" completed without producing a result`);
     }
 
     return {

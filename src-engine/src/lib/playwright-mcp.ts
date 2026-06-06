@@ -11,7 +11,9 @@ export function resolvePlaywrightCli(): { command: string; args: string[] } | nu
     if (fs.existsSync(cliPath)) {
       return { command: "node", args: [cliPath, "--headless"] };
     }
-  } catch { /* not installed locally */ }
+  } catch {
+    /* not installed locally */
+  }
   return null;
 }
 

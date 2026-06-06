@@ -18,7 +18,9 @@ describe("useAsyncAction", () => {
 
   it("should set loading during execution", async () => {
     let resolveFn: () => void;
-    const promise = new Promise<void>((resolve) => { resolveFn = resolve; });
+    const promise = new Promise<void>((resolve) => {
+      resolveFn = resolve;
+    });
 
     const { result } = renderHook(() => useAsyncAction());
 
@@ -59,7 +61,9 @@ describe("useAsyncAction", () => {
 
   it("should prevent concurrent executions", async () => {
     let resolveFn: () => void;
-    const promise = new Promise<void>((resolve) => { resolveFn = resolve; });
+    const promise = new Promise<void>((resolve) => {
+      resolveFn = resolve;
+    });
     const { result } = renderHook(() => useAsyncAction());
 
     act(() => {

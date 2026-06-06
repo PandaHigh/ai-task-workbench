@@ -54,7 +54,9 @@ describe("StreamingOutput", () => {
   });
 
   it("should render success result", () => {
-    const map = new Map([["t1", [{ type: "result", subtype: "success", duration_ms: 5000, total_cost_usd: 0.05, num_turns: 3 }]]]);
+    const map = new Map([
+      ["t1", [{ type: "result", subtype: "success", duration_ms: 5000, total_cost_usd: 0.05, num_turns: 3 }]],
+    ]);
     mockGet.mockReturnValue(map);
     render(<StreamingOutput taskId="t1" />);
     expect(screen.getByText("OK")).toBeInTheDocument();

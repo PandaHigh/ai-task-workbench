@@ -40,7 +40,8 @@ const REMOVE_ANIMATION_MS = 200;
 
 function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolean; onRemove: (id: number) => void }) {
   const style = TOAST_STYLES[toast.type];
-  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const prefersReducedMotion =
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const DURATION: Record<ToastType, number> = { success: 2500, info: 4000, warning: 5000, error: 6000 };
 
@@ -76,7 +77,14 @@ function ToastItem({ toast, exiting, onRemove }: { toast: Toast; exiting: boolea
       <button
         onClick={() => onRemove(toast.id)}
         aria-label="关闭通知"
-        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          fontSize: "14px",
+          padding: "0 2px",
+        }}
       >
         {"✕"}
       </button>

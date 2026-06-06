@@ -16,13 +16,12 @@ export function ProfileManager() {
 
   useEffect(() => {
     if (!connected) return;
-    Promise.all([
-      call("profile.list", {}),
-      call("config.get", { key: "activeProfile" }),
-    ]).then(([list, active]) => {
-      setProfiles((list ?? []) as OrchestratorProfile[]);
-      setActiveId((active as string) ?? "adaptive");
-    }).catch(() => {});
+    Promise.all([call("profile.list", {}), call("config.get", { key: "activeProfile" })])
+      .then(([list, active]) => {
+        setProfiles((list ?? []) as OrchestratorProfile[]);
+        setActiveId((active as string) ?? "adaptive");
+      })
+      .catch(() => {});
   }, [connected, call]);
 
   const activate = async (id: string) => {
@@ -52,22 +51,41 @@ export function ProfileManager() {
             border: activeId === profile.id ? "1px solid var(--blue)" : "1px solid transparent",
           }}
           onClick={() => activate(profile.id)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(profile.id); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              activate(profile.id);
+            }
+          }}
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{profile.name}</span>
+              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                {profile.name}
+              </span>
               {profile.isBuiltIn && (
-                <span className="text-[10px] px-1 rounded" style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}>内置</span>
+                <span
+                  className="text-[10px] px-1 rounded"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}
+                >
+                  内置
+                </span>
               )}
-              <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{MODE_LABELS[profile.config.mode]}</span>
+              <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                {MODE_LABELS[profile.config.mode]}
+              </span>
             </div>
-            <div className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{profile.description}</div>
+            <div className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
+              {profile.description}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {!profile.isBuiltIn && (
               <button
-                onClick={(e) => { e.stopPropagation(); remove(profile.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remove(profile.id);
+                }}
                 className="text-[10px] px-1.5 py-0.5 rounded"
                 style={{ color: "var(--red)" }}
               >

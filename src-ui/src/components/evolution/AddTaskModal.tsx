@@ -18,9 +18,13 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
       aria-modal="true"
       aria-label="添加任务"
       style={{
-        position: "fixed", inset: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)",
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0, 0, 0, 0.6)",
+        backdropFilter: "blur(4px)",
         zIndex: 50,
       }}
       onClick={onClose}
@@ -28,8 +32,13 @@ export function AddTaskModal({ open, onClose, onSubmit, defaultPriority = 5, def
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--bg-secondary)", border: "1px solid var(--border)",
-          borderRadius: "12px", padding: "24px", minWidth: "min(340px, calc(100vw - 32px))", maxWidth: "480px", width: "90%",
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          borderRadius: "12px",
+          padding: "24px",
+          minWidth: "min(340px, calc(100vw - 32px))",
+          maxWidth: "480px",
+          width: "90%",
           animation: "slideUp 0.2s ease-out",
         }}
       >

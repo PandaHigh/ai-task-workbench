@@ -109,8 +109,16 @@ export class MasterAgent {
         maxTurns: 2,
         systemPrompt,
         disallowedTools: [
-          "AskUserQuestion", "Bash", "Read", "Write", "Edit",
-          "Glob", "Grep", "WebSearch", "WebFetch", "Agent",
+          "AskUserQuestion",
+          "Bash",
+          "Read",
+          "Write",
+          "Edit",
+          "Glob",
+          "Grep",
+          "WebSearch",
+          "WebFetch",
+          "Agent",
         ],
       });
 
@@ -195,9 +203,7 @@ export class MasterAgent {
   private buildPrompt(session: MasterSession): string {
     const windowSize = session.brainstormState ? 12 : 20;
     const recentMessages = session.messages.slice(-windowSize);
-    const conversation = recentMessages
-      .map((m) => `${m.role === "user" ? "用户" : "助手"}: ${m.content}`)
-      .join("\n\n");
+    const conversation = recentMessages.map((m) => `${m.role === "user" ? "用户" : "助手"}: ${m.content}`).join("\n\n");
     return `对话历史：\n${conversation}\n\n请继续对话：`;
   }
 
@@ -211,7 +217,9 @@ export class MasterAgent {
         if (typeof parsed.method === "string") {
           calls.push({ method: parsed.method, params: parsed.params ?? {} });
         }
-      } catch { /* skip malformed JSON */ }
+      } catch {
+        /* skip malformed JSON */
+      }
     }
     return calls;
   }
@@ -240,7 +248,10 @@ export class MasterAgent {
     return "";
   }
 
-  private async executeToolCall(call: { method: string; params: Record<string, unknown> }): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  private async executeToolCall(call: {
+    method: string;
+    params: Record<string, unknown>;
+  }): Promise<{ success: boolean; data?: unknown; error?: string }> {
     const handler = methodHandlers[call.method];
     if (!handler) {
       return { success: false, error: `Unknown method: ${call.method}` };

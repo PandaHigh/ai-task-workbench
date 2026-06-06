@@ -73,7 +73,13 @@ export async function runRalplan(
     try {
       plan = JSON.parse(extractJson(draftResult.result)) as ExecutionPlan;
     } catch {
-      plan = { understanding: task.content, steps: [task.content], targetFiles: [], risks: ["Failed to parse plan"], testStrategy: "manual" };
+      plan = {
+        understanding: task.content,
+        steps: [task.content],
+        targetFiles: [],
+        risks: ["Failed to parse plan"],
+        testStrategy: "manual",
+      };
     }
 
     // Step 2: Architect review
@@ -152,7 +158,13 @@ export async function runRalplan(
   const consensusReached = architectVerdict.approved && criticVerdict.approved;
 
   return {
-    plan: plan ?? { understanding: task.content, steps: [task.content], targetFiles: [], risks: [], testStrategy: "manual" },
+    plan: plan ?? {
+      understanding: task.content,
+      steps: [task.content],
+      targetFiles: [],
+      risks: [],
+      testStrategy: "manual",
+    },
     architectVerdict,
     criticVerdict,
     iterations,

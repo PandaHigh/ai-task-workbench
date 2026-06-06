@@ -13,10 +13,7 @@ export type ComplexityLevel = "simple" | "moderate" | "complex" | "massive";
 
 // ─── 执行策略 ────────────────────────────────────────────────────────────
 
-export type ExecutionStrategy =
-  | { type: "direct" }
-  | { type: "builtin"; templateName: string }
-  | { type: "dynamic" };
+export type ExecutionStrategy = { type: "direct" } | { type: "builtin"; templateName: string } | { type: "dynamic" };
 
 // ─── 复杂度评估结果 ──────────────────────────────────────────────────────
 

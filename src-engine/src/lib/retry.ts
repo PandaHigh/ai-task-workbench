@@ -14,10 +14,7 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
   shouldRetry: () => true,
 };
 
-export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  options?: RetryOptions,
-): Promise<T> {
+export async function retryWithBackoff<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
   const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
   let lastError: unknown;
 
@@ -29,10 +26,7 @@ export async function retryWithBackoff<T>(
       if (attempt >= opts.maxAttempts || !opts.shouldRetry(err)) {
         throw err;
       }
-      const delay = Math.min(
-        opts.initialDelayMs * Math.pow(opts.backoffFactor, attempt - 1),
-        opts.maxDelayMs,
-      );
+      const delay = Math.min(opts.initialDelayMs * Math.pow(opts.backoffFactor, attempt - 1), opts.maxDelayMs);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

@@ -53,7 +53,11 @@ describe("task-store", () => {
 
   it("should set loading during loadTasks", async () => {
     let resolveLoad: (v: unknown) => void;
-    (engineClient.call as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+    (engineClient.call as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise((r) => {
+        resolveLoad = r;
+      }),
+    );
     const p = useTaskStore.getState().loadTasks();
     expect(useTaskStore.getState().loading).toBe(true);
     resolveLoad!([]);

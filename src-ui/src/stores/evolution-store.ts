@@ -50,8 +50,7 @@ export const useEvolutionStore = create<EvolutionStore>((set) => ({
     set((state) => ({
       activeTaskIds: state.activeTaskIds.filter((tid) => tid !== id),
     })),
-  addLog: (log) =>
-    set((state) => ({ logs: [...state.logs, { ...log, id: _nextLogId++ }].slice(-1000) })),
+  addLog: (log) => set((state) => ({ logs: [...state.logs, { ...log, id: _nextLogId++ }].slice(-1000) })),
   setLogs: (logs) => set({ logs: logs.slice(-1000) }),
   setCommits: (commits) => set({ commits }),
   setLessons: (lessons) => set({ lessons }),

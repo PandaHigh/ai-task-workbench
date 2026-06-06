@@ -2,7 +2,10 @@
  * Strip markdown fences and find balanced-bracket JSON in LLM output.
  */
 export function extractJson(text: string): string {
-  let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+  let cleaned = text
+    .replace(/```(?:json)?\s*/gi, "")
+    .replace(/```/g, "")
+    .trim();
 
   // Strip common non-JSON prefixes (e.g. "Here is the plan:\n")
   const jsonStart = Math.min(
@@ -13,14 +16,22 @@ export function extractJson(text: string): string {
     cleaned = cleaned.substring(jsonStart);
   }
 
-  try { JSON.parse(cleaned); return cleaned; } catch { /* not pure JSON */ }
+  try {
+    JSON.parse(cleaned);
+    return cleaned;
+  } catch {
+    /* not pure JSON */
+  }
 
   const balanced = findBalancedJson(cleaned);
   return balanced || cleaned;
 }
 
 export function parseJsonOrThrow<T>(text: string): T {
-  let cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+  let cleaned = text
+    .replace(/```(?:json)?\s*/gi, "")
+    .replace(/```/g, "")
+    .trim();
 
   const jsonStart = Math.min(
     cleaned.indexOf("{") === -1 ? Infinity : cleaned.indexOf("{"),
@@ -30,7 +41,11 @@ export function parseJsonOrThrow<T>(text: string): T {
     cleaned = cleaned.substring(jsonStart);
   }
 
-  try { return JSON.parse(cleaned) as T; } catch { /* try balanced */ }
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    /* try balanced */
+  }
 
   const balanced = findBalancedJson(cleaned);
   if (balanced) {
@@ -49,15 +64,29 @@ function findBalancedJson(text: string): string | null {
     let escape = false;
     for (let i = startIdx; i < text.length; i++) {
       const ch = text[i];
-      if (escape) { escape = false; continue; }
-      if (ch === "\\") { escape = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
       if (inString) continue;
       if (ch === open) depth++;
       if (ch === close) depth--;
       if (depth === 0) {
         const candidate = text.substring(startIdx, i + 1);
-        try { JSON.parse(candidate); return candidate; } catch { return null; }
+        try {
+          JSON.parse(candidate);
+          return candidate;
+        } catch {
+          return null;
+        }
       }
     }
     return null;

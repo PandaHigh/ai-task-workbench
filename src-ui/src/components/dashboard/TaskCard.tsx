@@ -13,15 +13,15 @@ interface TaskCardProps {
 }
 
 const STATUS_CFG: Record<string, { color: string; label: string; mood: RobotMood }> = {
-  idle:      { color: "var(--text-secondary)", label: "准备中", mood: "idle" },
-  running:   { color: "var(--blue-light)",     label: "工作中", mood: "working" },
-  paused:    { color: "var(--yellow)",          label: "已暂停", mood: "thinking" },
-  scoring:   { color: "var(--purple)",          label: "评分中", mood: "thinking" },
-  completed: { color: "var(--green)",           label: "已完成", mood: "celebrating" },
-  failed:    { color: "var(--red)",             label: "出错了", mood: "error" },
-  reverted:  { color: "var(--orange)",          label: "已回退", mood: "error" },
-  cancelled: { color: "var(--text-tertiary)",   label: "已取消", mood: "idle" },
-  skipped:   { color: "var(--gray)",            label: "已跳过", mood: "idle" },
+  idle: { color: "var(--text-secondary)", label: "准备中", mood: "idle" },
+  running: { color: "var(--blue-light)", label: "工作中", mood: "working" },
+  paused: { color: "var(--yellow)", label: "已暂停", mood: "thinking" },
+  scoring: { color: "var(--purple)", label: "评分中", mood: "thinking" },
+  completed: { color: "var(--green)", label: "已完成", mood: "celebrating" },
+  failed: { color: "var(--red)", label: "出错了", mood: "error" },
+  reverted: { color: "var(--orange)", label: "已回退", mood: "error" },
+  cancelled: { color: "var(--text-tertiary)", label: "已取消", mood: "idle" },
+  skipped: { color: "var(--gray)", label: "已跳过", mood: "idle" },
 };
 
 export function TaskCard({ task, onDelete }: TaskCardProps) {
@@ -40,9 +40,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
     return () => clearInterval(timer);
   }, [isRunning]);
 
-  const elapsed = task.startedAt
-    ? formatDuration((task.completedAt || now) - task.startedAt)
-    : "未开始";
+  const elapsed = task.startedAt ? formatDuration((task.completedAt || now) - task.startedAt) : "未开始";
 
   const handleDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
@@ -66,7 +64,10 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
       >
         <div className="task-card-inner">
           {/* Left: Pixel robot */}
-          <div className="flex-shrink-0 flex items-center justify-center w-14 border-r" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="flex-shrink-0 flex items-center justify-center w-14 border-r"
+            style={{ borderColor: "var(--border)" }}
+          >
             <RobotMascot mood={cfg.mood} size={36} />
           </div>
 
@@ -74,10 +75,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
           <div className="flex-1 p-3 flex flex-col min-w-0">
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
-              <span
-                className="status-badge"
-                style={{ background: `${cfg.color}15`, color: cfg.color }}
-              >
+              <span className="status-badge" style={{ background: `${cfg.color}15`, color: cfg.color }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
                 {cfg.label}
               </span>
@@ -94,13 +92,24 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
                   {elapsed}
                 </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(true);
+                  }}
                   className="w-5 h-5 rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 max-md:opacity-50 transition-opacity delete-btn"
                   style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                   title="删除"
                   aria-label="删除任务"
                 >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  >
                     <line x1="2" y1="2" x2="8" y2="8" />
                     <line x1="8" y1="2" x2="2" y2="8" />
                   </svg>
@@ -114,13 +123,20 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
             </p>
 
             {/* Footer */}
-            <div className="mt-auto text-xs flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
+            <div
+              className="mt-auto text-xs flex items-center justify-between"
+              style={{ color: "var(--text-secondary)" }}
+            >
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="truncate">{(task.workingDir || "").split("/").pop()}</span>
-                <span>已完成 {task.totalTasksCompleted}/{Math.max(task.totalTasksCompleted, task.goals.length)} 项</span>
+                <span>
+                  已完成 {task.totalTasksCompleted}/{Math.max(task.totalTasksCompleted, task.goals.length)} 项
+                </span>
               </div>
               {task.totalCostUsd > 0 && (
-                <span className="text-xs" style={{ color: "var(--text-secondary)" }}>${task.totalCostUsd.toFixed(2)}</span>
+                <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  ${task.totalCostUsd.toFixed(2)}
+                </span>
               )}
             </div>
           </div>

@@ -33,7 +33,11 @@ export class WorktreeManager {
       await git.raw(["worktree", "remove", worktreePath, "--force"]);
     } catch {
       // If worktree removal fails, try pruning
-      try { await git.raw(["worktree", "prune"]); } catch { /* ignore */ }
+      try {
+        await git.raw(["worktree", "prune"]);
+      } catch {
+        /* ignore */
+      }
     }
 
     // Delete the branch

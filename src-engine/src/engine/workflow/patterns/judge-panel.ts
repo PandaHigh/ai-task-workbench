@@ -57,10 +57,7 @@ export class JudgePanel {
   /**
    * 对多个方案进行独立评审并打分，返回综合排名。
    */
-  async evaluate(
-    options: PanelOption[],
-    opts: JudgePanelOptions,
-  ): Promise<PanelVerdict> {
+  async evaluate(options: PanelOption[], opts: JudgePanelOptions): Promise<PanelVerdict> {
     const judgeCount = opts.judgeCount ?? 3;
     const roleName = opts.judgeRole ?? "architect";
     const dimensions = opts.dimensions ?? ["correctness", "completeness", "quality", "maintainability"];
@@ -76,7 +73,7 @@ export class JudgePanel {
       const scores: Score[] = [];
 
       const judgePromises = Array.from({ length: judgeCount }, (_, i) =>
-        this.runJudge(`judge-${i + 1}`, role, option, dimensions, opts.workingDir)
+        this.runJudge(`judge-${i + 1}`, role, option, dimensions, opts.workingDir),
       );
       const judgeResults = await Promise.all(judgePromises);
       scores.push(...judgeResults);
@@ -85,9 +82,7 @@ export class JudgePanel {
       const aggregatedDimensions: Record<string, number> = {};
       for (const dim of dimensions) {
         const dimScores = scores.map((s) => s.dimensions[dim] ?? 0).filter((s) => s > 0);
-        aggregatedDimensions[dim] = dimScores.length > 0
-          ? dimScores.reduce((a, b) => a + b, 0) / dimScores.length
-          : 0;
+        aggregatedDimensions[dim] = dimScores.length > 0 ? dimScores.reduce((a, b) => a + b, 0) / dimScores.length : 0;
       }
       const overall = Object.values(aggregatedDimensions).reduce((a, b) => a + b, 0) / dimensions.length;
 
@@ -104,11 +99,12 @@ export class JudgePanel {
 
     // 排名
     judgedOptions.sort((a, b) => b.score.overall - a.score.overall);
-    judgedOptions.forEach((opt, i) => { opt.rank = i + 1; });
+    judgedOptions.forEach((opt, i) => {
+      opt.rank = i + 1;
+    });
 
-    const consensusScore = judgedOptions.length > 0
-      ? judgedOptions.reduce((sum, o) => sum + o.score.overall, 0) / judgedOptions.length
-      : 0;
+    const consensusScore =
+      judgedOptions.length > 0 ? judgedOptions.reduce((sum, o) => sum + o.score.overall, 0) / judgedOptions.length : 0;
 
     return {
       winner: judgedOptions[0],

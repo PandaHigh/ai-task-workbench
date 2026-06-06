@@ -47,9 +47,7 @@ export function PluginManager() {
       const result = await call("plugin.list", {});
       setPlugins((result as PluginEntry[]) || []);
     } catch (err) {
-      toast.error(
-        `加载插件列表失败: ${err instanceof Error ? err.message : err}`,
-      );
+      toast.error(`加载插件列表失败: ${err instanceof Error ? err.message : err}`);
     } finally {
       setLoading(false);
     }
@@ -83,9 +81,7 @@ export function PluginManager() {
       setShowAdd(false);
       await loadPlugins();
     } catch (err) {
-      toast.error(
-        `添加失败: ${err instanceof Error ? err.message : err}`,
-      );
+      toast.error(`添加失败: ${err instanceof Error ? err.message : err}`);
     } finally {
       setAdding(false);
     }
@@ -99,9 +95,7 @@ export function PluginManager() {
       setConfirmDelete(null);
       await loadPlugins();
     } catch (err) {
-      toast.error(
-        `删除失败: ${err instanceof Error ? err.message : err}`,
-      );
+      toast.error(`删除失败: ${err instanceof Error ? err.message : err}`);
     } finally {
       setDeleting(null);
     }
@@ -113,9 +107,7 @@ export function PluginManager() {
       await call("plugin.toggle", { id: plugin.id, enabled: !plugin.enabled });
       await loadPlugins();
     } catch (err) {
-      toast.error(
-        `切换失败: ${err instanceof Error ? err.message : err}`,
-      );
+      toast.error(`切换失败: ${err instanceof Error ? err.message : err}`);
     } finally {
       setToggling(null);
     }
@@ -151,11 +143,7 @@ export function PluginManager() {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="glass-card p-3 animate-pulse"
-            style={{ height: 48 }}
-          />
+          <div key={i} className="glass-card p-3 animate-pulse" style={{ height: 48 }} />
         ))}
       </div>
     );
@@ -166,10 +154,7 @@ export function PluginManager() {
       {/* Plugin list */}
       <div className="glass-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3
-            className="text-xs font-bold"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>
             MCP Server 插件 ({plugins.length})
           </h3>
           <button
@@ -184,10 +169,7 @@ export function PluginManager() {
 
         {/* Add form */}
         {showAdd && (
-          <div
-            className="mb-3 p-3 rounded space-y-2"
-            style={{ background: "var(--bg-tertiary)" }}
-          >
+          <div className="mb-3 p-3 rounded space-y-2" style={{ background: "var(--bg-tertiary)" }}>
             <input
               type="text"
               placeholder="插件名称 (例如: my-mcp-server)"
@@ -237,17 +219,11 @@ export function PluginManager() {
 
         {/* Empty state */}
         {plugins.length === 0 ? (
-          <div
-            className="text-center py-4"
-            style={{ border: "1px dashed var(--border)", borderRadius: 8 }}
-          >
+          <div className="text-center py-4" style={{ border: "1px dashed var(--border)", borderRadius: 8 }}>
             <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               暂无 MCP Server 插件
             </p>
-            <p
-              className="text-[10px] mt-1"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
               点击上方"添加插件"按钮安装 MCP Server
             </p>
           </div>
@@ -267,40 +243,25 @@ export function PluginManager() {
                       style={{ background: statusColor(plugin.status) }}
                       title={statusLabel(plugin.status)}
                     />
-                    <span
-                      className="text-xs font-semibold truncate"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <span className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                       {plugin.name}
                     </span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
                       style={{
-                        background:
-                          plugin.status === "running"
-                            ? "var(--green)"
-                            : "var(--border)",
-                        color:
-                          plugin.status === "running"
-                            ? "#fff"
-                            : "var(--text-secondary)",
+                        background: plugin.status === "running" ? "var(--green)" : "var(--border)",
+                        color: plugin.status === "running" ? "#fff" : "var(--text-secondary)",
                         opacity: plugin.status === "running" ? 0.8 : 1,
                       }}
                     >
                       {statusLabel(plugin.status)}
                     </span>
                   </div>
-                  <p
-                    className="text-[10px] mt-0.5 truncate"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-secondary)" }}>
                     {plugin.config.command} {plugin.config.args.join(" ")}
                   </p>
                   {plugin.error && (
-                    <p
-                      className="text-[10px] mt-0.5 truncate"
-                      style={{ color: "var(--red)" }}
-                    >
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--red)" }}>
                       {plugin.error}
                     </p>
                   )}
@@ -313,17 +274,11 @@ export function PluginManager() {
                     disabled={toggling === plugin.id}
                     className="px-2 py-0.5 rounded text-[10px] font-semibold disabled:opacity-40"
                     style={{
-                      background: plugin.enabled
-                        ? "var(--green)"
-                        : "var(--border)",
+                      background: plugin.enabled ? "var(--green)" : "var(--border)",
                       color: plugin.enabled ? "#fff" : "var(--text-secondary)",
                     }}
                   >
-                    {toggling === plugin.id
-                      ? "..."
-                      : plugin.enabled
-                        ? "已启用"
-                        : "已禁用"}
+                    {toggling === plugin.id ? "..." : plugin.enabled ? "已启用" : "已禁用"}
                   </button>
 
                   {/* Delete button */}

@@ -44,10 +44,17 @@ Risks: ${plan.risks.join("; ")}`);
   }
 
   if (context.lessonsLearned.length > 0) {
-    parts.push(`## Lessons Learned\n${context.lessonsLearned.slice(-5).map((l) => `- [${l.category}] ${l.lesson}`).join("\n")}`);
+    parts.push(
+      `## Lessons Learned\n${context.lessonsLearned
+        .slice(-5)
+        .map((l) => `- [${l.category}] ${l.lesson}`)
+        .join("\n")}`,
+    );
   }
 
-  parts.push("## Instructions\nImplement the task following the execution plan. Make focused, minimal changes. Follow the project's existing code patterns.");
+  parts.push(
+    "## Instructions\nImplement the task following the execution plan. Make focused, minimal changes. Follow the project's existing code patterns.",
+  );
 
   notify("task.progress", {
     taskId: task.id,
@@ -59,7 +66,8 @@ Risks: ${plan.risks.join("; ")}`);
     workingDir,
     timeoutMinutes: task.timeoutMinutes || 30,
     maxTurns: role.maxTurns,
-    systemPrompt: "You are a skilled software developer. Implement the assigned task with high quality code. Write clean, idiomatic code following the project's existing patterns. Make focused, minimal changes.",
+    systemPrompt:
+      "You are a skilled software developer. Implement the assigned task with high quality code. Write clean, idiomatic code following the project's existing patterns. Make focused, minimal changes.",
     allowedTools: role.tools,
     abortSignal,
   });
@@ -68,7 +76,8 @@ Risks: ${plan.risks.join("; ")}`);
   let diffSummary = "";
   try {
     const { execFileSync } = await import("child_process");
-    diffSummary = execFileSync("git", ["diff", "--stat"], { cwd: workingDir, encoding: "utf-8" }) || "No changes detected";
+    diffSummary =
+      execFileSync("git", ["diff", "--stat"], { cwd: workingDir, encoding: "utf-8" }) || "No changes detected";
   } catch {
     diffSummary = "Changes made (diff unavailable)";
   }

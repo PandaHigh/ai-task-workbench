@@ -13,10 +13,13 @@ export function Sidebar() {
   const { isDesktop, restarting, restartEngine } = useDesktopEngine();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleNav = useCallback((path: string) => {
-    navigate(path);
-    setMobileOpen(false);
-  }, [navigate]);
+  const handleNav = useCallback(
+    (path: string) => {
+      navigate(path);
+      setMobileOpen(false);
+    },
+    [navigate],
+  );
 
   const isAssistant = location.pathname === "/";
   const isSettings = location.pathname.startsWith("/settings");
@@ -31,7 +34,15 @@ export function Sidebar() {
         aria-label={mobileOpen ? "关闭导航菜单" : "打开导航菜单"}
         aria-expanded={mobileOpen}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="var(--text-secondary)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
           {mobileOpen ? (
             <>
               <line x1="4" y1="4" x2="12" y2="12" />
@@ -90,11 +101,29 @@ export function Sidebar() {
                 title={theme === "light" ? "深色模式" : "浅色模式"}
               >
                 {theme === "light" ? (
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="var(--text-secondary)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M14 8.5A6.5 6.5 0 117.5 2a5 5 0 006.5 6.5z" />
                   </svg>
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--yellow)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="var(--yellow)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <circle cx="8" cy="8" r="3.5" />
                     <line x1="8" y1="1" x2="8" y2="3" />
                     <line x1="8" y1="13" x2="8" y2="15" />
@@ -113,7 +142,15 @@ export function Sidebar() {
                 style={{ color: "var(--text-secondary)" }}
                 aria-label="关闭导航"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                >
                   <line x1="3" y1="3" x2="11" y2="11" />
                   <line x1="11" y1="3" x2="3" y2="11" />
                 </svg>
@@ -132,7 +169,16 @@ export function Sidebar() {
             className={`nav-item ${isAssistant ? "active" : ""}`}
           >
             <span className="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M14 10c0 .6-.4 1-1 1H5l-3 3V3c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v7z" />
               </svg>
             </span>
@@ -147,7 +193,16 @@ export function Sidebar() {
             className={`nav-item ${isSettings ? "active" : ""}`}
           >
             <span className="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="8" cy="8" r="2.5" />
                 <path d="M13.3 10a1.2 1.2 0 00.2 1.3l.1.1a1.45 1.45 0 11-2.05 2.05l-.1-.1a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.73 1.1v.3a1.45 1.45 0 11-2.9 0v-.15a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.1.1a1.45 1.45 0 11-2.05-2.05l.1-.1a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.73h-.3a1.45 1.45 0 110-2.9h.15a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.1-.1A1.45 1.45 0 114.45 2.7l.1.1a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.73-1.1v-.3a1.45 1.45 0 012.9 0v.15a1.2 1.2 0 00.73 1.1 1.2 1.2 0 001.3-.2l.1-.1a1.45 1.45 0 112.05 2.05l-.1.1a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.73h.3a1.45 1.45 0 010 2.9h-.15a1.2 1.2 0 00-1.1.73z" />
               </svg>

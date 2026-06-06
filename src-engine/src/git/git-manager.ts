@@ -31,9 +31,7 @@ export class GitManager {
     await this.git.add("-A");
 
     const shortId = taskId.substring(0, 6);
-    const summary = taskContent.length > 50
-      ? taskContent.substring(0, 47) + "..."
-      : taskContent;
+    const summary = taskContent.length > 50 ? taskContent.substring(0, 47) + "..." : taskContent;
     const message = `[${shortId}] ${summary} #AI commit#`;
 
     const result = await this.git.commit(message);
@@ -45,7 +43,11 @@ export class GitManager {
       await this.git.revert(commitHash);
     } catch (err) {
       // If revert has conflicts, abort it
-      try { await this.git.raw(["revert", "--abort"]); } catch (abortErr) { console.warn("[git] revert --abort also failed:", abortErr instanceof Error ? abortErr.message : abortErr); }
+      try {
+        await this.git.raw(["revert", "--abort"]);
+      } catch (abortErr) {
+        console.warn("[git] revert --abort also failed:", abortErr instanceof Error ? abortErr.message : abortErr);
+      }
       throw err;
     }
   }
@@ -63,12 +65,14 @@ export class GitManager {
     }
   }
 
-  async getLastNCommits(n: number): Promise<Array<{
-    hash: string;
-    message: string;
-    date: string;
-    isAiCommit: boolean;
-  }>> {
+  async getLastNCommits(n: number): Promise<
+    Array<{
+      hash: string;
+      message: string;
+      date: string;
+      isAiCommit: boolean;
+    }>
+  > {
     const log = await this.git.log([`-n`, String(n)]);
     return log.all.map((entry) => ({
       hash: entry.hash,
@@ -104,17 +108,24 @@ export class GitManager {
         linesChanged += (textFile.insertions ?? 0) + (textFile.deletions ?? 0);
       }
       const criticalPatterns = [
-        "package.json", "tsconfig", "docker-compose", "Dockerfile",
-        ".env", "config/", "build/", "deploy/", "Makefile",
+        "package.json",
+        "tsconfig",
+        "docker-compose",
+        "Dockerfile",
+        ".env",
+        "config/",
+        "build/",
+        "deploy/",
+        "Makefile",
       ];
       const hasCriticalFiles = files.some((f) => {
         const file = (f as { file?: string }).file ?? "";
         return criticalPatterns.some((p) => file.includes(p));
       });
       return { filesChanged: files.length, linesChanged, hasCriticalFiles };
-    } catch (err) { console.warn("[git] Diff stats failed:", errorToMessage(err));
+    } catch (err) {
+      console.warn("[git] Diff stats failed:", errorToMessage(err));
       return { filesChanged: 0, linesChanged: 0, hasCriticalFiles: false };
     }
   }
-
 }

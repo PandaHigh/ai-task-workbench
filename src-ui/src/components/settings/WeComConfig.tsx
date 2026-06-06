@@ -53,7 +53,9 @@ export function WeComConfig() {
       setLoaded(true);
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [connected]);
 
   const refreshStatus = async () => {
@@ -101,18 +103,32 @@ export function WeComConfig() {
   return (
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>企业微信机器人</h3>
+        <h3 className="text-xs font-bold" style={{ color: "var(--text-secondary)" }}>
+          企业微信机器人
+        </h3>
         <div className="flex items-center gap-2">
           {status && (
-            <span className="flex items-center gap-1 text-[10px]" style={{ color: status.connected ? "var(--green)" : "var(--text-secondary)" }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: status.connected ? "var(--green)" : "var(--text-secondary)" }} />
+            <span
+              className="flex items-center gap-1 text-[10px]"
+              style={{ color: status.connected ? "var(--green)" : "var(--text-secondary)" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: status.connected ? "var(--green)" : "var(--text-secondary)" }}
+              />
               {status.connected ? "已连接" : status.enabled ? "未连接" : "未启用"}
             </span>
           )}
           <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
-              className="w-3.5 h-3.5 rounded" />
-            <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>启用</span>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+              className="w-3.5 h-3.5 rounded"
+            />
+            <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
+              启用
+            </span>
           </label>
         </div>
       </div>
@@ -122,8 +138,13 @@ export function WeComConfig() {
       </p>
 
       <div>
-        <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>Bot ID</label>
-        <input type="text" value={botId} onChange={(e) => setBotId(e.target.value)}
+        <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+          Bot ID
+        </label>
+        <input
+          type="text"
+          value={botId}
+          onChange={(e) => setBotId(e.target.value)}
           placeholder="企业微信后台 → 智能机器人 → API Mode"
           className="w-full px-3 py-1.5 rounded text-xs outline-none"
           style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
@@ -131,8 +152,13 @@ export function WeComConfig() {
       </div>
 
       <div>
-        <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>Secret</label>
-        <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)}
+        <label className="text-[10px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+          Secret
+        </label>
+        <input
+          type="password"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
           placeholder="长连接专用密钥"
           className="w-full px-3 py-1.5 rounded text-xs outline-none"
           style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
@@ -140,21 +166,38 @@ export function WeComConfig() {
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={handleSave} disabled={saving}
+        <button
+          onClick={handleSave}
+          disabled={saving}
           className="px-4 py-1.5 rounded text-xs font-semibold disabled:opacity-40"
-          style={{ background: "var(--blue)", color: "#fff" }}>
+          style={{ background: "var(--blue)", color: "#fff" }}
+        >
           {saving ? "保存中..." : "保存配置"}
         </button>
 
         <div className="flex items-center gap-1 ml-auto">
-          <input type="text" value={testTarget} onChange={(e) => setTestTarget(e.target.value)}
+          <input
+            type="text"
+            value={testTarget}
+            onChange={(e) => setTestTarget(e.target.value)}
             placeholder="用户ID或群聊ID"
             className="w-32 px-2 py-1.5 rounded text-[10px] outline-none"
-            style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
           />
-          <button onClick={handleTest} disabled={testing || !status?.connected}
+          <button
+            onClick={handleTest}
+            disabled={testing || !status?.connected}
             className="px-3 py-1.5 rounded text-[10px] font-semibold disabled:opacity-40"
-            style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+            style={{
+              background: "var(--bg-tertiary)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+            }}
+          >
             {testing ? "发送中..." : "测试"}
           </button>
         </div>

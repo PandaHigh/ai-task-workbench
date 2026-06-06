@@ -29,8 +29,8 @@ const TEAM_TRANSITIONS: Record<TeamStage, TeamStage[]> = {
   "team-exec": ["team-verify"],
   "team-verify": ["team-fix", "complete", "failed"],
   "team-fix": ["team-exec", "team-verify", "complete", "failed"],
-  "complete": [],
-  "failed": [],
+  complete: [],
+  failed: [],
 };
 
 export interface TeamConfig {
@@ -78,18 +78,18 @@ export class OmxAmpTeamOrchestrator {
     try {
       // Phase: team-plan — analyze tasks and create execution plan
       this.state.phase = "team-plan";
-      this.notify("log.entry", { level: "info", source: "engine", message: `[team] Phase: team-plan (${tasks.length} tasks)` });
+      this.notify("log.entry", {
+        level: "info",
+        source: "engine",
+        message: `[team] Phase: team-plan (${tasks.length} tasks)`,
+      });
 
-      const planResult = await this.runTeamPhaseWithCC(
-        "team-plan", tasks, run, context, abortSignal,
-      );
+      const planResult = await this.runTeamPhaseWithCC("team-plan", tasks, run, context, abortSignal);
       totalCost += planResult.totalCostUsd;
 
       // Phase: team-prd — generate task specifications
       this.transitionTo("team-prd");
-      const prdResult = await this.runTeamPhaseWithCC(
-        "team-prd", tasks, run, context, abortSignal,
-      );
+      const prdResult = await this.runTeamPhaseWithCC("team-prd", tasks, run, context, abortSignal);
       totalCost += prdResult.totalCostUsd;
 
       // Phase: team-exec — parallel execution via workers
@@ -125,7 +125,7 @@ export class OmxAmpTeamOrchestrator {
 
         const dispatchPromise = workerManager.dispatch(workerId, assignment);
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Task ${task.id.substring(0, 6)} timed out`)), TASK_TIMEOUT_MS)
+          setTimeout(() => reject(new Error(`Task ${task.id.substring(0, 6)} timed out`)), TASK_TIMEOUT_MS),
         );
 
         dispatchPromises.push(
@@ -189,7 +189,11 @@ export class OmxAmpTeamOrchestrator {
   private transitionTo(phase: TeamStage): void {
     const allowed = TEAM_TRANSITIONS[this.state.phase];
     if (!allowed?.includes(phase) && phase !== "complete" && phase !== "failed") {
-      this.notify("log.entry", { level: "warn", source: "engine", message: `[team] Invalid transition: ${this.state.phase} -> ${phase}` });
+      this.notify("log.entry", {
+        level: "warn",
+        source: "engine",
+        message: `[team] Invalid transition: ${this.state.phase} -> ${phase}`,
+      });
     }
     this.state.phase = phase;
   }

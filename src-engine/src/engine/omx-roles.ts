@@ -40,39 +40,237 @@ export const MODEL_CLASS_MAP: Record<ModelClass, string> = {
 
 const ROLES: OmxAmpRole[] = [
   // ── Build lane ──
-  { id: "explore", name: "Explorer", description: "Discovers project structure, dependencies, and conventions.", posture: "analytical", modelClass: "fast", routingRole: "specialist", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 10, category: "research" },
-  { id: "analyst", name: "Analyst", description: "Analyzes requirements, maps dependencies, identifies risks.", posture: "analytical", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "planning" },
-  { id: "planner", name: "Planner", description: "Creates concrete execution plans from task descriptions.", posture: "constructive", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "planning" },
-  { id: "architect", name: "Architect", description: "Reviews technical designs, validates architecture decisions.", posture: "analytical", modelClass: "frontier", routingRole: "reviewer", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "planning" },
-  { id: "debugger", name: "Debugger", description: "Diagnoses and fixes bugs through systematic investigation.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "execution" },
-  { id: "executor", name: "Executor", description: "Implements code changes following execution plans.", posture: "constructive", modelClass: "standard", routingRole: "worker", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 40, category: "execution" },
-  { id: "verifier", name: "Verifier", description: "Verifies implementation correctness against specifications.", posture: "analytical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 20, category: "review" },
+  {
+    id: "explore",
+    name: "Explorer",
+    description: "Discovers project structure, dependencies, and conventions.",
+    posture: "analytical",
+    modelClass: "fast",
+    routingRole: "specialist",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 10,
+    category: "research",
+  },
+  {
+    id: "analyst",
+    name: "Analyst",
+    description: "Analyzes requirements, maps dependencies, identifies risks.",
+    posture: "analytical",
+    modelClass: "standard",
+    routingRole: "coordinator",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "planning",
+  },
+  {
+    id: "planner",
+    name: "Planner",
+    description: "Creates concrete execution plans from task descriptions.",
+    posture: "constructive",
+    modelClass: "standard",
+    routingRole: "coordinator",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "planning",
+  },
+  {
+    id: "architect",
+    name: "Architect",
+    description: "Reviews technical designs, validates architecture decisions.",
+    posture: "analytical",
+    modelClass: "frontier",
+    routingRole: "reviewer",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "planning",
+  },
+  {
+    id: "debugger",
+    name: "Debugger",
+    description: "Diagnoses and fixes bugs through systematic investigation.",
+    posture: "analytical",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 25,
+    category: "execution",
+  },
+  {
+    id: "executor",
+    name: "Executor",
+    description: "Implements code changes following execution plans.",
+    posture: "constructive",
+    modelClass: "standard",
+    routingRole: "worker",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 40,
+    category: "execution",
+  },
+  {
+    id: "verifier",
+    name: "Verifier",
+    description: "Verifies implementation correctness against specifications.",
+    posture: "analytical",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Bash", "Glob", "Grep"],
+    maxTurns: 20,
+    category: "review",
+  },
 
   // ── Review lane ──
-  { id: "quality-reviewer", name: "Quality Reviewer", description: "Reviews code quality, patterns, and maintainability.", posture: "critical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 15, category: "review" },
-  { id: "security-reviewer", name: "Security Reviewer", description: "Reviews for security vulnerabilities and compliance.", posture: "adversarial", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 15, category: "review" },
-  { id: "code-reviewer", name: "Code Reviewer", description: "General code review for correctness and completeness.", posture: "critical", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 20, category: "review" },
+  {
+    id: "quality-reviewer",
+    name: "Quality Reviewer",
+    description: "Reviews code quality, patterns, and maintainability.",
+    posture: "critical",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Bash", "Glob", "Grep"],
+    maxTurns: 15,
+    category: "review",
+  },
+  {
+    id: "security-reviewer",
+    name: "Security Reviewer",
+    description: "Reviews for security vulnerabilities and compliance.",
+    posture: "adversarial",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Bash", "Glob", "Grep"],
+    maxTurns: 15,
+    category: "review",
+  },
+  {
+    id: "code-reviewer",
+    name: "Code Reviewer",
+    description: "General code review for correctness and completeness.",
+    posture: "critical",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Bash", "Glob", "Grep"],
+    maxTurns: 20,
+    category: "review",
+  },
 
   // ── Domain lane ──
-  { id: "test-engineer", name: "Test Engineer", description: "Designs and implements test strategies and test suites.", posture: "constructive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "execution" },
-  { id: "designer", name: "Designer", description: "Implements UI/UX changes following design specifications.", posture: "creative", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 30, category: "execution" },
-  { id: "qa-tester", name: "QA Tester", description: "End-to-end testing and user-facing quality assurance.", posture: "adversarial", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25, category: "review" },
-  { id: "git-master", name: "Git Master", description: "Manages git operations, branches, merges, and conflict resolution.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 15, category: "execution" },
-  { id: "code-simplifier", name: "Code Simplifier", description: "Simplifies and refactors code for clarity and maintainability.", posture: "analytical", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 20, category: "execution" },
-  { id: "researcher", name: "Researcher", description: "Investigates technologies, libraries, and best practices.", posture: "inquisitive", modelClass: "standard", routingRole: "specialist", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "research" },
+  {
+    id: "test-engineer",
+    name: "Test Engineer",
+    description: "Designs and implements test strategies and test suites.",
+    posture: "constructive",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 25,
+    category: "execution",
+  },
+  {
+    id: "designer",
+    name: "Designer",
+    description: "Implements UI/UX changes following design specifications.",
+    posture: "creative",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 30,
+    category: "execution",
+  },
+  {
+    id: "qa-tester",
+    name: "QA Tester",
+    description: "End-to-end testing and user-facing quality assurance.",
+    posture: "adversarial",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 25,
+    category: "review",
+  },
+  {
+    id: "git-master",
+    name: "Git Master",
+    description: "Manages git operations, branches, merges, and conflict resolution.",
+    posture: "analytical",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 15,
+    category: "execution",
+  },
+  {
+    id: "code-simplifier",
+    name: "Code Simplifier",
+    description: "Simplifies and refactors code for clarity and maintainability.",
+    posture: "analytical",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 20,
+    category: "execution",
+  },
+  {
+    id: "researcher",
+    name: "Researcher",
+    description: "Investigates technologies, libraries, and best practices.",
+    posture: "inquisitive",
+    modelClass: "standard",
+    routingRole: "specialist",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "research",
+  },
 
   // ── Product lane (used by team orchestrator) ──
-  { id: "product-manager", name: "Product Manager", description: "Translates user needs into actionable requirements and priorities.", posture: "inquisitive", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep"], maxTurns: 15, category: "planning" },
+  {
+    id: "product-manager",
+    name: "Product Manager",
+    description: "Translates user needs into actionable requirements and priorities.",
+    posture: "inquisitive",
+    modelClass: "standard",
+    routingRole: "coordinator",
+    tools: ["Read", "Glob", "Grep"],
+    maxTurns: 15,
+    category: "planning",
+  },
 
   // ── Coordination lane (Prometheus) ──
-  { id: "metis", name: "Prometheus Metis", description: "Interview agent — clarifies requirements through deep questioning.", posture: "inquisitive", modelClass: "standard", routingRole: "coordinator", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 20, category: "meta" },
-  { id: "momus", name: "Prometheus Momus", description: "Critic agent — adversarial plan review and risk challenge.", posture: "adversarial", modelClass: "standard", routingRole: "reviewer", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "meta" },
-  { id: "oracle", name: "Prometheus Oracle", description: "Validation agent — verifies implementation readiness and completion.", posture: "analytical", modelClass: "frontier", routingRole: "reviewer", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15, category: "meta" },
+  {
+    id: "metis",
+    name: "Prometheus Metis",
+    description: "Interview agent — clarifies requirements through deep questioning.",
+    posture: "inquisitive",
+    modelClass: "standard",
+    routingRole: "coordinator",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 20,
+    category: "meta",
+  },
+  {
+    id: "momus",
+    name: "Prometheus Momus",
+    description: "Critic agent — adversarial plan review and risk challenge.",
+    posture: "adversarial",
+    modelClass: "standard",
+    routingRole: "reviewer",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "meta",
+  },
+  {
+    id: "oracle",
+    name: "Prometheus Oracle",
+    description: "Validation agent — verifies implementation readiness and completion.",
+    posture: "analytical",
+    modelClass: "frontier",
+    routingRole: "reviewer",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+    category: "meta",
+  },
 ];
 
-export const OMX_ROLES: Readonly<Record<string, OmxAmpRole>> = Object.fromEntries(
-  ROLES.map((r) => [r.id, r]),
-);
+export const OMX_ROLES: Readonly<Record<string, OmxAmpRole>> = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
 export function getOmxRole(id: string): OmxAmpRole | undefined {
   return OMX_ROLES[id];
@@ -98,19 +296,64 @@ const ROLE_KEYWORDS: Array<{
   weight: number;
 }> = [
   // ── High-specificity specialists (weight 3) ──
-  { id: "security-reviewer", keywords: ["security", "vulnerability", "xss", "csrf", "injection", "安全", "漏洞"], patterns: [/\b(auth|jwt|token|encrypt|ssl|tls|oauth)\b/i], weight: 3 },
-  { id: "qa-tester", keywords: ["e2e", "integration test", "acceptance", "smoke", "回归"], patterns: [/\b(playwright|cypress|selenium|puppeteer)\b/i], weight: 3 },
-  { id: "researcher", keywords: ["research", "investigate", "compare", "evaluate", "调研", "分析"], patterns: [/\b(benchmark|hypothesis|ablation|study)\b/i], weight: 3 },
+  {
+    id: "security-reviewer",
+    keywords: ["security", "vulnerability", "xss", "csrf", "injection", "安全", "漏洞"],
+    patterns: [/\b(auth|jwt|token|encrypt|ssl|tls|oauth)\b/i],
+    weight: 3,
+  },
+  {
+    id: "qa-tester",
+    keywords: ["e2e", "integration test", "acceptance", "smoke", "回归"],
+    patterns: [/\b(playwright|cypress|selenium|puppeteer)\b/i],
+    weight: 3,
+  },
+  {
+    id: "researcher",
+    keywords: ["research", "investigate", "compare", "evaluate", "调研", "分析"],
+    patterns: [/\b(benchmark|hypothesis|ablation|study)\b/i],
+    weight: 3,
+  },
 
   // ── Medium-specificity (weight 2) ──
-  { id: "designer", keywords: ["ui", "ux", "css", "style", "layout", "component", "frontend", "界面", "样式", "组件", "页面"], patterns: [/\b(design|figma|tailwind|styled|animation)\b/i], weight: 2 },
-  { id: "debugger", keywords: ["bug", "fix", "error", "crash", "debug", "broken", "fail", "异常", "修复", "崩溃"], patterns: [/\b(stack\s*trace|segfault|assertion|panic)\b/i], weight: 2 },
-  { id: "code-simplifier", keywords: ["refactor", "simplify", "clean", "restructure", "重构", "简化"], patterns: [/\b(dedup|extract|rename|move|dead\s*code)\b/i], weight: 2 },
-  { id: "test-engineer", keywords: ["test", "spec", "jest", "vitest", "单元测试"], patterns: [/\b(unit\s*test|coverage|mock|stub|snapshot)\b/i], weight: 2 },
-  { id: "git-master", keywords: ["git", "merge", "branch", "conflict", "rebase", "版本", "分支"], patterns: [/\b(cherry.pick|bisect|stash|blame)\b/i], weight: 2 },
+  {
+    id: "designer",
+    keywords: ["ui", "ux", "css", "style", "layout", "component", "frontend", "界面", "样式", "组件", "页面"],
+    patterns: [/\b(design|figma|tailwind|styled|animation)\b/i],
+    weight: 2,
+  },
+  {
+    id: "debugger",
+    keywords: ["bug", "fix", "error", "crash", "debug", "broken", "fail", "异常", "修复", "崩溃"],
+    patterns: [/\b(stack\s*trace|segfault|assertion|panic)\b/i],
+    weight: 2,
+  },
+  {
+    id: "code-simplifier",
+    keywords: ["refactor", "simplify", "clean", "restructure", "重构", "简化"],
+    patterns: [/\b(dedup|extract|rename|move|dead\s*code)\b/i],
+    weight: 2,
+  },
+  {
+    id: "test-engineer",
+    keywords: ["test", "spec", "jest", "vitest", "单元测试"],
+    patterns: [/\b(unit\s*test|coverage|mock|stub|snapshot)\b/i],
+    weight: 2,
+  },
+  {
+    id: "git-master",
+    keywords: ["git", "merge", "branch", "conflict", "rebase", "版本", "分支"],
+    patterns: [/\b(cherry.pick|bisect|stash|blame)\b/i],
+    weight: 2,
+  },
 
   // ── Broad catch-alls (weight 1) ──
-  { id: "product-manager", keywords: ["requirement", "feature", "user story", "需求", "功能"], patterns: [/\b(backlog|sprint|epic|acceptance)\b/i], weight: 1 },
+  {
+    id: "product-manager",
+    keywords: ["requirement", "feature", "user story", "需求", "功能"],
+    patterns: [/\b(backlog|sprint|epic|acceptance)\b/i],
+    weight: 1,
+  },
 ];
 
 /**
@@ -133,9 +376,7 @@ export function routeRoleForPhase(
     case "ralplan":
       return {
         primary: getOmxRole("planner")!,
-        secondary: content.includes("architect") || content.includes("架构")
-          ? getOmxRole("architect")!
-          : undefined,
+        secondary: content.includes("architect") || content.includes("架构") ? getOmxRole("architect")! : undefined,
       };
 
     case "ultragoal":
@@ -158,9 +399,9 @@ function routeByContent(content: string): { primary: OmxAmpRole; secondary?: Omx
   let bestScore = 0;
 
   for (const entry of ROLE_KEYWORDS) {
-    const kwHits = entry.keywords.filter(kw => content.includes(kw)).length;
-    const regexHits = entry.patterns.filter(p => p.test(content)).length;
-    const score = (kwHits * entry.weight) + (regexHits * entry.weight * 2);
+    const kwHits = entry.keywords.filter((kw) => content.includes(kw)).length;
+    const regexHits = entry.patterns.filter((p) => p.test(content)).length;
+    const score = kwHits * entry.weight + regexHits * entry.weight * 2;
     if (score > bestScore) {
       bestScore = score;
       bestMatch = entry.id;
@@ -182,8 +423,8 @@ function routeReviewer(content: string): { primary: OmxAmpRole; secondary: OmxAm
   const architect = getOmxRole("architect")!;
   for (const entry of ROLE_KEYWORDS) {
     if (!entry.id.includes("reviewer")) continue;
-    const kwHits = entry.keywords.filter(kw => content.includes(kw)).length;
-    const regexHits = entry.patterns.filter(p => p.test(content)).length;
+    const kwHits = entry.keywords.filter((kw) => content.includes(kw)).length;
+    const regexHits = entry.patterns.filter((p) => p.test(content)).length;
     if (kwHits > 0 || regexHits > 0) {
       const specialist = getOmxRole(entry.id);
       if (specialist) return { primary: architect, secondary: specialist };
@@ -194,10 +435,10 @@ function routeReviewer(content: string): { primary: OmxAmpRole; secondary: OmxAm
 
 /** Route QA to test-engineer or qa-tester */
 function routeQa(content: string): { primary: OmxAmpRole } {
-  const qaEntry = ROLE_KEYWORDS.find(e => e.id === "qa-tester");
+  const qaEntry = ROLE_KEYWORDS.find((e) => e.id === "qa-tester");
   if (qaEntry) {
-    const kwHits = qaEntry.keywords.filter(kw => content.includes(kw)).length;
-    const regexHits = qaEntry.patterns.filter(p => p.test(content)).length;
+    const kwHits = qaEntry.keywords.filter((kw) => content.includes(kw)).length;
+    const regexHits = qaEntry.patterns.filter((p) => p.test(content)).length;
     if (kwHits > 0 || regexHits > 0) return { primary: getOmxRole("qa-tester")! };
   }
   return { primary: getOmxRole("test-engineer")! };
@@ -229,10 +470,42 @@ export interface LegacyAgentRole {
 export type AgentRole = LegacyAgentRole;
 
 const LEGACY_ROLE_MAP: Record<string, () => AgentRole> = {
-  planner: () => ({ id: "planner", name: "Planner", description: "Analyzes tasks and produces execution plans.", systemPrompt: "You are a Planner. Analyze the task, understand the project context, and produce a concrete execution plan with clear steps.", tools: ["Read", "Glob", "Grep", "Bash"], maxTurns: 15 }),
-  developer: () => ({ id: "developer", name: "Developer", description: "Implements code changes.", systemPrompt: "You are a Developer. Implement the code changes described in the execution plan. Write clean, correct, well-tested code.", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 40 }),
-  tester: () => ({ id: "tester", name: "Tester", description: "Writes and runs tests.", systemPrompt: "You are a Tester. Write and run tests to verify the implementation. Cover edge cases and ensure correctness.", tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"], maxTurns: 25 }),
-  reviewer: () => ({ id: "reviewer", name: "Reviewer", description: "Reviews code quality.", systemPrompt: "You are a Code Reviewer. Review the changes for correctness, quality, security, and maintainability.", tools: ["Read", "Bash", "Glob", "Grep"], maxTurns: 20 }),
+  planner: () => ({
+    id: "planner",
+    name: "Planner",
+    description: "Analyzes tasks and produces execution plans.",
+    systemPrompt:
+      "You are a Planner. Analyze the task, understand the project context, and produce a concrete execution plan with clear steps.",
+    tools: ["Read", "Glob", "Grep", "Bash"],
+    maxTurns: 15,
+  }),
+  developer: () => ({
+    id: "developer",
+    name: "Developer",
+    description: "Implements code changes.",
+    systemPrompt:
+      "You are a Developer. Implement the code changes described in the execution plan. Write clean, correct, well-tested code.",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 40,
+  }),
+  tester: () => ({
+    id: "tester",
+    name: "Tester",
+    description: "Writes and runs tests.",
+    systemPrompt:
+      "You are a Tester. Write and run tests to verify the implementation. Cover edge cases and ensure correctness.",
+    tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    maxTurns: 25,
+  }),
+  reviewer: () => ({
+    id: "reviewer",
+    name: "Reviewer",
+    description: "Reviews code quality.",
+    systemPrompt:
+      "You are a Code Reviewer. Review the changes for correctness, quality, security, and maintainability.",
+    tools: ["Read", "Bash", "Glob", "Grep"],
+    maxTurns: 20,
+  }),
 };
 
 export function omxRoleToLegacy(role: OmxAmpRole): AgentRole {
@@ -259,7 +532,14 @@ ${taskContent}
 ## Project Goals
 ${context.goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}
 
-${context.lessonsLearned.length > 0 ? `## Lessons from Previous Failures\n${context.lessonsLearned.slice(-5).map((l) => `- [${l.category}] ${l.lesson}`).join("\n")}` : ""}
+${
+  context.lessonsLearned.length > 0
+    ? `## Lessons from Previous Failures\n${context.lessonsLearned
+        .slice(-5)
+        .map((l) => `- [${l.category}] ${l.lesson}`)
+        .join("\n")}`
+    : ""
+}
 
 ## Instructions
 Analyze this task and identify:

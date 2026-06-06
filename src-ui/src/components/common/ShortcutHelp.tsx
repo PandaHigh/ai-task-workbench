@@ -78,14 +78,26 @@ export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ margin: "0 0 16px", fontSize: "15px", color: "var(--text-primary)", fontWeight: 600 }}>
-          快捷键
-        </h3>
+        <h3 style={{ margin: "0 0 16px", fontSize: "15px", color: "var(--text-primary)", fontWeight: 600 }}>快捷键</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {shortcuts.map((s, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
+            <div
+              key={i}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}
+            >
               <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{s.description}</span>
-              <kbd style={{ fontSize: "12px", padding: "2px 8px", background: "var(--bg-tertiary)", border: "1px solid var(--border)", borderRadius: "4px", color: "var(--text-primary)", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+              <kbd
+                style={{
+                  fontSize: "12px",
+                  padding: "2px 8px",
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "4px",
+                  color: "var(--text-primary)",
+                  fontFamily: "monospace",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {formatKey(s)}
               </kbd>
             </div>

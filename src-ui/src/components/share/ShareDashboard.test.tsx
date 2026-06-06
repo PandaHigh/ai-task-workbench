@@ -44,8 +44,16 @@ vi.mock("../evolution/AgentProgressPanel", () => ({
 }));
 
 vi.mock("../evolution/LogPanel", () => ({
-  LogPanel: ({ logs }: { logs: Array<{ id: number; timestamp: number; level: string; source: string; message: string }> }) => (
-    <div>{logs.map(l => <span key={l.id}>{l.message}</span>)}</div>
+  LogPanel: ({
+    logs,
+  }: {
+    logs: Array<{ id: number; timestamp: number; level: string; source: string; message: string }>;
+  }) => (
+    <div>
+      {logs.map((l) => (
+        <span key={l.id}>{l.message}</span>
+      ))}
+    </div>
   ),
 }));
 
@@ -77,7 +85,7 @@ vi.mock("../../lib/platform", () => ({
 import { ShareDashboard } from "./ShareDashboard";
 
 const mockRefresh = vi.fn();
-let mockShareView: ReturnType<typeof import("../../hooks/useShareView")["useShareView"]>;
+let mockShareView: ReturnType<(typeof import("../../hooks/useShareView"))["useShareView"]>;
 
 describe("ShareDashboard", () => {
   beforeEach(() => {
@@ -97,8 +105,24 @@ describe("ShareDashboard", () => {
         totalTasksCompleted: 2,
       } as any,
       tasks: [
-        { id: "t1", content: "Task 1", status: "completed", type: "user_defined", priority: 1, completedAt: Date.now(), runId: "r1" } as any,
-        { id: "t2", content: "Task 2", status: "failed", type: "ai_generated", priority: 2, errorMessage: "Error msg", runId: "r1" } as any,
+        {
+          id: "t1",
+          content: "Task 1",
+          status: "completed",
+          type: "user_defined",
+          priority: 1,
+          completedAt: Date.now(),
+          runId: "r1",
+        } as any,
+        {
+          id: "t2",
+          content: "Task 2",
+          status: "failed",
+          type: "ai_generated",
+          priority: 2,
+          errorMessage: "Error msg",
+          runId: "r1",
+        } as any,
       ],
       commits: [],
       lessons: [],
@@ -106,9 +130,7 @@ describe("ShareDashboard", () => {
         { id: "t3", content: "Queued task", type: "ai_generated", priority: 3, status: "queued", runId: "r1" } as any,
       ],
       report: null,
-      logs: [
-        { id: 1, timestamp: Date.now(), level: "info", source: "engine", message: "Test log" },
-      ],
+      logs: [{ id: 1, timestamp: Date.now(), level: "info", source: "engine", message: "Test log" }],
       call: vi.fn(),
       refresh: mockRefresh,
       wsConnected: true,

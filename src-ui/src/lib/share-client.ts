@@ -45,7 +45,9 @@ export class ShareClient {
     return res.json();
   }
 
-  async getLogs(token: string): Promise<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>> {
+  async getLogs(
+    token: string,
+  ): Promise<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>> {
     const res = await fetch(this.tokenUrl(token, "logs"));
     if (!res.ok) throw new Error(await this.extractError(res));
     return res.json();
@@ -65,7 +67,10 @@ export class ShareClient {
   }
 
   // Write operations
-  async createTask(token: string, params: { content: string; type?: string; priority?: number; timeoutMinutes?: number }): Promise<TaskDefinition> {
+  async createTask(
+    token: string,
+    params: { content: string; type?: string; priority?: number; timeoutMinutes?: number },
+  ): Promise<TaskDefinition> {
     const res = await fetch(this.tokenUrl(token, "task.create"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,7 +124,11 @@ export class ShareClient {
     if (!res.ok) throw new Error(await this.extractError(res));
   }
 
-  async updateTask(token: string, taskId: string, updates: { content?: string; priority?: number; timeoutMinutes?: number }): Promise<TaskDefinition> {
+  async updateTask(
+    token: string,
+    taskId: string,
+    updates: { content?: string; priority?: number; timeoutMinutes?: number },
+  ): Promise<TaskDefinition> {
     const res = await fetch(this.tokenUrl(token, "task.update"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -163,10 +172,14 @@ export class ShareClient {
       }, 10000);
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({
-          jsonrpc: "2.0", id: 1, method: "share.authenticate",
-          params: { token },
-        }));
+        ws.send(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "share.authenticate",
+            params: { token },
+          }),
+        );
       };
 
       ws.onmessage = (event) => {
@@ -186,7 +199,9 @@ export class ShareClient {
           if (msg.method && this.notificationHandler) {
             this.notificationHandler(msg.method, msg.params || {});
           }
-        } catch { /* ignore parse errors */ }
+        } catch {
+          /* ignore parse errors */
+        }
       };
 
       ws.onerror = () => {

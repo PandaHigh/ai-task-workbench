@@ -2,7 +2,20 @@ import { spawn } from "child_process";
 import path from "path";
 import { platform, homedir } from "os";
 
-const SAFE_ENV_KEYS = ["PATH", "HOME", "USERPROFILE", "LANG", "TERM", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC", "APPDATA", "LOCALAPPDATA"] as const;
+const SAFE_ENV_KEYS = [
+  "PATH",
+  "HOME",
+  "USERPROFILE",
+  "LANG",
+  "TERM",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "SYSTEMROOT",
+  "COMSPEC",
+  "APPDATA",
+  "LOCALAPPDATA",
+] as const;
 
 const isWin = platform() === "win32";
 
@@ -27,15 +40,37 @@ export async function killProcessTree(pid: number): Promise<void> {
       process.kill(pid);
     } else {
       // Kill the entire process group by sending SIGTERM to -pid (negative = group)
-      try { process.kill(-pid, "SIGTERM"); } catch { /* process group may have already exited — will try single pid next */ }
-      try { process.kill(pid, "SIGTERM"); } catch { /* process may have already exited */ }
+      try {
+        process.kill(-pid, "SIGTERM");
+      } catch {
+        /* process group may have already exited — will try single pid next */
+      }
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        /* process may have already exited */
+      }
       // Give processes 2s then SIGKILL
       await new Promise((r) => setTimeout(r, 2000));
-      try { process.kill(-pid, "SIGKILL"); } catch { /* process may have already exited */ }
-      try { process.kill(pid, 0); } catch { return; } // confirmed dead
-      try { process.kill(pid, "SIGKILL"); } catch { /* process may have already exited */ }
+      try {
+        process.kill(-pid, "SIGKILL");
+      } catch {
+        /* process may have already exited */
+      }
+      try {
+        process.kill(pid, 0);
+      } catch {
+        return;
+      } // confirmed dead
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        /* process may have already exited */
+      }
     }
-  } catch { /* process may have already exited */ }
+  } catch {
+    /* process may have already exited */
+  }
 }
 
 export async function killAllActiveProcesses(): Promise<void> {
@@ -47,11 +82,11 @@ export async function killAllActiveProcesses(): Promise<void> {
 
 // Environment variables to forward to Claude CLI child process
 const FORWARD_ENV_PREFIXES = [
-  "ANTHROPIC_",   // ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, etc.
-  "CLAUDE_",      // CLAUDE_API_KEY, CLAUDE_CODE_USE_BEDROCK, etc.
-  "AWS_",         // AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION (for Bedrock)
-  "GOOGLE_",      // GOOGLE_CLOUD_PROJECT, etc. (for Vertex)
-  "OPENAI_",      // OPENAI_API_KEY, OPENAI_BASE_URL (if using OpenAI-compatible)
+  "ANTHROPIC_", // ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, etc.
+  "CLAUDE_", // CLAUDE_API_KEY, CLAUDE_CODE_USE_BEDROCK, etc.
+  "AWS_", // AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION (for Bedrock)
+  "GOOGLE_", // GOOGLE_CLOUD_PROJECT, etc. (for Vertex)
+  "OPENAI_", // OPENAI_API_KEY, OPENAI_BASE_URL (if using OpenAI-compatible)
 ];
 
 function buildSafeEnv(): NodeJS.ProcessEnv {
@@ -81,9 +116,10 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
       env.PATH = `${homedir()}/.local/bin${path.delimiter}${env.PATH}`;
     }
   }
-  if (!env.PATH) env.PATH = isWin
-    ? `${process.env.SYSTEMROOT ?? "C:\\Windows"}\\System32`
-    : `/usr/local/bin:/usr/bin:/bin:${homedir()}/.local/bin`;
+  if (!env.PATH)
+    env.PATH = isWin
+      ? `${process.env.SYSTEMROOT ?? "C:\\Windows"}\\System32`
+      : `/usr/local/bin:/usr/bin:/bin:${homedir()}/.local/bin`;
   env.LANG = env.LANG || (isWin ? "en_US.UTF-8" : "en_US.UTF-8");
   return env;
 }
@@ -132,10 +168,7 @@ export class CCClient {
     this.claudePath = platform() === "win32" && claudePath === "claude" ? "claude.cmd" : claudePath;
   }
 
-  async executeTask(
-    prompt: string,
-    options: CCExecutionOptions
-  ): Promise<CCTaskResult> {
+  async executeTask(prompt: string, options: CCExecutionOptions): Promise<CCTaskResult> {
     const args = this.buildArgs(prompt, options);
     const messages: CCMessage[] = [];
     let result = "";
@@ -163,12 +196,24 @@ export class CCClient {
         if (sigkillTimer) clearTimeout(sigkillTimer);
       };
 
-      const timeout = setTimeout(() => {
-        settled = true;
-        proc.kill(isWin ? undefined : "SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
-        reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
-      }, options.timeoutMinutes * 60 * 1000);
+      const timeout = setTimeout(
+        () => {
+          settled = true;
+          proc.kill(isWin ? undefined : "SIGTERM");
+          sigkillTimer = setTimeout(() => {
+            try {
+              proc.kill(isWin ? undefined : "SIGKILL");
+            } catch (killErr) {
+              console.error(
+                "[cc-client] SIGKILL failed after timeout:",
+                killErr instanceof Error ? killErr.message : killErr,
+              );
+            }
+          }, 5000);
+          reject(new Error(`Task timed out after ${options.timeoutMinutes} minutes`));
+        },
+        options.timeoutMinutes * 60 * 1000,
+      );
 
       let stdoutBuffer = "";
       let stderrBuffer = "";
@@ -190,7 +235,9 @@ export class CCClient {
             }
           }
         } catch (parseErr) {
-          console.warn(`[cc-client] Non-JSON line from CC stdout, skipping: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+          console.warn(
+            `[cc-client] Non-JSON line from CC stdout, skipping: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+          );
         }
       };
 
@@ -223,12 +270,12 @@ export class CCClient {
                 return "";
               })
               .filter(Boolean);
-            const fallbackResult = assistantTexts.length > 0
-              ? assistantTexts[assistantTexts.length - 1]
-              : "";
+            const fallbackResult = assistantTexts.length > 0 ? assistantTexts[assistantTexts.length - 1] : "";
 
             if (fallbackResult) {
-              console.warn(`[cc-client] CC exited with code ${code} but has ${messages.length} messages — using last assistant message as fallback result`);
+              console.warn(
+                `[cc-client] CC exited with code ${code} but has ${messages.length} messages — using last assistant message as fallback result`,
+              );
               resolve({
                 result: fallbackResult,
                 sessionId,
@@ -265,7 +312,16 @@ export class CCClient {
           if (settled) return;
           settled = true;
           proc.kill(isWin ? undefined : "SIGTERM");
-          sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+          sigkillTimer = setTimeout(() => {
+            try {
+              proc.kill(isWin ? undefined : "SIGKILL");
+            } catch (killErr) {
+              console.error(
+                "[cc-client] SIGKILL failed after abort:",
+                killErr instanceof Error ? killErr.message : killErr,
+              );
+            }
+          }, 5000);
           reject(new Error("Task was aborted"));
         };
         options.abortSignal.addEventListener("abort", onAbort);
@@ -283,10 +339,7 @@ export class CCClient {
     });
   }
 
-  async *executeTaskStream(
-    prompt: string,
-    options: CCExecutionOptions
-  ): AsyncGenerator<CCMessage> {
+  async *executeTaskStream(prompt: string, options: CCExecutionOptions): AsyncGenerator<CCMessage> {
     const args = this.buildArgs(prompt, options);
 
     const proc = spawn(this.claudePath, args, {
@@ -307,12 +360,24 @@ export class CCClient {
       if (sigkillTimer) clearTimeout(sigkillTimer);
     };
 
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      proc.kill(isWin ? undefined : "SIGTERM");
-      sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream timeout:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
-    }, options.timeoutMinutes * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        if (settled) return;
+        settled = true;
+        proc.kill(isWin ? undefined : "SIGTERM");
+        sigkillTimer = setTimeout(() => {
+          try {
+            proc.kill(isWin ? undefined : "SIGKILL");
+          } catch (killErr) {
+            console.error(
+              "[cc-client] SIGKILL failed after stream timeout:",
+              killErr instanceof Error ? killErr.message : killErr,
+            );
+          }
+        }, 5000);
+      },
+      options.timeoutMinutes * 60 * 1000,
+    );
 
     let buffer = "";
     let resolveNext: ((value: IteratorResult<CCMessage>) => void) | null = null;
@@ -338,7 +403,9 @@ export class CCClient {
             resolveNext = null;
           }
         } catch (streamParseErr) {
-          console.warn(`[cc-client] Non-JSON line from CC stream, skipping: ${streamParseErr instanceof Error ? streamParseErr.message : String(streamParseErr)}`);
+          console.warn(
+            `[cc-client] Non-JSON line from CC stream, skipping: ${streamParseErr instanceof Error ? streamParseErr.message : String(streamParseErr)}`,
+          );
         }
       }
     });
@@ -354,7 +421,9 @@ export class CCClient {
             resolveNext = null;
           }
         } catch (flushErr) {
-          console.warn(`[cc-client] Incomplete JSON in stream flush, skipping: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`);
+          console.warn(
+            `[cc-client] Incomplete JSON in stream flush, skipping: ${flushErr instanceof Error ? flushErr.message : String(flushErr)}`,
+          );
         }
       }
       done = true;
@@ -381,7 +450,16 @@ export class CCClient {
         if (settled) return;
         settled = true;
         proc.kill(isWin ? undefined : "SIGTERM");
-        sigkillTimer = setTimeout(() => { try { proc.kill(isWin ? undefined : "SIGKILL"); } catch (killErr) { console.error("[cc-client] SIGKILL failed after stream abort:", killErr instanceof Error ? killErr.message : killErr); } }, 5000);
+        sigkillTimer = setTimeout(() => {
+          try {
+            proc.kill(isWin ? undefined : "SIGKILL");
+          } catch (killErr) {
+            console.error(
+              "[cc-client] SIGKILL failed after stream abort:",
+              killErr instanceof Error ? killErr.message : killErr,
+            );
+          }
+        }, 5000);
       };
       options.abortSignal.addEventListener("abort", onAbort);
       // Safety: remove listener after 30s to prevent leak if proc never exits
@@ -417,10 +495,13 @@ export class CCClient {
 
   private buildArgs(prompt: string, options: CCExecutionOptions): string[] {
     const args: string[] = [
-      "-p", prompt,
-      "--output-format", "stream-json",
+      "-p",
+      prompt,
+      "--output-format",
+      "stream-json",
       "--verbose",
-      "--permission-mode", "acceptEdits",
+      "--permission-mode",
+      "acceptEdits",
     ];
 
     if (options.model) {

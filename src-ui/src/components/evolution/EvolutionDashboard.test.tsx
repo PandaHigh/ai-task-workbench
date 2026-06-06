@@ -126,7 +126,9 @@ function renderEvolution(runId = "run-001", run?: ExecutionRun) {
 
 function setupEvolutionStore(overrides: Partial<typeof defaultEvolutionStore> = {}) {
   vi.mocked(useEvolutionStore).mockImplementation(((selector?: Function) =>
-    selector ? selector({ ...defaultEvolutionStore, ...overrides }) : { ...defaultEvolutionStore, ...overrides }) as any);
+    selector
+      ? selector({ ...defaultEvolutionStore, ...overrides })
+      : { ...defaultEvolutionStore, ...overrides }) as any);
 }
 
 describe("EvolutionDashboard", () => {

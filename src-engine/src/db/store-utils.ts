@@ -31,7 +31,9 @@ export function readJsonFile<T>(filePath: string, fallback: T, tag = "store"): T
       return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
     }
   } catch (err) {
-    console.error(`[${tag}] Failed to read/parse ${filePath}: ${err instanceof Error ? err.message : err}. Using fallback.`);
+    console.error(
+      `[${tag}] Failed to read/parse ${filePath}: ${err instanceof Error ? err.message : err}. Using fallback.`,
+    );
   }
   return fallback;
 }
@@ -65,11 +67,15 @@ export function cleanupTmpFiles(dir: string): void {
           fs.unlinkSync(fullPath);
           console.warn(`[store] Cleaned up stale tmp file: ${fullPath}`);
         } catch (cleanupErr) {
-          console.warn(`[store] Failed to clean up tmp file ${fullPath}: ${cleanupErr instanceof Error ? cleanupErr.message : cleanupErr}`);
+          console.warn(
+            `[store] Failed to clean up tmp file ${fullPath}: ${cleanupErr instanceof Error ? cleanupErr.message : cleanupErr}`,
+          );
         }
       }
     }
   } catch (dirErr) {
-    console.warn(`[store] Data directory not found or unreadable: ${dirErr instanceof Error ? dirErr.message : dirErr}`);
+    console.warn(
+      `[store] Data directory not found or unreadable: ${dirErr instanceof Error ? dirErr.message : dirErr}`,
+    );
   }
 }

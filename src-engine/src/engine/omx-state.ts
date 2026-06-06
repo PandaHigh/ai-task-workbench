@@ -152,10 +152,7 @@ export class OmxAmpStateStore {
     if (!state) return;
     // Reset this stage and all subsequent stages
     for (let i = stageIndex; i < state.pipeline.stages.length; i++) {
-      state.pipeline.stages[i] = createInitialModeState(
-        state.pipeline.stages[i].stageName,
-        i,
-      );
+      state.pipeline.stages[i] = createInitialModeState(state.pipeline.stages[i].stageName, i);
     }
     state.pipeline.currentStageIndex = stageIndex;
     this.save(runId, state);
@@ -163,7 +160,11 @@ export class OmxAmpStateStore {
 
   clear(runId: string): void {
     this.cache.delete(runId);
-    try { unlinkSync(stateFilePath(runId)); } catch { /* file may not exist */ }
+    try {
+      unlinkSync(stateFilePath(runId));
+    } catch {
+      /* file may not exist */
+    }
   }
 
   getStages(): typeof OMX_STAGES {

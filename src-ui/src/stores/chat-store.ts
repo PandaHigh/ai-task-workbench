@@ -51,10 +51,7 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   addUserMessage: (content) =>
     set((s) => ({
-      messages: [
-        ...s.messages,
-        { id: crypto.randomUUID(), role: "user", content, timestamp: Date.now() },
-      ],
+      messages: [...s.messages, { id: crypto.randomUUID(), role: "user", content, timestamp: Date.now() }],
     })),
 
   startAssistantMessage: () =>
@@ -63,7 +60,14 @@ export const useChatStore = create<ChatStore>((set) => ({
       streamingContent: "",
       messages: [
         ...s.messages,
-        { id: crypto.randomUUID(), role: "assistant", content: "", timestamp: Date.now(), isStreaming: true, toolCalls: [] },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "",
+          timestamp: Date.now(),
+          isStreaming: true,
+          toolCalls: [],
+        },
       ],
     })),
 

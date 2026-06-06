@@ -13,7 +13,15 @@
  */
 
 import type { CCClient, CCMessage } from "../cc-integration/cc-client.js";
-import type { TaskDefinition, ExecutionPlan, TestResult, ReviewResult, TaskContext, PhaseRecord, TaskPhase } from "@ai-workbench/shared";
+import type {
+  TaskDefinition,
+  ExecutionPlan,
+  TestResult,
+  ReviewResult,
+  TaskContext,
+  PhaseRecord,
+  TaskPhase,
+} from "@ai-workbench/shared";
 import { OmxAmpStateStore, createInitialRunState } from "./omx-state.js";
 import { OmxAmpGate } from "./omx-gate.js";
 
@@ -38,10 +46,10 @@ const DEFAULT_CONFIG: OmxAmpPipelineConfig = {
   maxGateRetries: 2,
   gateThresholds: {
     "deep-interview": 0.6,
-    "ralplan": 0.7,
-    "ultragoal": 0.6,
+    ralplan: 0.7,
+    ultragoal: 0.6,
     "code-review": 0.7,
-    "ultraqa": 0.6,
+    ultraqa: 0.6,
   },
 };
 
@@ -65,10 +73,10 @@ export interface OmxAmpPipelineResult {
 
 const STAGE_PHASE_MAP: Record<string, TaskPhase> = {
   "deep-interview": "planner",
-  "ralplan": "planner",
-  "ultragoal": "developer",
+  ralplan: "planner",
+  ultragoal: "developer",
   "code-review": "reviewer",
-  "ultraqa": "tester",
+  ultraqa: "tester",
 };
 
 // ─── Pipeline class ─────────────────────────────────────────────────────────
@@ -91,11 +99,7 @@ export class OmxAmpPipeline {
     this.gate = new OmxAmpGate(ccClient, notify, config.gateThresholds);
   }
 
-  async run(
-    task: TaskDefinition,
-    context: TaskContext,
-    abortSignal?: AbortSignal,
-  ): Promise<OmxAmpPipelineResult> {
+  async run(task: TaskDefinition, context: TaskContext, abortSignal?: AbortSignal): Promise<OmxAmpPipelineResult> {
     this.startTime = Date.now();
     this.messages = [];
     this.phases = [];
@@ -148,14 +152,33 @@ export class OmxAmpPipeline {
               this.recordPhase(stageName, "skipped");
               break;
             }
-            interviewArtifacts = await runDeepInterview(task, context, this.ccClient, this.notify, this.workingDir, abortSignal);
-            const interviewGate = await this.gate.evaluate(stageName, interviewArtifacts as unknown as Record<string, unknown>, this.workingDir, abortSignal);
+            interviewArtifacts = await runDeepInterview(
+              task,
+              context,
+              this.ccClient,
+              this.notify,
+              this.workingDir,
+              abortSignal,
+            );
+            const interviewGate = await this.gate.evaluate(
+              stageName,
+              interviewArtifacts as unknown as Record<string, unknown>,
+              this.workingDir,
+              abortSignal,
+            );
             if (!interviewGate.passed) {
               this.stateStore.updateStage(task.runId, i, { status: "gating" });
               this.recordPhase(stageName, "gating");
-              this.notify("task.progress", { taskId: task.id, phase: "planner", message: `Gate failed: ${interviewGate.reason}` });
+              this.notify("task.progress", {
+                taskId: task.id,
+                phase: "planner",
+                message: `Gate failed: ${interviewGate.reason}`,
+              });
             } else {
-              this.stateStore.updateStage(task.runId, i, { status: "passed", artifacts: interviewArtifacts as unknown as Record<string, unknown> });
+              this.stateStore.updateStage(task.runId, i, {
+                status: "passed",
+                artifacts: interviewArtifacts as unknown as Record<string, unknown>,
+              });
               this.recordPhase(stageName, "completed");
             }
             break;
@@ -163,17 +186,34 @@ export class OmxAmpPipeline {
 
           case "ralplan": {
             ralplanArtifacts = await runRalplan(
-              task, context, interviewArtifacts,
-              this.ccClient, this.notify, this.workingDir,
-              this.config.maxRalplanIterations, abortSignal,
+              task,
+              context,
+              interviewArtifacts,
+              this.ccClient,
+              this.notify,
+              this.workingDir,
+              this.config.maxRalplanIterations,
+              abortSignal,
             );
-            const ralplanGate = await this.gate.evaluate(stageName, ralplanArtifacts as unknown as Record<string, unknown>, this.workingDir, abortSignal);
+            const ralplanGate = await this.gate.evaluate(
+              stageName,
+              ralplanArtifacts as unknown as Record<string, unknown>,
+              this.workingDir,
+              abortSignal,
+            );
             if (!ralplanGate.passed) {
               this.stateStore.updateStage(task.runId, i, { status: "gating" });
               this.recordPhase(stageName, "gating");
-              this.notify("task.progress", { taskId: task.id, phase: "planner", message: `Gate failed: ${ralplanGate.reason}` });
+              this.notify("task.progress", {
+                taskId: task.id,
+                phase: "planner",
+                message: `Gate failed: ${ralplanGate.reason}`,
+              });
             } else {
-              this.stateStore.updateStage(task.runId, i, { status: "passed", artifacts: ralplanArtifacts as unknown as Record<string, unknown> });
+              this.stateStore.updateStage(task.runId, i, {
+                status: "passed",
+                artifacts: ralplanArtifacts as unknown as Record<string, unknown>,
+              });
               this.recordPhase(stageName, "completed");
             }
             break;
@@ -182,17 +222,34 @@ export class OmxAmpPipeline {
           case "ultragoal": {
             if (!ralplanArtifacts) throw new Error("Missing ralplan artifacts");
             ultragoalArtifacts = await runUltragoal(
-              task, { goals: context.goals, lessonsLearned: context.lessonsLearned },
-              ralplanArtifacts, this.ccClient, this.notify, this.workingDir,
-              lastFeedback || undefined, abortSignal,
+              task,
+              { goals: context.goals, lessonsLearned: context.lessonsLearned },
+              ralplanArtifacts,
+              this.ccClient,
+              this.notify,
+              this.workingDir,
+              lastFeedback || undefined,
+              abortSignal,
             );
-            const ultraGate = await this.gate.evaluate(stageName, ultragoalArtifacts as unknown as Record<string, unknown>, this.workingDir, abortSignal);
+            const ultraGate = await this.gate.evaluate(
+              stageName,
+              ultragoalArtifacts as unknown as Record<string, unknown>,
+              this.workingDir,
+              abortSignal,
+            );
             if (!ultraGate.passed) {
               this.stateStore.updateStage(task.runId, i, { status: "gating" });
               this.recordPhase(stageName, "gating");
-              this.notify("task.progress", { taskId: task.id, phase: "developer", message: `Gate failed: ${ultraGate.reason}` });
+              this.notify("task.progress", {
+                taskId: task.id,
+                phase: "developer",
+                message: `Gate failed: ${ultraGate.reason}`,
+              });
             } else {
-              this.stateStore.updateStage(task.runId, i, { status: "passed", artifacts: ultragoalArtifacts as unknown as Record<string, unknown> });
+              this.stateStore.updateStage(task.runId, i, {
+                status: "passed",
+                artifacts: ultragoalArtifacts as unknown as Record<string, unknown>,
+              });
               this.recordPhase(stageName, "completed");
             }
             break;
@@ -201,10 +258,18 @@ export class OmxAmpPipeline {
           case "code-review": {
             if (!ralplanArtifacts || !ultragoalArtifacts) throw new Error("Missing upstream artifacts");
             codeReviewArtifacts = await runCodeReview(
-              task, ralplanArtifacts.plan, ultragoalArtifacts,
-              this.ccClient, this.notify, this.workingDir, abortSignal,
+              task,
+              ralplanArtifacts.plan,
+              ultragoalArtifacts,
+              this.ccClient,
+              this.notify,
+              this.workingDir,
+              abortSignal,
             );
-            this.stateStore.updateStage(task.runId, i, { status: codeReviewArtifacts.reviewResult.approved ? "passed" : "failed", artifacts: codeReviewArtifacts as unknown as Record<string, unknown> });
+            this.stateStore.updateStage(task.runId, i, {
+              status: codeReviewArtifacts.reviewResult.approved ? "passed" : "failed",
+              artifacts: codeReviewArtifacts as unknown as Record<string, unknown>,
+            });
             this.recordPhase(stageName, codeReviewArtifacts.reviewResult.approved ? "completed" : "failed");
 
             if (!codeReviewArtifacts.reviewResult.approved) {
@@ -212,7 +277,13 @@ export class OmxAmpPipeline {
               reviewCycle++;
               if (reviewCycle >= this.config.maxGateRetries) {
                 this.stateStore.updateStage(task.runId, i, { status: "failed" });
-                return this.buildResult(task, "Code review failed after max retries", ralplanArtifacts?.plan, codeReviewArtifacts?.reviewResult, ultraQaArtifacts?.testResult);
+                return this.buildResult(
+                  task,
+                  "Code review failed after max retries",
+                  ralplanArtifacts?.plan,
+                  codeReviewArtifacts?.reviewResult,
+                  ultraQaArtifacts?.testResult,
+                );
               }
               // Loop back to ralplan
               i = this.stateStore.getStageIndex("ralplan");
@@ -231,10 +302,18 @@ export class OmxAmpPipeline {
           case "ultraqa": {
             if (!ralplanArtifacts || !ultragoalArtifacts) throw new Error("Missing upstream artifacts");
             ultraQaArtifacts = await runUltraQa(
-              task, ralplanArtifacts.plan, ultragoalArtifacts,
-              this.ccClient, this.notify, this.workingDir, abortSignal,
+              task,
+              ralplanArtifacts.plan,
+              ultragoalArtifacts,
+              this.ccClient,
+              this.notify,
+              this.workingDir,
+              abortSignal,
             );
-            this.stateStore.updateStage(task.runId, i, { status: ultraQaArtifacts.testResult.allPassed ? "passed" : "failed", artifacts: ultraQaArtifacts as unknown as Record<string, unknown> });
+            this.stateStore.updateStage(task.runId, i, {
+              status: ultraQaArtifacts.testResult.allPassed ? "passed" : "failed",
+              artifacts: ultraQaArtifacts as unknown as Record<string, unknown>,
+            });
             this.recordPhase(stageName, ultraQaArtifacts.testResult.allPassed ? "completed" : "failed");
 
             if (!ultraQaArtifacts.testResult.allPassed) {
@@ -242,7 +321,13 @@ export class OmxAmpPipeline {
               reviewCycle++;
               if (reviewCycle >= this.config.maxGateRetries) {
                 this.stateStore.updateStage(task.runId, i, { status: "failed" });
-                return this.buildResult(task, "QA failed after max retries", ralplanArtifacts?.plan, codeReviewArtifacts?.reviewResult, ultraQaArtifacts.testResult);
+                return this.buildResult(
+                  task,
+                  "QA failed after max retries",
+                  ralplanArtifacts?.plan,
+                  codeReviewArtifacts?.reviewResult,
+                  ultraQaArtifacts.testResult,
+                );
               }
               // Loop back to ralplan
               i = this.stateStore.getStageIndex("ralplan");

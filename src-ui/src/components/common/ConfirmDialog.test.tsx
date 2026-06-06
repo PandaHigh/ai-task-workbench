@@ -55,7 +55,16 @@ describe("ConfirmDialog", () => {
   });
 
   it("should render with danger variant", () => {
-    render(<ConfirmDialog open={true} message="Test" confirmLabel="Del" variant="danger" onConfirm={onConfirm} onCancel={onCancel} />);
+    render(
+      <ConfirmDialog
+        open={true}
+        message="Test"
+        confirmLabel="Del"
+        variant="danger"
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
+    );
     expect(screen.getByText("Del")).toBeInTheDocument();
   });
 

@@ -63,10 +63,7 @@ export class AdversarialVerifier {
   /**
    * 验证一批发现。返回每个发现的验证结果。
    */
-  async verifyAll(
-    findings: Finding[],
-    options: AdversarialVerifyOptions,
-  ): Promise<VerificationResult[]> {
+  async verifyAll(findings: Finding[], options: AdversarialVerifyOptions): Promise<VerificationResult[]> {
     const results: VerificationResult[] = [];
 
     for (const finding of findings) {
@@ -80,10 +77,7 @@ export class AdversarialVerifier {
   /**
    * 验证单个发现。
    */
-  async verifyOne(
-    finding: Finding,
-    options: AdversarialVerifyOptions,
-  ): Promise<VerificationResult> {
+  async verifyOne(finding: Finding, options: AdversarialVerifyOptions): Promise<VerificationResult> {
     const voterCount = options.voterCount ?? 3;
     const passThreshold = options.passThreshold ?? 0.6;
     const roleName = options.voterRole ?? "momus";
@@ -127,7 +121,7 @@ ${finding.evidence ? `**证据**: ${finding.evidence}` : ""}
 
     // 并行启动所有 voter
     const votePromises = Array.from({ length: voterCount }, (_, i) =>
-      this.runVoter(`voter-${i + 1}`, role, voterPrompt, options.workingDir)
+      this.runVoter(`voter-${i + 1}`, role, voterPrompt, options.workingDir),
     );
 
     const votes = await Promise.all(votePromises);
@@ -157,8 +151,7 @@ ${finding.evidence ? `**证据**: ${finding.evidence}` : ""}
       const result = await executor.execute(role, prompt, workingDir);
       const output = result.output ?? "";
 
-      const isPassed = output.toUpperCase().includes("PASSED")
-        && !output.toUpperCase().includes("REJECTED");
+      const isPassed = output.toUpperCase().includes("PASSED") && !output.toUpperCase().includes("REJECTED");
 
       // 提取置信度
       let confidence = 0.5;

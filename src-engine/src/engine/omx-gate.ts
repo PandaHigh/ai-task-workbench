@@ -22,11 +22,11 @@ const GATE_PROMPTS: Record<string, string> = {
 Check: Are there unresolved ambiguities? Are all constraints identified?
 Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "explanation" }`,
 
-  "ralplan": `Evaluate whether the execution plan is complete and actionable.
+  ralplan: `Evaluate whether the execution plan is complete and actionable.
 Check: Are all steps concrete? Are target files identified? Is the test strategy adequate?
 Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "explanation" }`,
 
-  "ultragoal": `Evaluate whether the implementation is complete.
+  ultragoal: `Evaluate whether the implementation is complete.
 Check: Were the planned changes actually made? Does the code compile?
 Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "explanation" }`,
 
@@ -34,17 +34,17 @@ Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "
 Check: Are all critical issues resolved? Is the code quality acceptable?
 Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "explanation" }`,
 
-  "ultraqa": `Evaluate the QA test results.
+  ultraqa: `Evaluate the QA test results.
 Check: Do all tests pass? Is coverage adequate?
 Respond ONLY with valid JSON: { "passed": boolean, "score": 0.0-1.0, "reason": "explanation" }`,
 };
 
 const DEFAULT_THRESHOLDS: Record<string, number> = {
   "deep-interview": 0.6,
-  "ralplan": 0.7,
-  "ultragoal": 0.6,
+  ralplan: 0.7,
+  ultragoal: 0.6,
   "code-review": 0.7,
-  "ultraqa": 0.6,
+  ultraqa: 0.6,
 };
 
 export class OmxAmpGate {
@@ -71,7 +71,8 @@ export class OmxAmpGate {
         workingDir,
         timeoutMinutes: 5,
         maxTurns: 3,
-        systemPrompt: "You are a quality gate evaluator. Assess whether the stage output meets the required quality threshold. Respond with valid JSON only.",
+        systemPrompt:
+          "You are a quality gate evaluator. Assess whether the stage output meets the required quality threshold. Respond with valid JSON only.",
         abortSignal,
       });
 
@@ -101,11 +102,14 @@ export class OmxAmpGate {
   canSkip(stageName: string, taskContent: string, artifacts: Record<string, unknown>): boolean {
     if (stageName === "deep-interview") {
       const content = taskContent.toLowerCase();
-      const isSpecific = content.length > 50 && (
-        content.includes("fix") || content.includes("add") ||
-        content.includes("update") || content.includes("remove") ||
-        content.includes("refactor") || content.includes("implement")
-      );
+      const isSpecific =
+        content.length > 50 &&
+        (content.includes("fix") ||
+          content.includes("add") ||
+          content.includes("update") ||
+          content.includes("remove") ||
+          content.includes("refactor") ||
+          content.includes("implement"));
       const hasConstraints = !!artifacts.constraints || !!artifacts.acceptanceCriteria;
       return isSpecific && content.length < 500 && !hasConstraints;
     }

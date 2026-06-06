@@ -12,12 +12,29 @@ import { useNotifications } from "./hooks/useNotifications";
 function NotFound() {
   const navigate = useNavigate();
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        gap: 16,
+      }}
+    >
       <h1 style={{ fontSize: 48, opacity: 0.3, margin: 0 }}>404</h1>
       <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>页面不存在</p>
       <button
         onClick={() => navigate("/")}
-        style={{ padding: "6px 16px", background: "var(--blue)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+        style={{
+          padding: "6px 16px",
+          background: "var(--blue)",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+          fontSize: 13,
+        }}
       >
         返回首页
       </button>
@@ -32,19 +49,29 @@ export function App() {
   return (
     <ToastProvider>
       <Routes>
-        <Route path="/share/:token" element={<ErrorBoundary><ShareDashboard /></ErrorBoundary>} />
-        <Route path="*" element={
-          <AppShell>
+        <Route
+          path="/share/:token"
+          element={
             <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<MainDashboard />} />
-                <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <ShareDashboard />
             </ErrorBoundary>
-          </AppShell>
-        } />
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <AppShell>
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<MainDashboard />} />
+                  <Route path="/evolution/:runId" element={<EvolutionDashboard />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ErrorBoundary>
+            </AppShell>
+          }
+        />
       </Routes>
     </ToastProvider>
   );

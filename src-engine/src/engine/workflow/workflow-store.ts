@@ -13,7 +13,8 @@ import type { WorkflowDefinition, WorkflowExecution } from "./workflow-types.js"
 function dataDir(): string {
   const platform = process.platform;
   if (platform === "darwin") return join(homedir(), "Library", "Application Support", "ai-task-workbench");
-  if (platform === "win32") return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "ai-task-workbench");
+  if (platform === "win32")
+    return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "ai-task-workbench");
   return join(homedir(), ".local", "share", "ai-task-workbench");
 }
 

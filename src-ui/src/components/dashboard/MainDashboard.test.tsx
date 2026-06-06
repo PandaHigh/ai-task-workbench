@@ -12,8 +12,17 @@ vi.mock("../../stores/task-store", () => ({
   useTaskStore: vi.fn(),
 }));
 
+vi.mock("../../stores/workflow-store", () => ({
+  useWorkflowStore: vi.fn(),
+}));
+
+vi.mock("../chat/MasterChat", () => ({
+  MasterChat: () => <div data-testid="master-chat">AI Chat</div>,
+}));
+
 import { useEngine } from "../../hooks/useEngine";
 import { useTaskStore } from "../../stores/task-store";
+import { useWorkflowStore } from "../../stores/workflow-store";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -64,6 +73,9 @@ describe("MainDashboard", () => {
       deleteTask: vi.fn(),
       setActiveRun: vi.fn(),
     });
+    vi.mocked(useWorkflowStore).mockReturnValue({
+      activeWorkflows: new Map(),
+    } as ReturnType<typeof useWorkflowStore>);
   });
 
   it("连接引擎时自动加载任务", () => {
@@ -71,28 +83,9 @@ describe("MainDashboard", () => {
     expect(mockLoadTasks).toHaveBeenCalledTimes(1);
   });
 
-  it("显示引擎未连接状态", () => {
-    vi.mocked(useEngine).mockReturnValue({
-      connected: false,
-      call: vi.fn(),
-    });
+  it("渲染 AI 聊天组件", () => {
     renderDashboard();
-    expect(screen.getByText("AI 未连接")).toBeInTheDocument();
-  });
-
-  it("显示已连接状态和任务数量", () => {
-    vi.mocked(useTaskStore).mockReturnValue({
-      tasks: [makeTask()],
-      activeRunId: null,
-      loading: false,
-      loadTasks: mockLoadTasks,
-      addTask: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: vi.fn(),
-      setActiveRun: vi.fn(),
-    });
-    renderDashboard();
-    expect(screen.getByText(/AI 已就绪 · 共 1 个任务/)).toBeInTheDocument();
+    expect(screen.getByTestId("master-chat")).toBeInTheDocument();
   });
 
   it("加载中显示骨架屏", () => {
@@ -108,20 +101,12 @@ describe("MainDashboard", () => {
     });
     renderDashboard();
     const skeletons = screen.getAllByRole("progressbar");
-    expect(skeletons.length).toBe(6);
+    expect(skeletons.length).toBe(3);
   });
 
-  it("空任务列表显示空状态和新建按钮", () => {
+  it("空任务列表显示提示", () => {
     renderDashboard();
-    expect(screen.getByText("欢迎使用 PandaAI")).toBeInTheDocument();
-    expect(screen.getByText("开始第一个任务")).toBeInTheDocument();
-  });
-
-  it("点击新建任务按钮导航到 wizard", async () => {
-    const user = userEvent.setup();
-    renderDashboard();
-    await user.click(screen.getByText("开始第一个任务"));
-    expect(mockNavigate).toHaveBeenCalledWith("/wizard");
+    expect(screen.getByText(/暂无任务/)).toBeInTheDocument();
   });
 
   it("渲染任务卡片列表", () => {
@@ -138,24 +123,6 @@ describe("MainDashboard", () => {
     });
     renderDashboard();
     expect(screen.getAllByText("测试目标").length).toBe(3);
-  });
-
-  it("点击任务卡片导航到 evolution 页面", async () => {
-    const user = userEvent.setup();
-    const tasks = [makeTask({ id: "run-abc123" })];
-    vi.mocked(useTaskStore).mockReturnValue({
-      tasks,
-      activeRunId: null,
-      loading: false,
-      loadTasks: mockLoadTasks,
-      addTask: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: vi.fn(),
-      setActiveRun: vi.fn(),
-    });
-    renderDashboard();
-    await user.click(screen.getByText("测试目标"));
-    expect(mockNavigate).toHaveBeenCalledWith("/evolution/run-abc123");
   });
 
   it("未连接时不会加载任务", () => {
@@ -183,5 +150,29 @@ describe("MainDashboard", () => {
     vi.advanceTimersByTime(60_000);
     expect(mockLoadTasks).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+
+  it("显示任务数量标签", () => {
+    const tasks = [makeTask(), makeTask()];
+    vi.mocked(useTaskStore).mockReturnValue({
+      tasks,
+      activeRunId: null,
+      loading: false,
+      loadTasks: mockLoadTasks,
+      addTask: vi.fn(),
+      updateTask: vi.fn(),
+      deleteTask: vi.fn(),
+      setActiveRun: vi.fn(),
+    });
+    renderDashboard();
+    expect(screen.getByText(/任务 · 2/)).toBeInTheDocument();
+  });
+
+  it("收起面板后显示展开按钮", async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    const closeBtn = screen.getByLabelText("收起面板");
+    await user.click(closeBtn);
+    expect(screen.getByLabelText("展开任务面板")).toBeInTheDocument();
   });
 });

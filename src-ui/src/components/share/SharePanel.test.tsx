@@ -52,7 +52,11 @@ describe("SharePanel", () => {
 
   it("should create a new share link", async () => {
     mockCall.mockResolvedValueOnce([]);
-    mockCall.mockResolvedValueOnce({ token: "new-token", url: "http://localhost:1420/#/share/new-token", createdAt: Date.now() });
+    mockCall.mockResolvedValueOnce({
+      token: "new-token",
+      url: "http://localhost:1420/#/share/new-token",
+      createdAt: Date.now(),
+    });
     mockCall.mockResolvedValueOnce([]);
 
     render(<SharePanel open={true} onClose={() => {}} runId="r1" call={mockCall} />);
@@ -87,18 +91,19 @@ describe("SharePanel", () => {
     fireEvent.click(screen.getByText("创建链接"));
 
     await waitFor(() => {
-      expect(mockCall).toHaveBeenCalledWith("share.create", expect.objectContaining({
-        runId: "r1",
-        label: "测试标签",
-        expiresAt: expect.any(Number),
-      }));
+      expect(mockCall).toHaveBeenCalledWith(
+        "share.create",
+        expect.objectContaining({
+          runId: "r1",
+          label: "测试标签",
+          expiresAt: expect.any(Number),
+        }),
+      );
     });
   });
 
   it("should revoke a token", async () => {
-    const tokens = [
-      { token: "abc-123", runId: "r1", label: "", createdAt: Date.now(), expiresAt: null },
-    ];
+    const tokens = [{ token: "abc-123", runId: "r1", label: "", createdAt: Date.now(), expiresAt: null }];
     mockCall.mockResolvedValueOnce(tokens);
     mockCall.mockResolvedValueOnce({ revoked: true });
     mockCall.mockResolvedValueOnce([]);

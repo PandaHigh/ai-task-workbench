@@ -1,5 +1,16 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager, pluginRegistry, initWeComBot, getWeComBot } from "./json-rpc/methods.js";
+import {
+  setNotifyFn,
+  shutdown,
+  recoverStaleRuns,
+  store,
+  shareStore,
+  queueManager,
+  skillManager,
+  pluginRegistry,
+  initWeComBot,
+  getWeComBot,
+} from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 import { log } from "./lib/logger.js";
 import { resolvePlaywrightCli } from "./lib/playwright-mcp.js";
@@ -49,7 +60,9 @@ async function main() {
   };
 
   // Register shutdown callback for HTTP-triggered graceful shutdown (Windows Tauri close)
-  wsServer.shutdownCallback = () => { gracefulShutdown(); };
+  wsServer.shutdownCallback = () => {
+    gracefulShutdown();
+  };
 
   skillManager.initBuiltinSkills();
 
@@ -64,7 +77,9 @@ async function main() {
       pluginRegistry.register({ name: "playwright", ...cli });
       log.info("Auto-registered built-in Playwright MCP plugin");
     } else {
-      log.info("Playwright MCP not installed locally — skipping auto-registration (install @playwright/mcp for browser automation)");
+      log.info(
+        "Playwright MCP not installed locally — skipping auto-registration (install @playwright/mcp for browser automation)",
+      );
     }
   }
 
@@ -72,17 +87,25 @@ async function main() {
 
   const recovery = recoverStaleRuns();
   if (recovery.runsReset > 0 || recovery.tasksReset > 0) {
-    log.info(`Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset > 0 ? recovery.tasksReset : 0} tasks reset to pending`);
+    log.info(
+      `Crash recovery: ${recovery.runsReset} runs reset, ${recovery.tasksReset > 0 ? recovery.tasksReset : 0} tasks reset to pending`,
+    );
   }
 
   // Auto-cleanup runs completed more than 30 days ago
   const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
   const allRuns = store.listRuns();
-  const staleRuns = allRuns.filter((r) => r.status === "completed" && r.completedAt && Date.now() - r.completedAt > MAX_AGE_MS);
+  const staleRuns = allRuns.filter(
+    (r) => r.status === "completed" && r.completedAt && Date.now() - r.completedAt > MAX_AGE_MS,
+  );
   if (staleRuns.length > 0) {
     log.info(`Auto-cleanup: removing ${staleRuns.length} runs older than 30 days`);
     for (const r of staleRuns) {
-      try { store.deleteRun(r.id); } catch { /* ignore */ }
+      try {
+        store.deleteRun(r.id);
+      } catch {
+        /* ignore */
+      }
     }
   }
 

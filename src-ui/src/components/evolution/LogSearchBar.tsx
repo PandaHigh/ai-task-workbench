@@ -31,9 +31,7 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (l) => l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q)
-      );
+      result = result.filter((l) => l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q));
     }
     return result;
   }, [logs, search, levelFilter, sourceFilter]);
@@ -75,7 +73,9 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
         aria-label="日志级别过滤"
       >
         {LEVEL_OPTIONS.map((l) => (
-          <option key={l} value={l}>{l === "all" ? "全部级别" : l.toUpperCase()}</option>
+          <option key={l} value={l}>
+            {l === "all" ? "全部级别" : l.toUpperCase()}
+          </option>
         ))}
       </select>
       <select
@@ -91,7 +91,9 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
         aria-label="日志来源过滤"
       >
         {SOURCE_OPTIONS.map((s) => (
-          <option key={s} value={s}>{s === "all" ? "全部来源" : s}</option>
+          <option key={s} value={s}>
+            {s === "all" ? "全部来源" : s}
+          </option>
         ))}
       </select>
       {hasFilter && (
@@ -101,9 +103,17 @@ export function LogSearchBar({ logs, onFilteredChange }: LogSearchBarProps) {
       )}
       {hasFilter && (
         <button
-          onClick={() => { setSearch(""); setLevelFilter("all"); setSourceFilter("all"); }}
+          onClick={() => {
+            setSearch("");
+            setLevelFilter("all");
+            setSourceFilter("all");
+          }}
           className="text-[10px] px-1.5 py-0.5 rounded"
-          style={{ color: "var(--text-secondary)", background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}
+          style={{
+            color: "var(--text-secondary)",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+          }}
         >
           清除
         </button>

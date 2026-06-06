@@ -70,7 +70,9 @@ export class LoopScheduler {
   /**
    * 创建一个定时循环任务。
    */
-  create(loop: Omit<LoopDefinition, "currentIntervalSec" | "createdAt" | "history" | "active" | "lastExecutedAt">): LoopDefinition {
+  create(
+    loop: Omit<LoopDefinition, "currentIntervalSec" | "createdAt" | "history" | "active" | "lastExecutedAt">,
+  ): LoopDefinition {
     const def: LoopDefinition = {
       ...loop,
       currentIntervalSec: loop.intervalMinSec,
@@ -215,16 +217,10 @@ export class LoopScheduler {
   private adjustInterval(loop: LoopDefinition, hadChanges: boolean): void {
     if (hadChanges) {
       // 有变化 → 缩短间隔（更频繁检查）
-      loop.currentIntervalSec = Math.max(
-        loop.intervalMinSec,
-        loop.currentIntervalSec * 0.8,
-      );
+      loop.currentIntervalSec = Math.max(loop.intervalMinSec, loop.currentIntervalSec * 0.8);
     } else {
       // 无变化 → 延长间隔（减少浪费）
-      loop.currentIntervalSec = Math.min(
-        loop.intervalMaxSec,
-        loop.currentIntervalSec * 1.3,
-      );
+      loop.currentIntervalSec = Math.min(loop.intervalMaxSec, loop.currentIntervalSec * 1.3);
     }
   }
 

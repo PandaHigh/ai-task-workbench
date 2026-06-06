@@ -48,7 +48,15 @@ describe("AddTaskModal", () => {
   });
 
   it("should call onSubmit with text, priority, and timeout", () => {
-    render(<AddTaskModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} defaultPriority={3} defaultTimeout={120} />);
+    render(
+      <AddTaskModal
+        open={true}
+        onClose={mockOnClose}
+        onSubmit={mockOnSubmit}
+        defaultPriority={3}
+        defaultTimeout={120}
+      />,
+    );
     const textarea = screen.getByPlaceholderText("描述你的任务...");
     fireEvent.change(textarea, { target: { value: "Fix the bug" } });
     fireEvent.click(screen.getByText("确认添加"));

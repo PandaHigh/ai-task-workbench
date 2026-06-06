@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ExecutionRun, TaskDefinition, GitCommit, LessonLearned, GoalStatus, RunStatus } from "@ai-workbench/shared";
+import type {
+  ExecutionRun,
+  TaskDefinition,
+  GitCommit,
+  LessonLearned,
+  GoalStatus,
+  RunStatus,
+} from "@ai-workbench/shared";
 import { ShareClient } from "../lib/share-client";
 
 const SAFETY_POLL_INTERVAL = 30_000;
@@ -14,7 +21,9 @@ export function useShareView(token: string) {
   const [lessons, setLessons] = useState<LessonLearned[]>([]);
   const [queue, setQueue] = useState<TaskDefinition[]>([]);
   const [report, setReport] = useState<{ report: string; generatedAt: number } | null>(null);
-  const [logs, setLogs] = useState<Array<{ id: number; timestamp: number; level: string; source: string; message: string }>>([]);
+  const [logs, setLogs] = useState<
+    Array<{ id: number; timestamp: number; level: string; source: string; message: string }>
+  >([]);
   const [wsConnected, setWsConnected] = useState(false);
   const wsConnectedRef = useRef(false);
 
@@ -115,9 +124,19 @@ export function useShareView(token: string) {
     c.onNotification((method, params) => {
       switch (method) {
         case "run.status":
-          setRun(prev => prev ? { ...prev, status: params.status as RunStatus, ...(params.finalReport ? { finalReport: params.finalReport as string } : {}) } : prev);
+          setRun((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: params.status as RunStatus,
+                  ...(params.finalReport ? { finalReport: params.finalReport as string } : {}),
+                }
+              : prev,
+          );
           if (["completed", "failed", "paused", "budget_exceeded"].includes(params.status as string)) {
-            c.getRun(token).then(r => setRun(r)).catch(() => {});
+            c.getRun(token)
+              .then((r) => setRun(r))
+              .catch(() => {});
           }
           break;
         case "queue.updated":
@@ -125,25 +144,38 @@ export function useShareView(token: string) {
           break;
         case "task.status":
         case "task.scored":
-          c.getTasks(token).then(setTasks).catch(() => {});
+          c.getTasks(token)
+            .then(setTasks)
+            .catch(() => {});
           break;
         case "log.entry":
-          setLogs(prev => [...prev, { id: Date.now(), timestamp: Date.now(), ...(params as Record<string, unknown>) } as (typeof prev)[number]]);
+          setLogs((prev) => [
+            ...prev,
+            { id: Date.now(), timestamp: Date.now(), ...(params as Record<string, unknown>) } as (typeof prev)[number],
+          ]);
           break;
         case "git.commit":
-          c.getCommits(token).then(setCommits).catch(() => {});
+          c.getCommits(token)
+            .then(setCommits)
+            .catch(() => {});
           break;
         case "goal.updated":
-          setRun(prev => prev ? { ...prev, goalStatus: (params as Record<string, unknown>).status as GoalStatus } : prev);
+          setRun((prev) =>
+            prev ? { ...prev, goalStatus: (params as Record<string, unknown>).status as GoalStatus } : prev,
+          );
           break;
         case "task.phase":
         case "task.stream":
           // Streaming output — refresh tasks to get latest progress
-          c.getTasks(token).then(setTasks).catch(() => {});
+          c.getTasks(token)
+            .then(setTasks)
+            .catch(() => {});
           break;
       }
     });
-    return () => { c.onNotification(() => {}); };
+    return () => {
+      c.onNotification(() => {});
+    };
   }, [token]);
 
   // Safety net polling (30s) — only when not using WebSocket
@@ -154,44 +186,54 @@ export function useShareView(token: string) {
     return () => clearInterval(interval);
   }, [loading, error, fullRefresh]);
 
-  const call = useCallback(async (method: string, params?: Record<string, unknown>) => {
-    const c = client.current;
-    switch (method) {
-      case "task.create":
-        return c.createTask(token, params as { content: string; type?: string; priority?: number; timeoutMinutes?: number });
-      case "task.start":
-        return c.startTask(token, params!.taskId as string);
-      case "task.retry":
-        return c.retryTask(token, params!.taskId as string);
-      case "run.stop":
-        return c.stopRun(token);
-      case "queue.reorder":
-        return c.reorderQueue(token, (params!.taskIds) as string[]);
-      case "task.setTimeout":
-        return c.setTaskTimeout(token, params!.taskId as string, params!.minutes as number);
-      case "task.update":
-        return c.updateTask(token, params!.taskId as string, params as { content?: string; priority?: number; timeoutMinutes?: number });
-      case "queue.remove":
-        return c.removeTask(token, params!.taskId as string);
-      case "queue.list": {
-        const freshQueue = await c.getQueue(token);
-        setQueue(freshQueue);
-        return { runId: token, queue: freshQueue };
+  const call = useCallback(
+    async (method: string, params?: Record<string, unknown>) => {
+      const c = client.current;
+      switch (method) {
+        case "task.create":
+          return c.createTask(
+            token,
+            params as { content: string; type?: string; priority?: number; timeoutMinutes?: number },
+          );
+        case "task.start":
+          return c.startTask(token, params!.taskId as string);
+        case "task.retry":
+          return c.retryTask(token, params!.taskId as string);
+        case "run.stop":
+          return c.stopRun(token);
+        case "queue.reorder":
+          return c.reorderQueue(token, params!.taskIds as string[]);
+        case "task.setTimeout":
+          return c.setTaskTimeout(token, params!.taskId as string, params!.minutes as number);
+        case "task.update":
+          return c.updateTask(
+            token,
+            params!.taskId as string,
+            params as { content?: string; priority?: number; timeoutMinutes?: number },
+          );
+        case "queue.remove":
+          return c.removeTask(token, params!.taskId as string);
+        case "queue.list": {
+          const freshQueue = await c.getQueue(token);
+          setQueue(freshQueue);
+          return { runId: token, queue: freshQueue };
+        }
+        case "run.tasks":
+          return tasks;
+        case "run.commits":
+          return commits;
+        case "run.lessons":
+          return lessons;
+        case "run.report":
+          return { run, report };
+        case "run.logs":
+          return logs;
+        default:
+          throw new Error(`Unknown method: ${method}`);
       }
-      case "run.tasks":
-        return tasks;
-      case "run.commits":
-        return commits;
-      case "run.lessons":
-        return lessons;
-      case "run.report":
-        return { run, report };
-      case "run.logs":
-        return logs;
-      default:
-        throw new Error(`Unknown method: ${method}`);
-    }
-  }, [token, tasks, commits, lessons, run, report, logs]);
+    },
+    [token, tasks, commits, lessons, run, report, logs],
+  );
 
   return { loading, error, run, tasks, commits, lessons, queue, report, logs, call, refresh: fullRefresh, wsConnected };
 }

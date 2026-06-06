@@ -17,7 +17,12 @@ class EngineClient {
     return new Promise((resolve, reject) => {
       if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
         if (this.ws!.readyState === WebSocket.OPEN) resolve();
-        else this.ws!.onopen = () => { this.connected = true; this.reconnectAttempts = 0; resolve(); };
+        else
+          this.ws!.onopen = () => {
+            this.connected = true;
+            this.reconnectAttempts = 0;
+            resolve();
+          };
         return;
       }
 
@@ -34,7 +39,10 @@ class EngineClient {
         try {
           msg = JSON.parse(event.data as string);
         } catch (parseErr) {
-          console.warn("[engine-client] received non-JSON message:", parseErr instanceof Error ? parseErr.message : parseErr);
+          console.warn(
+            "[engine-client] received non-JSON message:",
+            parseErr instanceof Error ? parseErr.message : parseErr,
+          );
           return;
         }
 
@@ -126,7 +134,9 @@ class EngineClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect().catch((err) => { console.warn("[engine-client] reconnect failed:", err instanceof Error ? err.message : err); });
+      this.connect().catch((err) => {
+        console.warn("[engine-client] reconnect failed:", err instanceof Error ? err.message : err);
+      });
     }, delay);
   }
 }

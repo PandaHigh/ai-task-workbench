@@ -65,7 +65,8 @@ Respond ONLY with valid JSON:
     workingDir,
     timeoutMinutes: 10,
     maxTurns: architectRole.maxTurns,
-    systemPrompt: "You are a senior code reviewer. Assess technical correctness, security, and code quality. Respond with valid JSON only.",
+    systemPrompt:
+      "You are a senior code reviewer. Assess technical correctness, security, and code quality. Respond with valid JSON only.",
     abortSignal,
   });
 
@@ -113,7 +114,8 @@ Respond ONLY with valid JSON:
     workingDir,
     timeoutMinutes: 10,
     maxTurns: momusRole.maxTurns,
-    systemPrompt: "You are an adversarial code reviewer. Find every possible flaw. Only approve genuinely solid code. Respond with valid JSON only.",
+    systemPrompt:
+      "You are an adversarial code reviewer. Find every possible flaw. Only approve genuinely solid code. Respond with valid JSON only.",
     abortSignal,
   });
 
@@ -162,10 +164,14 @@ function buildCombinedFeedback(architect: ReviewResult, critic: ReviewResult): s
   const majorIssues = [...architect.issues, ...critic.issues].filter((i) => i.severity === "major");
 
   if (criticalIssues.length > 0) {
-    parts.push(`### Critical Issues:\n${criticalIssues.map((i) => `- [${i.file}${i.line ? `:${i.line}` : ""}] ${i.description}\n  Fix: ${i.suggestion}`).join("\n")}`);
+    parts.push(
+      `### Critical Issues:\n${criticalIssues.map((i) => `- [${i.file}${i.line ? `:${i.line}` : ""}] ${i.description}\n  Fix: ${i.suggestion}`).join("\n")}`,
+    );
   }
   if (majorIssues.length > 0) {
-    parts.push(`### Major Issues:\n${majorIssues.map((i) => `- [${i.file}${i.line ? `:${i.line}` : ""}] ${i.description}\n  Fix: ${i.suggestion}`).join("\n")}`);
+    parts.push(
+      `### Major Issues:\n${majorIssues.map((i) => `- [${i.file}${i.line ? `:${i.line}` : ""}] ${i.description}\n  Fix: ${i.suggestion}`).join("\n")}`,
+    );
   }
 
   return parts.join("\n\n");
