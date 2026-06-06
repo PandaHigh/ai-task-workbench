@@ -109,6 +109,8 @@ function validateWorkingDir(dir: string): string {
     throw new Error(`workingDir cannot be the home or temp directory: ${resolved}`);
   }
 
+  mkdirSync(resolved, { recursive: true });
+
   return resolved;
 }
 
