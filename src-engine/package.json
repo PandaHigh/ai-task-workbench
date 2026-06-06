@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-workbench/shared": "*",
     "@playwright/mcp": "^0.0.75",
+    "@wecom/aibot-node-sdk": "^1.0.7",
     "archiver": "^8.0.0",
     "cron": "^4.4.0",
     "simple-git": "^3.27.0",

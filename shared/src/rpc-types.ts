@@ -91,6 +91,11 @@ export type EngineMethod =
   | "profile.set"
   | "profile.delete"
   | "metrics.snapshot"
+  | "chat.send"
+  | "chat.history"
+  | "chat.clear"
+  | "wecom.status"
+  | "wecom.test"
 ;
 
 export type EngineNotification =
@@ -113,4 +118,7 @@ export type EngineNotification =
   | "skill.removed"
   | "plugin.updated"
   | "agent.progress"
+  | "chat.stream"
+  | "chat.complete"
+  | "chat.error"
 ;

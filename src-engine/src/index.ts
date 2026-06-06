@@ -1,5 +1,5 @@
 import { WsServer } from "./ws-server.js";
-import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager, pluginRegistry } from "./json-rpc/methods.js";
+import { setNotifyFn, shutdown, recoverStaleRuns, store, shareStore, queueManager, skillManager, pluginRegistry, initWeComBot, getWeComBot } from "./json-rpc/methods.js";
 import { killAllActiveProcesses } from "./cc-integration/cc-client.js";
 import { log } from "./lib/logger.js";
 import { resolvePlaywrightCli } from "./lib/playwright-mcp.js";
@@ -13,6 +13,13 @@ async function main() {
 
   const notify = (method: string, params: Record<string, unknown>) => {
     wsServer.broadcast(method, params);
+    // Forward engine notifications to WeChat Work bot for proactive push
+    const wecomBot = getWeComBot();
+    if (wecomBot?.isRunning()) {
+      wecomBot.handleEngineNotification(method, params).catch((err) => {
+        log.warn(`[wecom] Notification forwarding failed: ${err instanceof Error ? err.message : err}`);
+      });
+    }
   };
 
   setNotifyFn(notify);
@@ -26,6 +33,8 @@ async function main() {
     console.log("\nShutting down gracefully...");
 
     await killAllActiveProcesses();
+    const wecomBot = getWeComBot();
+    if (wecomBot) wecomBot.stop();
     store.flush();
 
     let shutdownOk = true;
@@ -43,6 +52,9 @@ async function main() {
   wsServer.shutdownCallback = () => { gracefulShutdown(); };
 
   skillManager.initBuiltinSkills();
+
+  // Initialize WeChat Work bot (connects if enabled in config)
+  initWeComBot();
 
   // Auto-register built-in Playwright MCP plugin if not already registered
   const existing = pluginRegistry.list();

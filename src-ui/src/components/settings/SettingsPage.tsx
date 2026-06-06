@@ -6,6 +6,7 @@ import { pageEnterStyle } from "../../hooks/useAnimations";
 import { SkillsManager } from "./SkillsManager";
 import { PluginManager } from "./PluginManager";
 import { ProfileManager } from "./ProfileManager";
+import { WeComConfig } from "./WeComConfig";
 
 interface OrigValues {
   qualityThreshold: number;
@@ -217,6 +218,12 @@ export function SettingsPage() {
         <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
           <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>编排配置</h3>
           <ProfileManager />
+        </div>
+
+        {/* WeChat Work Bot */}
+        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text-secondary)" }}>企业微信机器人</h3>
+          <WeComConfig />
         </div>
 
         {/* Advanced settings */}

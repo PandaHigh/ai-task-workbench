@@ -19,6 +19,7 @@ import { DEFAULT_CREW_CONFIG, type CrewMode, getBuiltInProfiles } from "../engin
 import { PluginRegistry, type McpServerConfig } from "../plugins/plugin-registry.js";
 
 import { getDataDir } from "../db/store-utils.js";
+import { log } from "../lib/logger.js";
 
 const PORT = Number(process.env.ENGINE_PORT) || 9731;
 
@@ -154,6 +155,9 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "adaptiveEnabled",
   "activeProfile",
   "branchStrategy",
+  "wecom.botId",
+  "wecom.secret",
+  "wecom.enabled",
 ]);
 
 // ─── Notify / shutdown ─────────────────────────────────────────────────
@@ -211,6 +215,17 @@ export function recoverStaleRuns(): { runsReset: number; tasksReset: number; app
 }
 
 type MethodHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
+
+// ─── Method metadata (optional, enriches master agent tool descriptions) ─
+
+export interface MethodDescriptor {
+  description: string;
+  params: Array<{ name: string; type: string; required: boolean; description: string }>;
+  category: string;
+}
+
+/** Optional metadata for RPC methods. MasterAgent reads methodHandlers keys + this metadata. */
+export const methodMeta: Record<string, MethodDescriptor> = {};
 
 // ─── Method handlers ───────────────────────────────────────────────────
 
@@ -1010,4 +1025,334 @@ export const methodHandlers: Record<string, MethodHandler> = {
     return { injected: true, newTaskId: injectedTask.id };
   },
 
+};
+
+// ─── Method metadata for master agent (optional enrichment) ─────────────
+// Methods without metadata are still available to the agent with generic descriptions.
+
+Object.assign(methodMeta, {
+  "run.list": {
+    description: "列出所有任务运行（包含状态、进度、成本等信息）",
+    params: [],
+    category: "run",
+  },
+  "run.create": {
+    description: "创建新的任务运行。需要工作目录、目标和终止条件。",
+    params: [
+      { name: "workingDir", type: "string", required: true, description: "工作目录路径" },
+      { name: "goals", type: "string[]", required: true, description: "任务目标列表" },
+      { name: "terminationConditions", type: "string[]", required: true, description: "终止条件列表" },
+      { name: "tasks", type: "array", required: false, description: "预定义子任务" },
+    ],
+    category: "run",
+  },
+  "run.stop": {
+    description: "停止正在运行的任务执行",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.delete": {
+    description: "删除一个任务运行",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.update": {
+    description: "更新任务运行的目标和终止条件",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "goals", type: "string[]", required: false, description: "新目标" },
+      { name: "terminationConditions", type: "string[]", required: false, description: "新终止条件" },
+    ],
+    category: "run",
+  },
+  "run.report": {
+    description: "获取任务运行的详细报告",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.tasks": {
+    description: "列出某个运行中的所有子任务",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.commits": {
+    description: "获取某个运行的 git 提交记录",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.lessons": {
+    description: "获取某个运行的教训记录",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "task.create": {
+    description: "向运行中添加新的子任务",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "content", type: "string", required: true, description: "任务内容描述" },
+      { name: "type", type: "string", required: false, description: "任务类型: user_defined 或 ai_generated" },
+      { name: "priority", type: "number", required: false, description: "优先级，数字越小越优先" },
+    ],
+    category: "task",
+  },
+  "task.start": {
+    description: "开始执行任务（启动自进化循环）",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "task",
+  },
+  "task.pause": {
+    description: "暂停正在运行的任务",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "task",
+  },
+  "task.resume": {
+    description: "恢复已暂停的任务",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "task",
+  },
+  "task.cancel": {
+    description: "取消某个子任务",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+    ],
+    category: "task",
+  },
+  "task.retry": {
+    description: "重试失败的子任务",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+    ],
+    category: "task",
+  },
+  "task.update": {
+    description: "更新子任务内容或优先级",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+      { name: "content", type: "string", required: false, description: "新内容" },
+      { name: "priority", type: "number", required: false, description: "新优先级" },
+    ],
+    category: "task",
+  },
+  "task.intervene": {
+    description: "干预子任务：暂停、取消或跳过",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+      { name: "action", type: "string", required: true, description: "操作: pause/cancel/skip" },
+    ],
+    category: "task",
+  },
+  "task.inject": {
+    description: "向运行中的子任务注入指令",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+      { name: "instruction", type: "string", required: true, description: "注入的指令内容" },
+    ],
+    category: "task",
+  },
+  "queue.list": {
+    description: "查看任务执行队列",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "queue",
+  },
+  "queue.reorder": {
+    description: "重新排列任务队列顺序",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskIds", type: "string[]", required: true, description: "新的任务 ID 顺序" },
+    ],
+    category: "queue",
+  },
+  "queue.remove": {
+    description: "从队列中移除任务",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "要移除的任务 ID" },
+    ],
+    category: "queue",
+  },
+  "config.get": {
+    description: "获取引擎配置值",
+    params: [{ name: "key", type: "string", required: true, description: "配置键名" }],
+    category: "config",
+  },
+  "config.set": {
+    description: "设置引擎配置值",
+    params: [
+      { name: "key", type: "string", required: true, description: "配置键名" },
+      { name: "value", type: "any", required: true, description: "配置值" },
+    ],
+    category: "config",
+  },
+  "share.create": {
+    description: "创建任务分享链接",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "label", type: "string", required: false, description: "分享标签" },
+    ],
+    category: "share",
+  },
+  "share.list": {
+    description: "列出所有分享链接",
+    params: [{ name: "runId", type: "string", required: false, description: "运行 ID（可选，不传则列出全部）" }],
+    category: "share",
+  },
+  "share.revoke": {
+    description: "撤销分享链接",
+    params: [{ name: "token", type: "string", required: true, description: "分享 token" }],
+    category: "share",
+  },
+  "activity.list": {
+    description: "查看活动时间线",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "limit", type: "number", required: false, description: "返回条数限制" },
+    ],
+    category: "activity",
+  },
+  "comment.list": {
+    description: "查看任务评论",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: false, description: "子任务 ID（可选）" },
+    ],
+    category: "comment",
+  },
+  "comment.create": {
+    description: "添加任务评论",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "taskId", type: "string", required: true, description: "子任务 ID" },
+      { name: "content", type: "string", required: true, description: "评论内容" },
+    ],
+    category: "comment",
+  },
+  "crew.list": {
+    description: "查看可用的 Agent 角色列表",
+    params: [],
+    category: "crew",
+  },
+  "crew.configure": {
+    description: "配置任务的 Agent 协作模式",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "mode", type: "string", required: false, description: "协作模式" },
+    ],
+    category: "crew",
+  },
+  "skill.list": {
+    description: "查看已安装的技能列表",
+    params: [{ name: "type", type: "string", required: false, description: "技能类型过滤" }],
+    category: "skill",
+  },
+  "plugin.list": {
+    description: "查看已安装的插件列表",
+    params: [],
+    category: "plugin",
+  },
+  "approval.respond": {
+    description: "响应审批请求（批准/拒绝/修改）",
+    params: [
+      { name: "runId", type: "string", required: true, description: "运行 ID" },
+      { name: "approvalId", type: "string", required: true, description: "审批 ID" },
+      { name: "action", type: "string", required: true, description: "操作: approve/reject/modify" },
+    ],
+    category: "approval",
+  },
+  "run.pauseGoal": {
+    description: "暂停目标评估",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "run.resumeGoal": {
+    description: "恢复目标评估",
+    params: [{ name: "runId", type: "string", required: true, description: "运行 ID" }],
+    category: "run",
+  },
+  "profile.list": {
+    description: "查看编排器配置列表",
+    params: [],
+    category: "profile",
+  },
+  "wecom.status": {
+    description: "查看企业微信机器人连接状态",
+    params: [],
+    category: "wecom",
+  },
+  "wecom.test": {
+    description: "发送测试消息到企业微信",
+    params: [
+      { name: "target", type: "string", required: true, description: "用户ID或群聊ID" },
+      { name: "content", type: "string", required: true, description: "消息内容（支持Markdown）" },
+    ],
+    category: "wecom",
+  },
+});
+
+// ─── Chat (Master Agent) RPC methods ────────────────────────────────────
+
+import { MasterAgent } from "../engine/master-agent/master-agent.js";
+
+const masterAgent = new MasterAgent();
+
+methodHandlers["chat.send"] = async (params) => {
+  const message = requireNonEmptyString(params, "message");
+  const sessionId = typeof params.sessionId === "string" && params.sessionId
+    ? params.sessionId
+    : crypto.randomUUID();
+
+  // Fire-and-forget: agent streams results via notifications
+  masterAgent.handleMessage(sessionId, message, notify).catch((err) => {
+    notify("chat.error", { sessionId, error: err instanceof Error ? err.message : String(err) });
+  });
+
+  return { sessionId, status: "processing" };
+};
+
+methodHandlers["chat.history"] = async (params) => {
+  const sessionId = requireString(params, "sessionId");
+  const messages = masterAgent.getHistory(sessionId);
+  return { sessionId, messages };
+};
+
+methodHandlers["chat.clear"] = async (params) => {
+  const sessionId = requireString(params, "sessionId");
+  masterAgent.clearSession(sessionId);
+  return { cleared: true };
+};
+
+// ─── WeChat Work (企业微信) Bot ──────────────────────────────────────────
+
+import { WeComBot } from "../engine/master-agent/wecom-bot.js";
+
+let wecomBot: WeComBot | null = null;
+
+export function initWeComBot(): void {
+  wecomBot = new WeComBot(masterAgent, store);
+  wecomBot.start().catch((err) => {
+    log.error(`[wecom] Failed to start: ${err instanceof Error ? err.message : err}`);
+  });
+}
+
+export function getWeComBot(): WeComBot | null {
+  return wecomBot;
+}
+
+methodHandlers["wecom.status"] = async () => {
+  if (!wecomBot) return { enabled: false, connected: false };
+  return wecomBot.getStatus();
+};
+
+methodHandlers["wecom.test"] = async (params) => {
+  if (!wecomBot || !wecomBot.isRunning()) {
+    throw new RpcValidationError("WeChat Work bot is not running. Enable and configure it in settings first.");
+  }
+  const target = requireNonEmptyString(params, "target");
+  const content = requireNonEmptyString(params, "content");
+  await wecomBot.sendProactiveMessage(target, content);
+  return { sent: true };
 };
