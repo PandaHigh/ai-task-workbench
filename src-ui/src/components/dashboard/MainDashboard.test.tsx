@@ -12,17 +12,12 @@ vi.mock("../../stores/task-store", () => ({
   useTaskStore: vi.fn(),
 }));
 
-vi.mock("../../stores/workflow-store", () => ({
-  useWorkflowStore: vi.fn(),
-}));
-
 vi.mock("../chat/MasterChat", () => ({
   MasterChat: () => <div data-testid="master-chat">AI Chat</div>,
 }));
 
 import { useEngine } from "../../hooks/useEngine";
 import { useTaskStore } from "../../stores/task-store";
-import { useWorkflowStore } from "../../stores/workflow-store";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -73,9 +68,6 @@ describe("MainDashboard", () => {
       deleteTask: vi.fn(),
       setActiveRun: vi.fn(),
     });
-    vi.mocked(useWorkflowStore).mockReturnValue({
-      activeWorkflows: new Map(),
-    } as ReturnType<typeof useWorkflowStore>);
   });
 
   it("连接引擎时自动加载任务", () => {

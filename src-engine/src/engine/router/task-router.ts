@@ -1,17 +1,19 @@
 /**
  * Task Router — 任务路由器
  *
- * 借鉴 Claude Code Ultracode 模式，根据任务复杂度动态选择执行策略。
+ * 简化为两档路由：
+ *   1. 简单任务 → direct（单次 CC 调用）
+ *   2. 其余任务 → pipeline（OMX 5阶段流水线）
  *
  * 路由流程：
- *   1. 快速关键词预匹配 → 命中内置模板则直接推荐
+ *   1. 快速关键词预匹配 → 命中复杂关键词直接走 pipeline
  *   2. 无命中 → 调用 CC 做完整复杂度评估
- *   3. 根据评估结果选择 direct / builtin:xxx / dynamic
+ *   3. 根据评估结果选择 direct / pipeline
  */
 
 import type { TaskDefinition } from "@ai-workbench/shared";
 import { CCClient } from "../../cc-integration/cc-client.js";
-import { buildRouterPrompt, TEMPLATE_KEYWORDS } from "./router-prompts.js";
+import { buildRouterPrompt, PIPELINE_KEYWORDS } from "./router-prompts.js";
 import type {
   ComplexityAssessment,
   ComplexityLevel,
@@ -38,16 +40,11 @@ export class TaskRouter {
 
   /**
    * 分析任务并返回路由决策。
-   *
-   * @param task 待分析的任务
-   * @param context 当前运行上下文（预算、已完成数等）
-   * @returns 路由决策结果
    */
   async analyze(task: TaskDefinition, context: RoutingContext): Promise<ComplexityAssessment> {
     // Step 1: 快速关键词预匹配
-    const quickMatch = this.quickMatch(task.content);
-    if (quickMatch) {
-      const assessment = this.buildAssessmentFromQuickMatch(task, quickMatch, context);
+    if (this.quickMatchPipeline(task.content)) {
+      const assessment = this.buildPipelineAssessment(task.content);
       this.emitDecision(task, assessment);
       return assessment;
     }
@@ -59,24 +56,11 @@ export class TaskRouter {
   }
 
   /**
-   * 快速关键词预匹配。
-   * 如果任务内容包含内置模板的关键词，直接推荐对应模板。
-   * 返回 null 表示无命中，需要走完整评估。
+   * 快速关键词预匹配：命中复杂关键词直接走 pipeline。
    */
-  private quickMatch(taskContent: string): string | null {
+  private quickMatchPipeline(taskContent: string): boolean {
     const lower = taskContent.toLowerCase();
-    let bestMatch: string | null = null;
-    let bestPriority = 0;
-
-    for (const [templateName, config] of Object.entries(TEMPLATE_KEYWORDS)) {
-      const hit = config.keywords.some((kw) => lower.includes(kw.toLowerCase()));
-      if (hit && config.priority > bestPriority) {
-        bestMatch = templateName;
-        bestPriority = config.priority;
-      }
-    }
-
-    return bestMatch;
+    return PIPELINE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
   }
 
   /**
@@ -133,16 +117,16 @@ export class TaskRouter {
 
       return this.parseAssessment(responseText);
     } catch (err) {
-      // 评估失败时降级为默认策略（omx-pipeline）
+      // 评估失败时降级为 pipeline
       console.warn(
-        "[task-router] Complexity analysis failed, falling back to omx-pipeline:",
+        "[task-router] Complexity analysis failed, falling back to pipeline:",
         err instanceof Error ? err.message : String(err),
       );
       return {
         level: "moderate",
-        strategy: { type: "builtin", templateName: "omx-pipeline" },
+        strategy: { type: "pipeline" },
         confidence: 0.3,
-        reason: "复杂度评估失败，降级为标准 pipeline",
+        reason: "复杂度评估失败，降级为 pipeline",
         dimensions: { scope: 0.5, uncertainty: 0.5, risk: 0.5, parallelism: 0.3, verificationNeed: 0.3 },
         estimatedAgents: 5,
         estimatedCostUsd: 1.0,
@@ -154,10 +138,8 @@ export class TaskRouter {
    * 解析 CC 返回的 JSON 为 ComplexityAssessment。
    */
   private parseAssessment(text: string): ComplexityAssessment {
-    // 提取 JSON（可能被 markdown code block 包裹）
     const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     if (!jsonMatch) {
-      // 解析失败，降级
       return this.defaultAssessment();
     }
 
@@ -189,15 +171,12 @@ export class TaskRouter {
 
   private parseStrategy(raw: unknown): ExecutionStrategy {
     if (!raw || typeof raw !== "object") {
-      return { type: "builtin", templateName: "omx-pipeline" };
+      return { type: "pipeline" };
     }
     const s = raw as Record<string, unknown>;
     if (s.type === "direct") return { type: "direct" };
-    if (s.type === "dynamic") return { type: "dynamic" };
-    if (s.type === "builtin" && typeof s.templateName === "string") {
-      return { type: "builtin", templateName: s.templateName };
-    }
-    return { type: "builtin", templateName: "omx-pipeline" };
+    // 任何非 direct 的都走 pipeline
+    return { type: "pipeline" };
   }
 
   private parseDimensions(raw: unknown): ComplexityDimensions {
@@ -220,70 +199,21 @@ export class TaskRouter {
     return fallback;
   }
 
-  /** 快速匹配命中的评估结果 */
-  private buildAssessmentFromQuickMatch(
-    _task: TaskDefinition,
-    templateName: string,
-    _context: RoutingContext,
-  ): ComplexityAssessment {
-    // 根据模板名推断复杂度和维度
-    const templateProfiles: Record<
-      string,
-      { level: ComplexityLevel; dimensions: ComplexityDimensions; agents: number; cost: number }
-    > = {
-      "security-audit": {
-        level: "complex",
-        dimensions: { scope: 0.8, uncertainty: 0.4, risk: 0.9, parallelism: 0.8, verificationNeed: 0.9 },
-        agents: 8,
-        cost: 3.0,
-      },
-      "code-review": {
-        level: "complex",
-        dimensions: { scope: 0.6, uncertainty: 0.3, risk: 0.6, parallelism: 0.7, verificationNeed: 0.7 },
-        agents: 5,
-        cost: 2.0,
-      },
-      "bug-sweep": {
-        level: "complex",
-        dimensions: { scope: 0.7, uncertainty: 0.6, risk: 0.5, parallelism: 0.7, verificationNeed: 0.8 },
-        agents: 6,
-        cost: 2.5,
-      },
-      migration: {
-        level: "massive",
-        dimensions: { scope: 0.9, uncertainty: 0.5, risk: 0.7, parallelism: 0.9, verificationNeed: 0.7 },
-        agents: 15,
-        cost: 10.0,
-      },
-      "dead-code": {
-        level: "complex",
-        dimensions: { scope: 0.7, uncertainty: 0.3, risk: 0.3, parallelism: 0.8, verificationNeed: 0.6 },
-        agents: 5,
-        cost: 2.0,
-      },
-    };
-
-    const profile = templateProfiles[templateName] ?? {
-      level: "moderate" as ComplexityLevel,
-      dimensions: { scope: 0.5, uncertainty: 0.4, risk: 0.4, parallelism: 0.3, verificationNeed: 0.4 },
-      agents: 5,
-      cost: 1.5,
-    };
-
+  /** 关键词匹配命中时的评估结果 — 直接走 pipeline */
+  private buildPipelineAssessment(_taskContent: string): ComplexityAssessment {
     return {
-      level: profile.level,
-      strategy: { type: "builtin", templateName },
+      level: "complex",
+      strategy: { type: "pipeline" },
       confidence: 0.85,
-      reason: `关键词匹配到内置模板 "${templateName}"`,
-      dimensions: profile.dimensions,
-      estimatedAgents: profile.agents,
-      estimatedCostUsd: profile.cost,
+      reason: `关键词匹配到复杂任务，走 OMX Pipeline`,
+      dimensions: { scope: 0.7, uncertainty: 0.4, risk: 0.5, parallelism: 0.5, verificationNeed: 0.6 },
+      estimatedAgents: 5,
+      estimatedCostUsd: 2.0,
     };
   }
 
   /** 默认评估（解析失败时降级） */
   private defaultAssessment(task?: TaskDefinition): ComplexityAssessment {
-    // 如果有 task 信息，根据内容长度做简单启发式
     if (task) {
       const contentLength = task.content.length;
       const isLikelySimple = contentLength < 50 && !task.dependsOn?.length;
@@ -293,7 +223,7 @@ export class TaskRouter {
           level: "simple",
           strategy: { type: "direct" },
           confidence: 0.4,
-          reason: "任务描述简短，降级为直接执行",
+          reason: "任务描述简短，走直接执行",
           dimensions: { scope: 0.2, uncertainty: 0.3, risk: 0.2, parallelism: 0.1, verificationNeed: 0.2 },
           estimatedAgents: 1,
           estimatedCostUsd: 0.1,
@@ -303,9 +233,9 @@ export class TaskRouter {
 
     return {
       level: "moderate",
-      strategy: { type: "builtin", templateName: "omx-pipeline" },
+      strategy: { type: "pipeline" },
       confidence: 0.4,
-      reason: "评估降级为标准 pipeline",
+      reason: "评估降级为 pipeline",
       dimensions: { scope: 0.5, uncertainty: 0.5, risk: 0.5, parallelism: 0.3, verificationNeed: 0.3 },
       estimatedAgents: 5,
       estimatedCostUsd: 1.0,

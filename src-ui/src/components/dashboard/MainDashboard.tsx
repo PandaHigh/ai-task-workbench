@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTaskStore } from "../../stores/task-store";
-import { useWorkflowStore } from "../../stores/workflow-store";
 import { useEngine } from "../../hooks/useEngine";
 import { Skeleton } from "../common/Skeleton";
 import { MasterChat } from "../chat/MasterChat";
 import { TaskCard } from "./TaskCard";
-import { WorkflowPanel } from "../workflow/WorkflowPanel";
 import { pageEnterStyle, staggerItemStyle } from "../../hooks/useAnimations";
 
 const REFRESH_INTERVAL = 30_000;
@@ -14,9 +12,6 @@ export function MainDashboard() {
   const { connected } = useEngine();
   const { tasks, loading, loadTasks } = useTaskStore();
   const [showTasks, setShowTasks] = useState(true);
-  const [rightTab, setRightTab] = useState<"tasks" | "workflows">("tasks");
-  const activeWorkflows = useWorkflowStore((s) => s.activeWorkflows);
-  const hasActiveWorkflows = activeWorkflows.size > 0;
 
   useEffect(() => {
     if (connected) loadTasks();
@@ -41,41 +36,14 @@ export function MainDashboard() {
           className="flex-shrink-0 flex flex-col overflow-hidden border-l"
           style={{ width: 340, borderColor: "var(--border)" }}
         >
-          {/* 面板头 + Tab 切换 */}
+          {/* 面板头 */}
           <div
             className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0"
             style={{ borderColor: "var(--border)" }}
           >
-            <div className="flex gap-3">
-              <button
-                onClick={() => setRightTab("tasks")}
-                style={{
-                  fontSize: 12,
-                  fontWeight: rightTab === "tasks" ? 600 : 400,
-                  color: rightTab === "tasks" ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                任务 · {tasks.length}
-              </button>
-              <button
-                onClick={() => setRightTab("workflows")}
-                style={{
-                  fontSize: 12,
-                  fontWeight: rightTab === "workflows" ? 600 : 400,
-                  color: rightTab === "workflows" ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                工作流{hasActiveWorkflows ? ` · ${activeWorkflows.size}` : ""}
-              </button>
-            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
+              任务 · {tasks.length}
+            </span>
             <button
               onClick={() => setShowTasks(false)}
               style={{
@@ -102,26 +70,22 @@ export function MainDashboard() {
             </button>
           </div>
 
-          {/* Tab 内容 */}
+          {/* 任务列表 */}
           <div className="flex-1 overflow-y-auto">
-            {rightTab === "tasks" ? (
-              <div className="p-3 space-y-2">
-                {loading && Array.from({ length: 3 }, (_, i) => <Skeleton key={i} variant="card" height={80} />)}
-                {!loading && tasks.length === 0 && (
-                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: 24 }}>
-                    暂无任务，通过 AI 助手创建
-                  </p>
-                )}
-                {!loading &&
-                  tasks.map((task, i) => (
-                    <div key={task.id} style={staggerItemStyle(i, 30)}>
-                      <TaskCard task={task} onDelete={() => loadTasks()} />
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <WorkflowPanel />
-            )}
+            <div className="p-3 space-y-2">
+              {loading && Array.from({ length: 3 }, (_, i) => <Skeleton key={i} variant="card" height={80} />)}
+              {!loading && tasks.length === 0 && (
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: 24 }}>
+                  暂无任务，通过 AI 助手创建
+                </p>
+              )}
+              {!loading &&
+                tasks.map((task, i) => (
+                  <div key={task.id} style={staggerItemStyle(i, 30)}>
+                    <TaskCard task={task} onDelete={() => loadTasks()} />
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
       )}

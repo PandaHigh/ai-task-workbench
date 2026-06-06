@@ -1,10 +1,9 @@
 /**
  * Task Router — 类型定义
  *
- * 借鉴 Claude Code Ultracode 模式，根据任务复杂度动态选择执行策略：
- *   direct          → 简单任务，MasterAgent 直接工具调用完成
- *   builtin:xxx     → 中等/复杂任务，走内置 workflow 模板（如 omx-pipeline、security-audit）
- *   dynamic         → 大规模/特殊任务，AI 动态生成 workflow 脚本编排
+ * 路由策略简化为两档：
+ *   direct   → 简单任务，单次 CC 调用完成
+ *   pipeline → 中等及以上任务，走 OMX 5阶段流水线
  */
 
 // ─── 复杂度等级 ──────────────────────────────────────────────────────────
@@ -13,7 +12,7 @@ export type ComplexityLevel = "simple" | "moderate" | "complex" | "massive";
 
 // ─── 执行策略 ────────────────────────────────────────────────────────────
 
-export type ExecutionStrategy = { type: "direct" } | { type: "builtin"; templateName: string } | { type: "dynamic" };
+export type ExecutionStrategy = { type: "direct" } | { type: "pipeline" };
 
 // ─── 复杂度评估结果 ──────────────────────────────────────────────────────
 

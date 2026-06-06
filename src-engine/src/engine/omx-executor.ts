@@ -268,7 +268,7 @@ export class Executor {
           run.id,
           "router",
           "info",
-          `Task routed: ${routeAssessment.strategy.type}${routeAssessment.strategy.type === "builtin" ? `:${(routeAssessment.strategy as { type: "builtin"; templateName: string }).templateName}` : ""} (confidence: ${(routeAssessment.confidence * 100).toFixed(0)}%, ${routeAssessment.reason})`,
+          `Task routed: ${routeAssessment.strategy.type} (confidence: ${(routeAssessment.confidence * 100).toFixed(0)}%, ${routeAssessment.reason})`,
           firstTask.id,
         );
       } catch (routeErr) {
@@ -281,14 +281,13 @@ export class Executor {
       }
 
       // Route to appropriate execution path
-      const strategy = routeAssessment?.strategy ?? { type: "builtin", templateName: "omx-pipeline" };
+      const strategy = routeAssessment?.strategy ?? { type: "pipeline" };
 
       if (strategy.type === "direct") {
         // Simple task: skip full pipeline, execute via single CC call
         await this.executeDirectTask(firstTask, run);
       } else {
-        // Default: go through OMX pipeline (builtin:omx-pipeline or future workflow templates)
-        // When WorkflowRuntime is ready (Phase 2), this will delegate to it
+        // All other tasks → OmxAmpPipeline (5-stage)
         await this.executeSingleTask(firstTask, run);
       }
 
@@ -756,18 +755,102 @@ export class Executor {
         reasoning: "Direct execution — auto-assumed passing for simple task",
       };
 
-      this.store.appendScore(run.id, task.id, score);
-      this.store.updateTask(run.id, task.id, {
-        status: "completed",
-        completedAt: Date.now(),
-        result: output,
-        score: score.overall,
-        scoreDetails: score,
-      });
-      this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
-      this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
+      // Checkpoint: borderline_score (same as pipeline path)
+      const scoreDiff = Math.abs(score.overall - this.config.qualityThreshold);
+      if (scoreDiff < 0.15) {
+        const diffStats = await this.getDiffStats(gitManager);
+        const decision = await this.checkApproval(
+          "borderline_score",
+          run,
+          task,
+          "Score near threshold. Commit or revert?",
+          { score, diffStats, taskContent: task.content },
+        );
+        if (decision?.action === "reject") {
+          score.passed = false;
+        }
+        if (decision?.instructions) {
+          this.log(run.id, "engine", "info", "Human instruction: " + decision.instructions, task.id);
+        }
+      }
 
-      this.log(run.id, "direct", "info", `Direct task completed successfully`, task.id);
+      if (score.passed) {
+        // Checkpoint: risky_commit (same as pipeline path)
+        const diffStats = await this.getDiffStats(gitManager);
+        const isRisky = diffStats.filesChanged > 10 || diffStats.linesChanged > 200 || diffStats.hasCriticalFiles;
+        if (isRisky) {
+          const decision = await this.checkApproval(
+            "risky_commit",
+            run,
+            task,
+            "Large change: " + diffStats.filesChanged + " files, " + diffStats.linesChanged + " lines. Review?",
+            { diffStats, taskContent: task.content },
+          );
+          if (decision?.action === "reject") {
+            score.passed = false;
+          }
+        }
+      }
+
+      this.store.appendScore(run.id, task.id, score);
+      this.store.updateTask(run.id, task.id, { score: score.overall, scoreDetails: score });
+      this.broadcast("task.scored", { taskId: task.id, runId: run.id, score });
+
+      this.log(
+        run.id,
+        "scorer",
+        score.passed ? "info" : "warn",
+        `Score: ${(score.overall * 100).toFixed(0)}% — ${score.passed ? "PASS" : "FAIL (reverting)"}`,
+        task.id,
+      );
+
+      if (score.passed) {
+        // Git commit
+        const commitHash = await gitManager.autoCommit(task.id, task.content);
+        this.log(
+          run.id,
+          "git",
+          "info",
+          `Committed: ${commitHash ? commitHash.substring(0, 7) : "unknown"} #AI commit#`,
+          task.id,
+        );
+        this.store.appendCommit(run.id, {
+          taskId: task.id,
+          runId: run.id,
+          hash: commitHash || "",
+          message: task.content,
+          isAiCommit: true,
+          timestamp: Date.now(),
+          additions: 0,
+          deletions: 0,
+        });
+        this.broadcast("git.commit", {
+          taskId: task.id,
+          runId: run.id,
+          hash: commitHash,
+          message: task.content,
+          isAiCommit: true,
+        });
+        this.store.updateTask(run.id, task.id, { status: "completed", completedAt: Date.now() });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "completed" });
+      } else {
+        // Revert changes
+        try {
+          await gitManager.checkoutClean();
+          await gitManager.revert("HEAD");
+          this.log(run.id, "git", "warn", "Reverted last commit (quality below threshold)", task.id);
+        } catch (revertErr) {
+          this.log(run.id, "git", "error", `Revert failed: ${errorToMessage(revertErr)}`, task.id);
+        }
+        this.store.updateTask(run.id, task.id, {
+          status: "failed",
+          completedAt: Date.now(),
+          errorMessage: `Score: ${(score.overall * 100).toFixed(0)}% (threshold: ${(this.config.qualityThreshold * 100).toFixed(0)}%). ${score.reasoning}`,
+        });
+        this.broadcast("task.status", { taskId: task.id, runId: run.id, status: "failed", reason: score.reasoning });
+      }
+
+      this.log(run.id, "direct", "info", `Direct task finished`, task.id);
     } catch (err) {
       const msg = errorToMessage(err);
       this.log(run.id, "direct", "error", `Direct execution failed: ${msg}`, task.id);
