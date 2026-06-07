@@ -524,7 +524,7 @@ export class CCClient {
       "stream-json",
       "--verbose",
       "--permission-mode",
-      "acceptEdits",
+      "bypassPermissions",
     );
 
     if (useStdinPrompt) {
