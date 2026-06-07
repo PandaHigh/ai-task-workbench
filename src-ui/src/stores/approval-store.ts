@@ -6,6 +6,10 @@ interface StreamMessage {
   subtype?: string;
   content?: unknown;
   timestamp?: number;
+  // tool_use specific fields from Claude CLI stream-json
+  name?: string;
+  input?: unknown;
+  tool_use_id?: string;
 }
 
 interface ApprovalStore {

@@ -150,6 +150,10 @@ export interface CCMessage {
   total_cost_usd?: number;
   duration_ms?: number;
   num_turns?: number;
+  // tool_use specific fields from Claude CLI stream-json
+  name?: string;
+  input?: unknown;
+  tool_use_id?: string;
 }
 
 export interface CCTaskResult {
