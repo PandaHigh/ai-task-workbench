@@ -170,6 +170,7 @@ export class CCClient {
 
   async executeTask(prompt: string, options: CCExecutionOptions): Promise<CCTaskResult> {
     const args = this.buildArgs(prompt, options);
+    const stdinPrompt = (options as any)._stdinPrompt as string | undefined;
     const messages: CCMessage[] = [];
     let result = "";
     let sessionId = "";
@@ -181,10 +182,16 @@ export class CCClient {
       const proc = spawn(this.claudePath, args, {
         cwd: options.workingDir,
         env: buildSafeEnv(),
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: [stdinPrompt ? "pipe" : "ignore", "pipe", "pipe"],
         detached: !isWin,
         ...(isWin ? { shell: true } : {}),
       });
+
+      // Write prompt to stdin when -p was omitted (Windows non-ASCII workaround)
+      if (stdinPrompt && proc.stdin) {
+        proc.stdin.write(stdinPrompt);
+        proc.stdin.end();
+      }
 
       if (proc.pid) trackPid(proc.pid);
 
@@ -241,14 +248,14 @@ export class CCClient {
         }
       };
 
-      proc.stdout.on("data", (chunk: Buffer) => {
+      proc.stdout!.on("data", (chunk: Buffer) => {
         stdoutBuffer += chunk.toString();
         const lines = stdoutBuffer.split("\n");
         stdoutBuffer = lines.pop() || "";
         for (const line of lines) parseAndCollect(line);
       });
 
-      proc.stderr.on("data", (chunk: Buffer) => {
+      proc.stderr!.on("data", (chunk: Buffer) => {
         stderrBuffer += chunk.toString();
       });
 
@@ -341,14 +348,21 @@ export class CCClient {
 
   async *executeTaskStream(prompt: string, options: CCExecutionOptions): AsyncGenerator<CCMessage> {
     const args = this.buildArgs(prompt, options);
+    const stdinPrompt = (options as any)._stdinPrompt as string | undefined;
 
     const proc = spawn(this.claudePath, args, {
       cwd: options.workingDir,
       env: buildSafeEnv(),
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdinPrompt ? "pipe" : "ignore", "pipe", "pipe"],
       detached: !isWin,
       ...(isWin ? { shell: true } : {}),
     });
+
+    // Write prompt to stdin when -p was omitted (Windows non-ASCII workaround)
+    if (stdinPrompt && proc.stdin) {
+      proc.stdin.write(stdinPrompt);
+      proc.stdin.end();
+    }
 
     if (proc.pid) trackPid(proc.pid);
 
@@ -384,12 +398,12 @@ export class CCClient {
     let done = false;
     let streamError: Error | null = null;
 
-    proc.stderr.on("data", (chunk: Buffer) => {
+    proc.stderr!.on("data", (chunk: Buffer) => {
       const data = chunk.toString();
       options.stderrCallback?.(data);
     });
 
-    proc.stdout.on("data", (chunk: Buffer) => {
+    proc.stdout!.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -494,15 +508,29 @@ export class CCClient {
   }
 
   private buildArgs(prompt: string, options: CCExecutionOptions): string[] {
-    const args: string[] = [
-      "-p",
-      prompt,
+    // On Windows, non-ASCII chars in -p argument cause --output-format stream-json
+    // to be ignored (plain text output instead of JSON). Workaround: pass prompt via stdin.
+    const hasNonAscii = /[\x80-￿]/.test(prompt);
+    const useStdinPrompt = isWin && hasNonAscii;
+
+    const args: string[] = [];
+
+    if (!useStdinPrompt) {
+      args.push("-p", prompt);
+    }
+
+    args.push(
       "--output-format",
       "stream-json",
       "--verbose",
       "--permission-mode",
       "acceptEdits",
-    ];
+    );
+
+    if (useStdinPrompt) {
+      // Mark for stdin piping — caller must write prompt to stdin
+      (options as any)._stdinPrompt = prompt;
+    }
 
     if (options.model) {
       args.push("--model", options.model);
