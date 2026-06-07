@@ -11,7 +11,7 @@ import * as wizardHandler from "../wizard/wizard-handler.js";
 
 import { resolve, normalize, join } from "path";
 import { homedir, tmpdir } from "os";
-import { mkdirSync } from "fs";
+import { mkdirSync, existsSync, readdirSync, readFileSync, statSync } from "fs";
 
 import { serializeGoalState } from "../lib/goal-utils.js";
 import { OMX_ROLES } from "../engine/omx-roles.js";
@@ -1470,6 +1470,180 @@ methodMeta["router.analyze"] = {
     { name: "runId", type: "string", required: true, description: "关联的 run ID" },
   ],
   category: "router",
+};
+
+// ─── Project Probe ──────────────────────────────────────────────────
+
+/** Expand ~/ and resolve a path without creating directories. */
+function expandPath(dir: string): string {
+  if (!dir || typeof dir !== "string") return dir;
+  if (dir.includes("\0")) throw new RpcValidationError("Invalid directory path");
+  const homeDir = homedir();
+  const expanded = dir.startsWith("~/") || dir.startsWith("~\\") ? homeDir + dir.slice(1) : dir === "~" ? homeDir : dir;
+  return resolve(expanded);
+}
+
+/** Check if the resolved path points to a system directory. */
+function isSystemDir(resolvedPath: string): boolean {
+  const normalizedLower = normalize(resolvedPath.toLowerCase());
+  for (const sysDir of SYSTEM_DIRS) {
+    if (
+      normalizedLower === sysDir ||
+      normalizedLower.startsWith(sysDir + "/") ||
+      normalizedLower.startsWith(sysDir + "\\")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Detect framework from package.json dependencies. */
+function detectNodeFramework(deps: Record<string, string>): string | undefined {
+  if (deps["next"]) return "next.js";
+  if (deps["nuxt"] || deps["nuxt3"]) return "nuxt";
+  if (deps["@sveltejs/kit"]) return "sveltekit";
+  if (deps["@angular/core"]) return "angular";
+  if (deps["vue"] || deps["vue3"]) return "vue";
+  if (deps["react"] || deps["react-dom"]) return "react";
+  if (deps["express"]) return "express";
+  if (deps["fastify"]) return "fastify";
+  if (deps["koa"]) return "koa";
+  if (deps["nestjs"] || deps["@nestjs/core"]) return "nestjs";
+  return undefined;
+}
+
+methodHandlers["project.probe"] = async (params) => {
+  const rawPath = requireNonEmptyString(params, "path");
+
+  let resolvedPath: string;
+  try {
+    resolvedPath = expandPath(rawPath);
+  } catch {
+    return { exists: false, error: "Invalid path format" };
+  }
+
+  // Block system directories
+  if (isSystemDir(resolvedPath)) {
+    return { exists: false, error: `Cannot probe system directory: ${resolvedPath}` };
+  }
+
+  // Block home / tmp root
+  const home = homedir().toLowerCase();
+  const tmp = tmpdir().toLowerCase();
+  const normalizedLower = normalize(resolvedPath.toLowerCase());
+  if (normalizedLower === home || normalizedLower === tmp) {
+    return { exists: false, error: `Cannot probe home or temp directory: ${resolvedPath}` };
+  }
+
+  // Check existence
+  if (!existsSync(resolvedPath)) {
+    return { exists: false, error: `Directory does not exist: ${resolvedPath}` };
+  }
+
+  // Must be a directory
+  try {
+    const st = statSync(resolvedPath);
+    if (!st.isDirectory()) {
+      return { exists: false, error: `Path is not a directory: ${resolvedPath}` };
+    }
+  } catch {
+    return { exists: false, error: `Cannot stat path: ${resolvedPath}` };
+  }
+
+  // Read top-level entries
+  let entries: string[];
+  try {
+    entries = readdirSync(resolvedPath);
+  } catch {
+    return { exists: true, path: resolvedPath, name: resolvedPath.split("/").pop() || resolvedPath, type: "unknown", error: "Cannot read directory contents" };
+  }
+
+  const entrySet = new Set(entries);
+  const name = resolvedPath.split("/").pop() || resolvedPath;
+
+  // Detect project type and framework
+  let type = "unknown";
+  let framework: string | undefined;
+
+  if (entrySet.has("package.json")) {
+    type = "node";
+    try {
+      const pkgRaw = readFileSync(join(resolvedPath, "package.json"), "utf-8");
+      const pkg = JSON.parse(pkgRaw) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+      const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+      framework = detectNodeFramework(allDeps);
+    } catch { /* ignore parse errors */ }
+  } else if (entrySet.has("go.mod")) {
+    type = "go";
+  } else if (entrySet.has("Cargo.toml")) {
+    type = "rust";
+  } else if (entrySet.has("requirements.txt") || entrySet.has("pyproject.toml") || entrySet.has("setup.py")) {
+    type = "python";
+    try {
+      if (entrySet.has("pyproject.toml")) {
+        const pyproject = readFileSync(join(resolvedPath, "pyproject.toml"), "utf-8");
+        if (pyproject.includes("django")) framework = "django";
+        else if (pyproject.includes("flask")) framework = "flask";
+        else if (pyproject.includes("fastapi")) framework = "fastapi";
+      }
+    } catch { /* ignore */ }
+  } else if (entrySet.has("pom.xml") || entrySet.has("build.gradle") || entrySet.has("build.gradle.kts")) {
+    type = "java";
+  } else if (entrySet.has("Gemfile")) {
+    type = "ruby";
+  }
+
+  // Detect hasTests
+  const hasTests =
+    entrySet.has("tests") ||
+    entrySet.has("test") ||
+    entrySet.has("__tests__") ||
+    entrySet.has("spec") ||
+    entries.some((e) => /\.(test|spec)\./.test(e)) ||
+    existsSync(join(resolvedPath, "src", "__tests__"));
+
+  // Detect hasDocker
+  const hasDocker = entrySet.has("Dockerfile") || entrySet.has("docker-compose.yml") || entrySet.has("docker-compose.yaml");
+
+  // Detect hasCI
+  const hasCI =
+    existsSync(join(resolvedPath, ".github", "workflows")) ||
+    entrySet.has(".gitlab-ci.yml") ||
+    entrySet.has("Jenkinsfile");
+
+  // Detect git remote
+  let gitRemote: string | undefined;
+  try {
+    const { execSync } = await import("child_process");
+    gitRemote = execSync("git remote get-url origin 2>/dev/null", { cwd: resolvedPath, encoding: "utf-8" }).trim() || undefined;
+  } catch { /* not a git repo or no remote */ }
+
+  // Collect top-level files for context (limit to 15, skip dotfiles and node_modules)
+  const topFiles = entries
+    .filter((e) => !e.startsWith(".") && e !== "node_modules" && e !== "__pycache__" && e !== ".git")
+    .slice(0, 15);
+
+  return {
+    exists: true,
+    path: resolvedPath,
+    name,
+    type,
+    framework,
+    hasTests,
+    hasDocker,
+    hasCI,
+    topFiles,
+    gitRemote,
+  };
+};
+
+methodMeta["project.probe"] = {
+  description: "探测指定路径的项目结构信息（项目类型、框架、测试、CI 等）",
+  params: [
+    { name: "path", type: "string", required: true, description: "要探测的目录路径" },
+  ],
+  category: "project",
 };
 
 // ─── Loop Scheduler ─────────────────────────────────────────────────────

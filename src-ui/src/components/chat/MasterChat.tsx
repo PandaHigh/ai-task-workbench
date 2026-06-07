@@ -4,7 +4,7 @@ import { useEngine } from "../../hooks/useEngine";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 
-const QUICK_HINTS = ["查看我的任务", "创建一个新任务", "某个任务的进度如何？"];
+const QUICK_HINTS = ["查看我的任务", "创建一个新任务", "某个任务的进度如何？", "帮我优化 ~/code/my-project 的性能"];
 
 export function MasterChat() {
   const { connected, call } = useEngine();

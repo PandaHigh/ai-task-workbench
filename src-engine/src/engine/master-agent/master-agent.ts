@@ -1,8 +1,8 @@
 import { CCClient } from "../../cc-integration/cc-client.js";
 import { methodHandlers } from "../../json-rpc/methods.js";
 import { buildSystemPrompt } from "./master-prompts.js";
-import { buildBrainstormSystemPrompt } from "./brainstorm-prompts.js";
-import type { BrainstormState, BrainstormPhase } from "./brainstorm-state.js";
+import { buildBrainstormSystemPrompt, buildQuickPathPrompt } from "./brainstorm-prompts.js";
+import type { BrainstormState, BrainstormPhase, QuickPathPhase } from "./brainstorm-state.js";
 
 export interface ChatChatMessage {
   role: "user" | "assistant" | "system";
@@ -69,7 +69,18 @@ export class MasterAgent {
 
     // Auto-activate brainstorming for task creation intent
     if (!session.brainstormState && this.detectTaskCreationIntent(userMessage)) {
-      session.brainstormState = { phase: "contextualizing", activatedAt: Date.now() };
+      // Check for quick-path: user message contains a project path + task intent
+      const path = this.extractProjectPath(userMessage);
+      if (path) {
+        session.brainstormState = {
+          phase: "probing",
+          activatedAt: Date.now(),
+          quickPath: true,
+          context: { workingDir: path },
+        };
+      } else {
+        session.brainstormState = { phase: "contextualizing", activatedAt: Date.now() };
+      }
       session.ccSessionId = undefined;
     }
 
@@ -95,7 +106,9 @@ export class MasterAgent {
   /** Run the agentic loop: call CC, parse tool calls, execute, feed results back. */
   private async runAgentLoop(session: MasterSession, notify: NotifyFn): Promise<string> {
     const systemPrompt = session.brainstormState
-      ? buildBrainstormSystemPrompt(session.brainstormState)
+      ? (session.brainstormState.quickPath
+        ? buildQuickPathPrompt(session.brainstormState)
+        : buildBrainstormSystemPrompt(session.brainstormState))
       : buildSystemPrompt();
     let totalToolCalls = 0;
     let accumulatedResponse = "";
@@ -268,8 +281,8 @@ export class MasterAgent {
     const lower = message.toLowerCase();
     const patterns = [
       /创建.*(任务|项目)/,
-      /帮我?(做|写|开发|实现|构建|build)/,
-      /我需要.*(做|开发|实现|build)/,
+      /帮我?(做|写|开发|实现|构建|build|改进|优化|重构|修复|测试|部署|添加|完善|清理|检查|审查|迁移)/,
+      /我需要.*(做|开发|实现|build|改进|优化|修复|测试)/,
       /新任务/,
       /我想/,
       /start.*task/i,
@@ -277,6 +290,8 @@ export class MasterAgent {
       /帮我?设计/,
       /头脑风暴/,
       /brainstorm/i,
+      /(改进|优化|重构|修复|测试|部署|添加|实现|完善|清理|检查|审查|迁移).*(项目|代码|功能|模块|服务|应用)/,
+      /(improve|optimize|refactor|fix|test|deploy|add|implement|enhance|review|migrate)\s/i,
     ];
     return patterns.some((p) => p.test(lower));
   }
@@ -286,13 +301,58 @@ export class MasterAgent {
     return /^(取消|算了|cancel|abort|不用了|停止|退出头脑风暴)$/.test(lower);
   }
 
+  /** Extract a filesystem path from user message. Returns the longest path-like match or null. */
+  private extractProjectPath(message: string): string | null {
+    // Path patterns to match
+    const patterns = [
+      // Home-relative: ~/path or ~\path
+      /~[/\\][\w\-./\\ ]+/g,
+      // Windows: C:\path or D:/path
+      /[A-Za-z]:[/\\][\w\-./\\ ]+/g,
+      // Absolute Unix paths starting with common prefixes
+      /(?:^|[\s(（"'""''])[/](?:home|Users|usr|opt|tmp|var|data|projects|code|workspace|workspaces|repos|src|dev)[/\\][\w\-./\\ ]+/g,
+      // Relative paths: ./path or ../path
+      /\.{1,2}[/\\][\w\-./\\ ]+/g,
+    ];
+
+    const candidates: string[] = [];
+
+    for (const pattern of patterns) {
+      let match: RegExpExecArray | null;
+      const regex = new RegExp(pattern.source, pattern.flags);
+      while ((match = regex.exec(message)) !== null) {
+        let candidate = match[0].trim();
+        // Strip leading whitespace/punctuation from context match
+        if (candidate.startsWith(" ") || candidate.startsWith("(") || candidate.startsWith("（") || candidate.startsWith('"') || candidate.startsWith("'") || candidate.startsWith("“") || candidate.startsWith("‘")) {
+          candidate = candidate.slice(1);
+        }
+        // Strip trailing Chinese punctuation and whitespace
+        candidate = candidate.replace(/[\s,，。、；;！!？?）)】\]》」}]+$/, "");
+        // Validate minimum length (at least 3 chars after cleanup)
+        if (candidate.length >= 3) {
+          candidates.push(candidate);
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Return the longest candidate (most specific path)
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0];
+  }
+
   private processBrainstormResponse(session: MasterSession, text: string): string {
     if (!session.brainstormState) return text;
 
     const phaseMatch = text.match(/<<PHASE:(\w+)>>/);
     if (phaseMatch) {
-      const newPhase = phaseMatch[1] as BrainstormPhase;
-      if (["contextualizing", "exploring", "approaches", "designing", "approved", "inactive"].includes(newPhase)) {
+      const newPhase = phaseMatch[1] as BrainstormPhase | QuickPathPhase;
+      const validPhases = [
+        "contextualizing", "exploring", "approaches", "designing", "approved", "inactive",
+        "probing", "refining",
+      ];
+      if (validPhases.includes(newPhase)) {
         session.brainstormState.phase = newPhase;
       }
     }

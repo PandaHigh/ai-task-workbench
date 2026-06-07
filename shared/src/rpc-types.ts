@@ -105,6 +105,7 @@ export type EngineMethod =
   | "workflow.save"
   | "wecom.status"
   | "wecom.test"
+  | "project.probe"
 ;
 
 export type EngineNotification =
