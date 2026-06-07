@@ -52,8 +52,8 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
-      # tauri-action 的 beforeBuildCommand 会自动执行 npm run build
-      # 此处只需 npm install，不需要重复 build
+      - name: build all workspaces
+        run: npm run build
 
       - name: build Tauri (Windows)
         uses: tauri-apps/tauri-action@v0
